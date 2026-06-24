@@ -1,454 +1,454 @@
-# Project Foundation
+# Projektgrundlagen
 
-## 1. Purpose of This Document
+## 1. Zweck dieses Dokuments
 
-This document defines the foundational decisions for the **Binokel Score Tracker** project. It provides a shared baseline for product direction, domain understanding, architecture, development practices, quality expectations, and delivery principles.
+Dieses Dokument hält die grundlegenden Entscheidungen für das Projekt **Binokel Score Tracker** fest. Es schafft eine gemeinsame Ausgangsbasis für Produktrichtung, Domänenverständnis, Architektur, Entwicklungspraktiken und Qualitätsansprüche.
 
-Its purpose is to ensure that future implementation decisions remain aligned with a clear product vision and a maintainable engineering approach.
+Sein Zweck ist es, sicherzustellen, dass zukünftige Implementierungsentscheidungen mit einer klaren Produktvision und einem wartbaren technischen Ansatz im Einklang bleiben.
 
 ---
 
-## 2. Product Vision
+## 2. Produktvision
 
-The **Binokel Score Tracker** is an online application for recording, managing, and reviewing scores for the traditional German card game **Binokel**.
+Der **Binokel Score Tracker** ist eine Online-Anwendung zum Erfassen, Verwalten und Nachvollziehen von Spielständen für das traditionelle deutsche Kartenspiel **Binokel**.
 
-The product should replace or improve manual scorekeeping by offering:
+Das Produkt soll das manuelle Anschreiben ersetzen oder verbessern, indem es bietet:
 
-- reliable and transparent score tracking,
-- an intuitive workflow during active play,
-- persistence of match results,
-- reduced risk of arithmetic or transcription errors,
-- a foundation for future extensions such as player history, statistics, and game variants.
+- eine zuverlässige und transparente Punkterfassung,
+- einen intuitiven Ablauf während des laufenden Spiels,
+- die Persistierung abgeschlossener Spiele,
+- ein geringeres Risiko für Rechen- oder Übertragungsfehler,
+- eine Grundlage für spätere Erweiterungen wie Spielerhistorie, Statistiken und Spielvarianten.
 
 ### Vision Statement
 
-> Build a reliable, understandable, and maintainable online score tracker for Binokel that combines strong domain clarity with modern software engineering practices such as BDD, clean architecture, automation, and testability.
+> Baue einen zuverlässigen, verständlichen und wartbaren Online-Score-Tracker für Binokel, der fachliche Klarheit mit modernen Software-Engineering-Praktiken wie BDD, sauberer Architektur, Automatisierung und testbarer Geschäftslogik verbindet.
 
 ---
 
-## 3. Project Goals
+## 3. Projektziele
 
-### Primary Goals
+### Primäre Ziele
 
-- Enable digital score tracking for Binokel games.
-- Model the essential scoring concepts of the game clearly and correctly.
-- Use **BDD with Gherkin** to describe business behavior in a shared language.
-- Establish a clean, maintainable, and testable codebase.
-- Automate quality checks and development workflows as early as possible.
+- Digitale Punkterfassung für Binokel-Spiele ermöglichen.
+- Die wesentlichen Wertungs- und Fachkonzepte des Spiels klar und korrekt modellieren.
+- **BDD mit Gherkin** nutzen, um fachliches Verhalten in einer gemeinsamen Sprache zu beschreiben.
+- Eine saubere, wartbare und testbare Codebasis aufbauen.
+- Qualitätsprüfungen und Entwicklungsabläufe so früh wie möglich automatisieren.
 
-### Secondary Goals
+### Sekundäre Ziele
 
-- Learn and evaluate practical AI-supported development workflows.
-- Create a demonstrable example of disciplined software engineering.
-- Prepare the project for future growth without premature overengineering.
-
----
-
-## 4. Non-Goals
-
-The following items are **not part of the initial project baseline** unless explicitly added later:
-
-- real-time multiplayer gameplay,
-- full implementation of all possible regional Binokel rule variations,
-- social platform features,
-- sophisticated ranking systems,
-- native mobile applications,
-- offline-first synchronization,
-- broad gamification features.
-
-These may become later roadmap items, but they are out of scope for the initial foundation and MVP.
+- Praktische, KI-gestützte Entwicklungsabläufe kennenlernen und bewerten.
+- Ein vorzeigbares Beispiel für diszipliniertes Software Engineering schaffen.
+- Das Projekt auf zukünftiges Wachstum vorbereiten, ohne vorschnell zu überengineeren.
 
 ---
 
-## 5. Target Users
+## 4. Nicht-Ziele
 
-### Primary Users
+Die folgenden Punkte gehören **nicht zur initialen Projektbasis**, sofern sie nicht später ausdrücklich ergänzt werden:
 
-- Small groups of players who want to track Binokel scores digitally during or after a game.
-- Players who want a clearer, less error-prone alternative to paper-based scorekeeping.
+- Echtzeit-Mehrspieler-Gameplay,
+- die vollständige Umsetzung aller denkbaren regionalen Binokel-Regelvarianten,
+- Social-Platform-Funktionen,
+- ausgefeilte Ranglisten-Systeme,
+- native Mobile-Apps,
+- Offline-First-Synchronisation,
+- umfassende Gamification-Funktionen.
 
-### Secondary Users
-
-- Returning players who want to review previous matches.
-- The project owner/developer as a learner and maintainer.
-
----
-
-## 6. MVP Scope
-
-The MVP should focus on the smallest coherent feature set that delivers real value.
-
-### In Scope for MVP
-
-- Create a game session.
-- Register participating players or teams.
-- Enter scoring-relevant results round by round.
-- Calculate and store cumulative scores.
-- Display the current game state clearly.
-- End a game and persist the final result.
-- Review completed games.
-
-### Explicitly Out of Scope for MVP
-
-- user accounts with complex permissions,
-- live collaboration across multiple devices,
-- advanced analytics dashboards,
-- tournament management,
-- support for many rule variants at once,
-- notification systems,
-- chat or community features.
+Diese Themen können später Teil einer Roadmap werden, liegen aber außerhalb des Umfangs der ersten Grundlage und des MVP.
 
 ---
 
-## 7. Domain Understanding
+## 5. Zielgruppen
 
-The project should model the domain explicitly instead of mixing game rules, UI behavior, and persistence logic.
+### Primäre Nutzer
 
-### Core Domain Concepts
+- Kleine Spielergruppen, die Binokel-Punkte während oder nach einem Spiel digital erfassen möchten.
+- Spieler, die eine klarere und weniger fehleranfällige Alternative zum papierbasierten Anschreiben suchen.
 
-The following concepts are expected to be central:
+### Sekundäre Nutzer
 
-- **Game** – a complete Binokel match.
-- **Round** – one scoring cycle within a game.
-- **Player** – an individual participant.
-- **Team** – if the selected Binokel mode uses teams.
-- **Score Entry** – the scoring-relevant input for a round.
-- **Total Score** – accumulated score across rounds.
-- **Rule Set** – the selected scoring interpretation or game variant.
-- **Game Status** – e.g. planned, active, completed, cancelled.
-
-### Domain Modeling Principle
-
-Domain concepts must be named consistently and implemented independently from technical concerns such as framework code, HTTP transport, or database layout.
+- Wiederkehrende Spieler, die vergangene Spiele nachverfolgen möchten.
+- Der Projekteigentümer bzw. Entwickler als Lernender und Wartender.
 
 ---
 
-## 8. Ubiquitous Language
+## 6. MVP-Umfang
 
-A shared vocabulary should be defined early and kept stable.
+Das MVP soll sich auf die kleinste zusammenhängende Funktionsmenge konzentrieren, die echten Nutzen liefert.
 
-### Initial Ubiquitous Language Candidates
+### Im MVP enthalten
 
-- **Game**: one full match
-- **Round**: one evaluated play/scoring cycle
-- **Score**: the numeric result assigned in context
-- **Score Entry**: an input record that contributes to scoring
-- **Player**: one person participating in the game
-- **Team**: grouped players if needed by rules
-- **Rule Set**: the selected set of scoring rules
-- **Standing**: current ranking within a game
-- **Final Result**: persisted outcome of a completed game
+- Ein neues Spiel anlegen.
+- Teilnehmende Spieler oder Teams erfassen.
+- Wertungsrelevante Ergebnisse rundenweise eingeben.
+- Kumulative Spielstände berechnen und speichern.
+- Den aktuellen Spielstand klar anzeigen.
+- Ein Spiel beenden und das Endergebnis persistieren.
+- Abgeschlossene Spiele nachträglich ansehen.
 
-### Rule
+### Explizit außerhalb des MVP
 
-If a domain term is ambiguous, it must be clarified in documentation before it spreads into code, tests, and UI labels.
-
----
-
-## 9. Functional Requirements
-
-At a high level, the system should support the following capabilities:
-
-1. Start a new score-tracking session.
-2. Define participants.
-3. Record scoring information per round.
-4. Calculate current totals consistently.
-5. Show current standings.
-6. Complete and archive a game.
-7. Retrieve prior completed games.
-
-### Example User Stories
-
-- As a player, I want to create a new game so that I can start tracking scores.
-- As a player, I want to enter results round by round so that the current total is always visible.
-- As a player, I want the application to calculate totals automatically so that I avoid manual calculation errors.
-- As a player, I want to review finished games so that I can understand previous results.
+- Benutzerkonten mit komplexen Berechtigungen,
+- Live-Zusammenarbeit über mehrere Geräte,
+- fortgeschrittene Analyse-Dashboards,
+- Turnierverwaltung,
+- gleichzeitige Unterstützung vieler Regelvarianten,
+- Benachrichtigungssysteme,
+- Chat- oder Community-Funktionen.
 
 ---
 
-## 10. BDD Strategy
+## 7. Domänenverständnis
 
-BDD is a central project principle, not only a testing add-on.
+Das Projekt soll die Fachdomäne ausdrücklich modellieren, anstatt Spielregeln, UI-Verhalten und Persistenzlogik miteinander zu vermischen.
 
-### Goals of BDD in This Project
+### Zentrale Fachkonzepte
 
-- Create a shared understanding of behavior before implementation.
-- Express business requirements in a readable form.
-- Connect business scenarios to executable automated checks.
-- Keep focus on observable behavior instead of internal implementation.
+Die folgenden Konzepte werden voraussichtlich zentral sein:
 
-### Gherkin Guidelines
+- **Spiel** – eine vollständige Binokel-Partie.
+- **Runde** – ein Wertungszyklus innerhalb eines Spiels.
+- **Spieler** – ein einzelner Teilnehmender.
+- **Team** – falls der gewählte Binokel-Modus mit Teams gespielt wird.
+- **Wertungseintrag** – die wertungsrelevante Eingabe für eine Runde.
+- **Gesamtstand** – der aufaddierte Punktestand über mehrere Runden.
+- **Regelwerk** – die gewählte Wertungslogik oder Spielvariante.
+- **Spielstatus** – zum Beispiel geplant, aktiv, abgeschlossen oder abgebrochen.
 
-- Features describe user-visible or business-relevant behavior.
-- Scenarios should be concrete, small, and understandable.
-- Each scenario should test one business behavior.
-- Scenario wording should use the project’s ubiquitous language.
-- Technical implementation details should not appear in business-facing Gherkin.
+### Prinzip der Domänenmodellierung
 
-### Recommended Feature Structure
-
-- One feature file per coherent business capability.
-- Clear feature description with business intent.
-- Scenarios focused on acceptance criteria.
-- Background only when it improves readability.
-
-### Separation Principle
-
-- **Gherkin** describes business intent.
-- **Integration/acceptance tests** verify behavior across boundaries.
-- **Unit tests** verify internal rules and edge cases.
+Fachbegriffe müssen konsistent benannt und unabhängig von technischen Belangen wie Framework-Code, HTTP-Transport oder Datenbanklayout umgesetzt werden.
 
 ---
 
-## 11. Architecture Principles
+## 8. Gemeinsame Fachsprache
 
-The project should prefer **simple, explicit, modular architecture**.
+Eine gemeinsame Fachsprache sollte früh definiert und stabil gehalten werden.
 
-### Recommended Architectural Direction
+### Erste Kandidaten für die gemeinsame Fachsprache
 
-A pragmatic layered or clean architecture is recommended, with clear separation between:
+- **Spiel**: eine vollständige Partie
+- **Runde**: ein ausgewerteter Spiel- bzw. Wertungszyklus
+- **Punktestand**: ein numerisches Ergebnis in einem klaren Kontext
+- **Wertungseintrag**: ein Eingabedatensatz, der zur Wertung beiträgt
+- **Spieler**: eine am Spiel teilnehmende Person
+- **Team**: eine Gruppe von Spielern, falls regelbedingt nötig
+- **Regelwerk**: die gewählte Menge an Wertungsregeln
+- **Stand**: der aktuelle kumulative Spielstand innerhalb einer Partie
+- **Endergebnis**: das persistierte Ergebnis eines abgeschlossenen Spiels
 
-- **Domain logic**
-- **Application/use-case orchestration**
-- **Infrastructure/adapters**
-- **User interface/API**
+### Regel
 
-### Architectural Rules
-
-- Business rules must not depend directly on UI or database details.
-- Framework-specific code should be isolated.
-- Side effects should be pushed to the outer layers.
-- Dependencies should point inward toward the domain.
-- Modules should be understandable and testable in isolation.
-
-### Initial Simplicity Rule
-
-Do not overengineer the first version. Use architecture to create clarity, not accidental complexity.
+Wenn ein Fachbegriff mehrdeutig ist, muss er in der Dokumentation geklärt werden, bevor er sich in Code, Tests und UI-Texten verbreitet.
 
 ---
 
-## 12. Technology Direction
+## 9. Funktionale Anforderungen
 
-Based on the current repository description, the tentative technology direction is:
+Auf hoher Ebene soll das System die folgenden Fähigkeiten unterstützen:
 
-- **Backend:** Python with Django
+1. Eine neue Score-Tracking-Sitzung starten.
+2. Teilnehmende definieren.
+3. Wertungsinformationen pro Runde erfassen.
+4. Aktuelle Gesamtstände konsistent berechnen.
+5. Den aktuellen Stand anzeigen.
+6. Ein Spiel abschließen und archivieren.
+7. Frühere abgeschlossene Spiele abrufen.
+
+### Beispielhafte User Stories
+
+- Als Spieler möchte ich ein neues Spiel anlegen, damit ich mit der Punkteerfassung beginnen kann.
+- Als Spieler möchte ich Ergebnisse rundenweise eingeben, damit der aktuelle Stand jederzeit sichtbar ist.
+- Als Spieler möchte ich, dass die Anwendung Gesamtstände automatisch berechnet, damit ich manuelle Rechenfehler vermeide.
+- Als Spieler möchte ich abgeschlossene Spiele später ansehen, damit ich frühere Ergebnisse nachvollziehen kann.
+
+---
+
+## 10. BDD-Strategie
+
+BDD ist ein zentrales Projektprinzip und nicht nur eine Ergänzung für Tests.
+
+### Ziele von BDD in diesem Projekt
+
+- Ein gemeinsames Verständnis des Verhaltens schaffen, bevor implementiert wird.
+- Fachliche Anforderungen in lesbarer Form ausdrücken.
+- Geschäftsszenarien mit ausführbaren automatisierten Prüfungen verbinden.
+- Den Fokus auf beobachtbares Verhalten statt auf interne Implementierungsdetails richten.
+
+### Gherkin-Richtlinien
+
+- Features beschreiben fachlich relevantes bzw. für Nutzer sichtbares Verhalten.
+- Szenarien sollen konkret, klein und verständlich sein.
+- Jedes Szenario soll genau ein fachliches Verhalten prüfen.
+- Die Formulierung der Szenarien soll die gemeinsame Fachsprache des Projekts verwenden.
+- Technische Implementierungsdetails gehören nicht in fachlich ausgerichtetes Gherkin.
+
+### Empfohlene Struktur für Features
+
+- Eine Feature-Datei pro zusammenhängender fachlicher Fähigkeit.
+- Eine klare Feature-Beschreibung mit fachlicher Absicht.
+- Szenarien mit Fokus auf Akzeptanzkriterien.
+- `Background` nur dann, wenn er die Lesbarkeit verbessert.
+
+### Trennungsprinzip
+
+- **Gherkin** beschreibt die fachliche Absicht.
+- **Integrations- bzw. Akzeptanztests** prüfen Verhalten über Systemgrenzen hinweg.
+- **Unit-Tests** prüfen interne Regeln und Randfälle.
+
+---
+
+## 11. Architekturprinzipien
+
+Das Projekt soll eine **einfache, explizite und modulare Architektur** bevorzugen.
+
+### Empfohlene architektonische Richtung
+
+Empfohlen wird eine pragmatische Schichten- oder Clean-Architecture mit klarer Trennung zwischen:
+
+- **Domänenlogik**
+- **Anwendungs- bzw. Use-Case-Orchestrierung**
+- **Infrastruktur bzw. Adaptern**
+- **Benutzeroberfläche bzw. API**
+
+### Architekturregeln
+
+- Fachlogik darf nicht direkt von UI- oder Datenbankdetails abhängen.
+- Framework-spezifischer Code soll isoliert werden.
+- Seiteneffekte sollen in die äußeren Schichten verschoben werden.
+- Abhängigkeiten sollen nach innen in Richtung Domäne zeigen.
+- Module sollen isoliert verständlich und testbar sein.
+
+### Regel der anfänglichen Einfachheit
+
+Die erste Version soll nicht überengineert werden. Architektur soll Klarheit schaffen, nicht unnötige Komplexität.
+
+---
+
+## 12. Technologierichtung
+
+Auf Basis der aktuellen Repository-Beschreibung ergibt sich folgende vorläufige Technologierichtung:
+
+- **Backend:** Python mit Django
 - **Frontend:** Vue
-- **Testing/BDD:** Gherkin-compatible tooling plus automated test layers
+- **Tests/BDD:** Gherkin-kompatible Werkzeuge plus automatisierte Testebenen
 
-### Technology Decision Rule
+### Regel für Technologieentscheidungen
 
-Technical choices should support:
+Technische Entscheidungen sollen unterstützen:
 
-- clarity,
-- maintainability,
-- testability,
-- deployment simplicity,
-- automation.
+- Klarheit,
+- Wartbarkeit,
+- Testbarkeit,
+- einfache Auslieferung,
+- Automatisierung.
 
-If a technology increases complexity without clear project value, it should be postponed or avoided.
-
----
-
-## 13. Non-Functional Requirements
-
-### Maintainability
-
-- Code should be readable, modular, and intentionally structured.
-- Naming should be domain-oriented and explicit.
-- Complexity should be minimized.
-
-### Testability
-
-- Domain logic must be testable without heavy framework setup.
-- Acceptance criteria should be automatable.
-- Tests should be fast enough to support frequent execution.
-
-### Reliability
-
-- Score calculations must be deterministic and verifiable.
-- Persisted results must be consistent.
-
-### Usability
-
-- Core score entry workflows must be simple and fast.
-- The UI should minimize ambiguity during active play.
-
-### Security
-
-- Even in early stages, basic secure defaults should be used.
-- Secrets must not be committed.
-- Configuration must be environment-based.
-
-### Deployability
-
-- The application should be buildable and deployable in a repeatable way.
-- Environment-specific setup should be minimized.
-
-### Observability
-
-- Logging should support debugging and operational understanding.
-- Failures should be visible and diagnosable.
+Wenn eine Technologie die Komplexität erhöht, ohne klaren Projektwert zu liefern, soll sie verschoben oder vermieden werden.
 
 ---
 
-## 14. 12-Factor App Principles
+## 13. Nicht-funktionale Anforderungen
 
-The project should align with relevant 12-factor principles where appropriate.
+### Wartbarkeit
 
-### Initial Commitments
+- Code soll lesbar, modular und bewusst strukturiert sein.
+- Benennungen sollen fachlich orientiert und eindeutig sein.
+- Komplexität soll minimiert werden.
 
-- Configuration via environment variables.
-- Clear dependency management.
-- Separation of config from code.
-- Reproducible build and run steps.
-- Stateless application processes where feasible.
-- Logs treated as event streams.
+### Testbarkeit
+
+- Domänenlogik muss ohne schwergewichtiges Framework-Setup testbar sein.
+- Akzeptanzkriterien sollen automatisierbar sein.
+- Tests sollen schnell genug sein, um häufig ausgeführt zu werden.
+
+### Zuverlässigkeit
+
+- Punktberechnungen müssen deterministisch und überprüfbar sein.
+- Persistierte Ergebnisse müssen konsistent sein.
+
+### Benutzbarkeit
+
+- Zentrale Eingabeworkflows für das Anschreiben müssen einfach und schnell sein.
+- Die UI soll Mehrdeutigkeiten während des laufenden Spiels minimieren.
+
+### Sicherheit
+
+- Auch in frühen Phasen sollen sichere Grundeinstellungen verwendet werden.
+- Geheimnisse dürfen nicht eingecheckt werden.
+- Konfiguration soll umgebungsbasiert sein.
+
+### Deploybarkeit
+
+- Die Anwendung soll reproduzierbar gebaut und ausgerollt werden können.
+- Umgebungsspezifischer Setup-Aufwand soll minimiert werden.
+
+### Beobachtbarkeit
+
+- Logging soll Debugging und Betriebsverständnis unterstützen.
+- Fehler sollen sichtbar und nachvollziehbar sein.
 
 ---
 
-## 15. Quality Standards
+## 14. 12-Factor-App-Prinzipien
+
+Das Projekt soll sich, wo sinnvoll, an relevanten 12-Factor-Prinzipien orientieren.
+
+### Erste Festlegungen
+
+- Konfiguration über Umgebungsvariablen.
+- Klare Abhängigkeitsverwaltung.
+- Trennung von Konfiguration und Code.
+- Reproduzierbare Build- und Run-Schritte.
+- Zustandsarme Anwendungsprozesse, wo möglich.
+- Logs als Ereignisströme behandeln.
+
+---
+
+## 15. Qualitätsstandards
 
 ### Definition of Done
 
-A work item is considered done only if:
+Ein Arbeitsergebnis gilt erst dann als fertig, wenn:
 
-- behavior is clearly defined,
-- acceptance criteria exist,
-- implementation is complete,
-- automated tests are added or updated,
-- code passes quality checks,
-- documentation is updated when needed,
-- the change is reviewable and understandable.
+- das Verhalten klar definiert ist,
+- Akzeptanzkriterien vorhanden sind,
+- die Implementierung abgeschlossen ist,
+- automatisierte Tests ergänzt oder angepasst wurden,
+- der Code die Qualitätsprüfungen besteht,
+- die Dokumentation bei Bedarf aktualisiert wurde,
+- die Änderung reviewbar und verständlich ist.
 
-### Coding Principles
+### Coding-Prinzipien
 
-- Prefer clarity over cleverness.
-- Keep functions and classes focused.
-- Avoid hidden coupling.
-- Use explicit naming.
-- Refactor continuously when it improves clarity.
+- Klarheit vor Cleverness.
+- Funktionen und Klassen mit klarem Fokus.
+- Versteckte Kopplung vermeiden.
+- Explizite Benennung verwenden.
+- Kontinuierlich refaktorisieren, wenn es die Klarheit verbessert.
 
-### Review Principles
+### Review-Prinzipien
 
-Reviews should check:
+In Reviews soll geprüft werden:
 
-- correctness,
-- readability,
-- alignment with architecture,
-- test coverage of intended behavior,
-- naming consistency,
-- unnecessary complexity.
-
----
-
-## 16. Test Strategy
-
-The test strategy should balance confidence, speed, and maintainability.
-
-### Test Layers
-
-- **BDD / acceptance tests** for end-to-end business behavior
-- **Integration tests** for component collaboration
-- **Unit tests** for isolated domain rules and calculations
-
-### Test Strategy Principles
-
-- Important business rules should be covered first.
-- Domain scoring logic should have strong unit-level protection.
-- Acceptance scenarios should reflect meaningful user workflows.
-- Test data should be easy to understand.
-- Fragile or overly implementation-coupled tests should be avoided.
+- Korrektheit,
+- Lesbarkeit,
+- Übereinstimmung mit der Architektur,
+- Testabdeckung des beabsichtigten Verhaltens,
+- Konsistenz der Benennung,
+- unnötige Komplexität.
 
 ---
 
-## 17. Automation and CI/CD Baseline
+## 16. Teststrategie
 
-Automation should be introduced early.
+Die Teststrategie soll ein Gleichgewicht zwischen Vertrauen, Geschwindigkeit und Wartbarkeit schaffen.
 
-### Minimum CI Expectations
+### Testebenen
 
-Every meaningful change should eventually trigger automated checks such as:
+- **BDD- bzw. Akzeptanztests** für fachliches Ende-zu-Ende-Verhalten
+- **Integrationstests** für das Zusammenspiel von Komponenten
+- **Unit-Tests** für isolierte Fachregeln und Berechnungen
 
-- dependency installation,
-- linting/format validation,
-- unit tests,
-- integration and/or acceptance tests where applicable,
-- build verification.
+### Prinzipien der Teststrategie
 
-### Pull Request Expectations
-
-Before merging, a change should:
-
-- pass automated checks,
-- be understandable in scope,
-- include tests appropriate to the change,
-- not degrade architecture or code quality.
+- Wichtige Geschäftsregeln sollen zuerst abgedeckt werden.
+- Die Domänenlogik für die Wertung soll stark auf Unit-Ebene abgesichert werden.
+- Akzeptanzszenarien sollen sinnvolle Nutzerabläufe widerspiegeln.
+- Testdaten sollen leicht verständlich sein.
+- Fragile oder zu stark an Implementierungsdetails gekoppelte Tests sollen vermieden werden.
 
 ---
 
-## 18. Documentation Strategy
+## 17. Automatisierung und CI/CD-Basis
 
-Documentation should be lightweight but deliberate.
+Automatisierung soll früh eingeführt werden.
 
-### Recommended Documentation Set
+### Mindestanforderungen an CI
 
-- `README.md` – entry point and project overview
-- `docs/project-foundation.md` – foundational decisions
-- `docs/ubiquitous-language.md` – domain vocabulary
-- `docs/architecture.md` – architectural structure and rationale
-- `docs/adr/` – architecture decision records for significant choices
+Jede sinnvolle Änderung soll perspektivisch automatisierte Prüfungen auslösen, zum Beispiel:
 
-### Documentation Rule
+- Installation der Abhängigkeiten,
+- Linting- bzw. Formatprüfungen,
+- Unit-Tests,
+- Integrations- und/oder Akzeptanztests, wo sinnvoll,
+- Build-Verifikation.
 
-Only document what helps decisions, onboarding, maintenance, or shared understanding.
+### Erwartungen an Pull Requests
 
----
+Vor dem Mergen soll eine Änderung:
 
-## 19. Assumptions
-
-The following assumptions are currently made and should be validated later:
-
-1. The initial implementation will use **Python/Django** for the backend.
-2. The initial implementation will use **Vue** for the frontend.
-3. The first target is a usable MVP for score tracking, not a full-featured game platform.
-4. A single primary Binokel rule interpretation will be supported first before addressing multiple variants.
-5. The repository owner wants a strong learning and engineering-quality focus in addition to product functionality.
+- automatisierte Prüfungen bestehen,
+- im Umfang verständlich sein,
+- dem Änderungsumfang angemessene Tests enthalten,
+- Architektur und Codequalität nicht verschlechtern.
 
 ---
 
-## 20. Open Questions
+## 18. Dokumentationsstrategie
 
-The following questions should be clarified early:
+Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 
-1. Which exact Binokel rules and scoring interpretation define version 1?
-2. Is the application focused first on local/private usage or broader public multi-user access?
-3. Are players tracked only within a game, or should persistent player profiles exist early?
-4. Will the MVP use teams, individual scoring, or both?
-5. Should authentication be part of the MVP or explicitly deferred?
-6. Which deployment target is intended first?
-7. Which BDD toolchain should be selected for Django/Vue integration?
-8. How much of the UI should be optimized for mobile-first usage during live play?
+### Empfohlenes Dokumentationsset
 
----
+- `README.md` – Einstiegspunkt und Projektüberblick
+- `docs/project-foundation.md` – grundlegende Entscheidungen
+- `docs/ubiquitous-language.md` – gemeinsame Fachsprache
+- `docs/architecture.md` – Architekturstruktur und Begründung
+- `docs/adr/` – Architecture Decision Records für wichtige Entscheidungen
 
-## 21. Recommended Next Steps
+### Dokumentationsregel
 
-1. Refine the README so that it reflects the project vision and engineering principles more clearly.
-2. Create `docs/ubiquitous-language.md` and define the first stable business vocabulary.
-3. Clarify the exact Binokel scoring rules for version 1.
-4. Derive an initial set of MVP user stories.
-5. Create the first Gherkin feature files for the highest-value workflows.
-6. Define the initial architecture/document module boundaries.
-7. Establish the first automated quality pipeline.
+Dokumentiert werden soll nur das, was Entscheidungen, Onboarding, Wartung oder gemeinsames Verständnis wirklich unterstützt.
 
 ---
 
-## 22. Guiding Principle
+## 19. Annahmen
 
-When in doubt, prefer:
+Derzeit werden die folgenden Annahmen getroffen, die später validiert werden sollten:
 
-- simpler design,
-- explicit domain language,
-- testable business logic,
-- automated quality checks,
-- incremental delivery over speculative complexity.
+1. Die erste Implementierung verwendet **Python/Django** für das Backend.
+2. Die erste Implementierung verwendet **Vue** für das Frontend.
+3. Das erste Ziel ist ein nutzbares MVP für das Anschreiben und nicht eine vollständige Spielplattform.
+4. Zunächst wird genau **eine primäre Binokel-Regelauslegung** unterstützt, bevor mehrere Varianten betrachtet werden.
+5. Der Repository-Eigentümer legt neben der Produktfunktionalität großen Wert auf Lernen und technische Qualität.
+
+---
+
+## 20. Offene Fragen
+
+Die folgenden Fragen sollten früh geklärt werden:
+
+1. Welche exakten Binokel-Regeln und welche Wertungslogik definieren Version 1?
+2. Ist die Anwendung zunächst für lokale/private Nutzung gedacht oder für breiteren öffentlichen Mehrbenutzerzugang?
+3. Werden Spieler zunächst nur innerhalb eines Spiels erfasst oder sollen früh persistente Spielerprofile existieren?
+4. Nutzt das MVP Teams, Einzelwertung oder beides?
+5. Soll Authentifizierung Teil des MVP sein oder ausdrücklich zurückgestellt werden?
+6. Welches Deployment-Ziel ist zuerst vorgesehen?
+7. Welche BDD-Toolchain soll für die Integration von Django und Vue gewählt werden?
+8. Wie stark soll die UI von Anfang an für mobile Nutzung während des Live-Spiels optimiert werden?
+
+---
+
+## 21. Empfohlene nächste Schritte
+
+1. Das README überarbeiten, damit es die Produktvision und die Engineering-Prinzipien klarer widerspiegelt.
+2. `docs/ubiquitous-language.md` erstellen und die erste stabile Fachsprache definieren.
+3. Die exakten Binokel-Regeln für Version 1 klären.
+4. Eine erste Menge an MVP-User-Stories ableiten.
+5. Die ersten Gherkin-Feature-Dateien für die wertvollsten Abläufe erstellen.
+6. Die ersten Architektur- bzw. Modulgrenzen definieren und dokumentieren.
+7. Die erste automatisierte Qualitätspipeline aufsetzen.
+
+---
+
+## 22. Leitprinzip
+
+Im Zweifel bevorzugen wir:
+
+- einfacheres Design,
+- explizite Fachsprache,
+- testbare Geschäftslogik,
+- automatisierte Qualitätssicherung,
+- inkrementelle Lieferung statt spekulativer Komplexität.
