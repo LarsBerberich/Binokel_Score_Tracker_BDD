@@ -1,169 +1,175 @@
-# Ubiquitous Language
+# Gemeinsame Fachsprache
 
-## 1. Purpose
+## 1. Zweck
 
-This document defines the shared domain vocabulary for the **Binokel Score Tracker** project.
+Dieses Dokument definiert die gemeinsame fachliche Sprache für das Projekt **Binokel Score Tracker**.
 
-Its goal is to ensure that product discussions, documentation, Gherkin scenarios, domain models, UI labels, and code all use the same terms with the same meanings.
+Ziel ist es, sicherzustellen, dass Fachgespräche, Dokumentation, Gherkin-Szenarien, Domänenmodell, UI-Bezeichnungen und Code dieselben Begriffe in derselben Bedeutung verwenden.
 
-A term that is unclear in the domain should be clarified here before it is introduced into implementation.
-
----
-
-## 2. Scope
-
-This vocabulary applies to:
-
-- product and rules discussions,
-- functional requirements,
-- BDD and Gherkin specifications,
-- backend domain models,
-- frontend UI terminology,
-- persistence naming where appropriate.
-
-The document is intentionally domain-oriented and should avoid framework-specific or technical wording where a domain term exists.
+Ein fachlicher Begriff, der unklar oder mehrdeutig ist, soll hier geklärt werden, bevor er in Implementierung, Tests oder Benutzeroberfläche übernommen wird.
 
 ---
 
-## 3. Core Modeling Principles
+## 2. Geltungsbereich
 
-1. Prefer **domain words** over technical shortcuts.
-2. Use **one term for one concept** wherever possible.
-3. Avoid synonyms in code, tests, and documentation if they refer to the same concept.
-4. If a term has multiple meanings in everyday speech, define the project-specific meaning explicitly.
-5. If local Binokel terminology and generic software terminology differ, prefer the Binokel term and explain it.
+Diese Fachsprache gilt für:
 
----
+- Produkt- und Regeldiskussionen,
+- funktionale Anforderungen,
+- BDD- und Gherkin-Spezifikationen,
+- Domänenmodell und fachnahe Backend-Logik,
+- UI-Terminologie im Frontend,
+- fachnahe Persistenzbenennung, wo sinnvoll.
 
-## 4. Core Terms
+Das Dokument ist bewusst fachlich ausgerichtet und soll framework-spezifische oder rein technische Begriffe vermeiden, wenn ein passender Fachbegriff existiert.
 
-### 4.1 Game
+## Sprachliche Anwendung im Projekt
 
-A **Game** is one complete Binokel match from start to finish.
+Die in diesem Dokument definierte gemeinsame Fachsprache wird durch die Sprachkonventionen in `docs/language-conventions.md` ergänzt.
 
-A game includes:
-- the participating players,
-- the selected rule set,
-- a sequence of rounds,
-- the current standings,
-- a final outcome.
-
-**Use in code/docs:** `Game`
-
-**Do not confuse with:**
-- a single round,
-- a single hand,
-- a generic app session.
+Während dieses Dokument die fachlich bevorzugten Begriffe beschreibt, legt `docs/language-conventions.md` fest, wie diese Begriffe in Dokumentation, Gherkin, Domänenmodell, technischer Infrastruktur und sonstigen Code-Artefakten verwendet werden sollen.
 
 ---
 
-### 4.2 Round
+## 3. Grundprinzipien der Modellierung
 
-A **Round** is one scoring cycle within a game.
-
-A round captures the scoring-relevant outcome of one played deal or one evaluated unit of play, depending on the selected Binokel rule interpretation.
-
-A round may include:
-- dealer information,
-- active players,
-- bidder / game maker,
-- bid value,
-- meld values,
-- trick points,
-- Mit points,
-- special outcomes such as successful play, simple loss, double loss, or Tausender.
-
-**Use in code/docs:** `Round`
-
-**Do not confuse with:**
-- a turn in the UI,
-- a full game.
+1. Fachbegriffe haben Vorrang vor technischen Abkürzungen.
+2. Ein Begriff soll möglichst genau ein Konzept bezeichnen.
+3. Synonyme sollen in Code, Tests und Dokumentation vermieden werden, wenn sie dasselbe meinen.
+4. Wenn ein Begriff im Alltag mehrere Bedeutungen hat, gilt die projektspezifische Definition aus diesem Dokument.
+5. Wenn sich lokale Binokel-Begriffe und allgemeine Softwarebegriffe unterscheiden, wird der Binokel-Begriff bevorzugt und bei Bedarf erläutert.
 
 ---
 
-### 4.3 Player
+## 4. Kernbegriffe
 
-A **Player** is one person participating in a game.
+### 4.1 Spiel
 
-For MVP, a player is primarily a scoring participant. Persistent player profiles may be added later, but the domain term remains the same.
+Ein **Spiel** ist eine vollständige Binokel-Partie vom Anfang bis zum Ende.
 
-**Use in code/docs:** `Player`
+Ein Spiel umfasst:
+- die teilnehmenden Spieler,
+- das gewählte Regelwerk,
+- eine Folge von Runden,
+- die aktuellen Punktestände,
+- ein Endergebnis.
 
-**Do not confuse with:**
-- a user account,
-- an authenticated system user.
+**Bevorzugte Verwendung im Code:** `Spiel`
 
----
-
-### 4.4 Dealer
-
-The **Dealer** is the player who deals for a round.
-
-In the currently documented 4-player interpretation, the dealer sits out during the round while the other three players are active.
-
-**Use in code/docs:** `Dealer` or `dealer`
-
-**Note:** This behavior belongs to the selected rule set and must not be assumed for every future variant.
+**Nicht verwechseln mit:**
+- einer einzelnen Runde,
+- einem einzelnen Blatt,
+- einer technischen Anwendungssitzung.
 
 ---
 
-### 4.5 Active Player
+### 4.2 Runde
 
-An **Active Player** is a player who participates directly in the current round.
+Eine **Runde** ist ein Wertungszyklus innerhalb eines Spiels.
 
-In the currently documented 4-player interpretation:
-- 3 players are active,
-- 1 player is dealer and inactive for that round.
+Eine Runde erfasst das wertungsrelevante Ergebnis eines gespielten Gebens oder einer ausgewerteten Spieleinheit – abhängig vom gewählten Binokel-Regelwerk.
 
-**Use in code/docs:** `Active Player`
+Eine Runde kann enthalten:
+- Informationen zum Geber,
+- aktive Spieler,
+- Reizenden bzw. Spielmacher,
+- Reizwert,
+- Meldewerte,
+- Stichpunkte,
+- Mitpunkte,
+- besondere Ausgänge wie gewonnenes Spiel, einfaches Abgehen, doppeltes Abgehen oder Tausender.
 
----
+**Bevorzugte Verwendung im Code:** `Runde`
 
-### 4.6 Rule Set
-
-A **Rule Set** is the explicit scoring and gameplay interpretation used for a game.
-
-It defines, for example:
-- player mode,
-- scoring rules,
-- bidding consequences,
-- end conditions,
-- special cases,
-- variant-specific terminology.
-
-**Use in code/docs:** `Rule Set`
-
-**Important:** Rules must not be hidden in scattered conditionals; they belong conceptually to a rule set.
+**Nicht verwechseln mit:**
+- einem UI-Schritt,
+- einem vollständigen Spiel.
 
 ---
 
-### 4.7 Score Entry
+### 4.3 Spieler
 
-A **Score Entry** is the structured input recorded for a round and a player.
+Ein **Spieler** ist eine Person, die an einem Spiel teilnimmt.
 
-It contains the scoring-relevant values needed to evaluate and display the round result.
+Im MVP ist ein Spieler primär ein fachlicher Wertungsteilnehmer. Persistente Spielerprofile können später ergänzt werden, ohne den Fachbegriff zu verändern.
 
-Depending on the rule set, a score entry may contain:
-- meld points,
-- trick points,
-- Mit points,
-- penalty values,
-- star markers,
-- explanatory status information.
+**Bevorzugte Verwendung im Code:** `Spieler`
 
-**Use in code/docs:** `ScoreEntry`
-
-**Do not confuse with:**
-- cumulative standing,
-- raw UI form state.
+**Nicht verwechseln mit:**
+- einem Benutzerkonto,
+- einem authentifizierten Systemnutzer.
 
 ---
 
-### 4.8 Meld
+### 4.4 Geber
 
-A **Meld** is a declared card combination that awards points according to the rule set.
+Der **Geber** ist der Spieler, der in einer Runde die Karten gibt.
 
-Examples from the documented rules include:
+In der derzeit dokumentierten 4-Spieler-Auslegung setzt der Geber in der Runde aus, während die drei anderen Spieler aktiv sind.
+
+**Bevorzugte Verwendung im Code:** `Geber`
+
+**Hinweis:** Dieses Verhalten gehört zum gewählten Regelwerk und darf nicht pauschal für alle künftigen Varianten angenommen werden.
+
+---
+
+### 4.5 Aktiver Spieler
+
+Ein **aktiver Spieler** ist ein Spieler, der in der aktuellen Runde direkt mitspielt.
+
+In der derzeit dokumentierten 4-Spieler-Auslegung gilt:
+- 3 Spieler sind aktiv,
+- 1 Spieler ist Geber und in dieser Runde nicht aktiv.
+
+**Bevorzugte Verwendung im Code:** `AktiverSpieler` oder fachlich über Rollenmodell
+
+---
+
+### 4.6 Regelwerk
+
+Ein **Regelwerk** ist die ausdrücklich festgelegte Spiel- und Wertungslogik, die für ein Spiel gilt.
+
+Es bestimmt zum Beispiel:
+- den Spielmodus,
+- Wertungsregeln,
+- Folgen des Reizens,
+- Endbedingungen,
+- Sonderfälle,
+- variantenspezifische Begriffe.
+
+**Bevorzugte Verwendung im Code:** `Regelwerk`
+
+**Wichtig:** Regeln dürfen nicht versteckt in verstreuten Bedingungsblöcken liegen, sondern gehören fachlich in ein klar benanntes Regelwerk.
+
+---
+
+### 4.7 Wertungseintrag
+
+Ein **Wertungseintrag** ist die strukturierte Eingabe, die für eine Runde und einen Spieler erfasst wird.
+
+Er enthält die wertungsrelevanten Angaben, die benötigt werden, um das Rundenresultat auszuwerten und darzustellen.
+
+Je nach Regelwerk kann ein Wertungseintrag enthalten:
+- Meldepunkte,
+- Stichpunkte,
+- Mitpunkte,
+- Strafwerte,
+- Sterne,
+- erläuternde Statusinformationen.
+
+**Bevorzugte Verwendung im Code:** `Wertungseintrag`
+
+**Nicht verwechseln mit:**
+- dem kumulierten Punktestand,
+- dem rohen Zustand eines Eingabeformulars.
+
+---
+
+### 4.8 Meldung
+
+Eine **Meldung** ist eine angesagte Kartenkombination, die gemäß Regelwerk Punkte bringt.
+
+Beispiele aus den dokumentierten Regeln sind:
 - Paar,
 - Trumpf-Paar,
 - Binokel,
@@ -171,342 +177,323 @@ Examples from the documented rules include:
 - Rundlauf,
 - Doppelter Binokel.
 
-**Use in code/docs:** `Meld`
+**Bevorzugte Verwendung im Code:** `Meldung`
 
-**Related term:** `Meld Points`
-
----
-
-### 4.9 Meld Points
-
-**Meld Points** are the points awarded for valid melds in a round.
-
-In the existing scoring examples, this is the **M** column.
-
-**Use in code/docs:** `Meld Points`
-
-**Important:** Whether meld points count may depend on round outcome rules, such as the stitch obligation or special loss scenarios.
+**Zugehöriger Begriff:** `Meldepunkte`
 
 ---
 
-### 4.10 Trick Points
+### 4.9 Meldepunkte
 
-**Trick Points** are the points earned from tricks during play.
+**Meldepunkte** sind die Punkte, die für gültige Meldungen in einer Runde vergeben werden.
 
-In the existing scoring examples, this is the **S** column.
+In den bisherigen Wertungsbeispielen entspricht dies der Spalte **M**.
 
-**Use in code/docs:** `Trick Points`
+**Bevorzugte Verwendung im Code:** `meldepunkte`
 
-**Do not confuse with:**
-- meld points,
-- cumulative total score.
+**Wichtig:** Ob Meldepunkte tatsächlich zählen, kann von Regeln wie dem Stich-Zwang oder besonderen Verlustfällen abhängen.
 
 ---
 
-### 4.11 Mit Points
+### 4.10 Stichpunkte
 
-**Mit Points** are bonus points awarded to opponents in certain loss scenarios of the game maker.
+**Stichpunkte** sind die Punkte, die durch gewonnene Stiche erzielt werden.
 
-In the documented rules, this is the **Mit** column and is currently described as `+30` in simple and double loss scenarios for the opponents.
+In den bisherigen Wertungsbeispielen entspricht dies der Spalte **S**.
 
-**Use in code/docs:** `Mit Points`
+**Bevorzugte Verwendung im Code:** `stichpunkte`
 
-**Important:** This is a domain-specific term and should not be translated into a vague generic label such as `bonus` without preserving its Binokel meaning.
-
----
-
-### 4.12 Standing
-
-The **Standing** is the cumulative score state of a player within an ongoing or completed game.
-
-It reflects the running total after each round.
-
-In the documented table example, this is the **STAND** row.
-
-**Use in code/docs:** `Standing`
-
-**Do not confuse with:**
-- a single round result,
-- ranking across many games.
+**Nicht verwechseln mit:**
+- Meldepunkten,
+- dem kumulierten Punktestand.
 
 ---
 
-### 4.13 Final Result
+### 4.11 Mitpunkte
 
-The **Final Result** is the persisted outcome of a completed game.
+**Mitpunkte** sind Zusatzpunkte, die Gegner in bestimmten Verlustfällen des Spielmachers erhalten.
 
-It includes at least:
-- the final standings,
-- the winner or winning condition,
-- the rule set used,
-- the completed sequence of rounds.
+In den dokumentierten Regeln entspricht dies der Spalte **Mit** und ist derzeit als `+30` für die Gegner bei einfachem und doppeltem Abgehen beschrieben.
 
-**Use in code/docs:** `Final Result`
+**Bevorzugte Verwendung im Code:** `mitpunkte`
+
+**Wichtig:** Dies ist ein fachlich geprägter Begriff und sollte nicht unklar in generische Wörter wie `Bonus` übersetzt werden.
 
 ---
 
-### 4.14 Bid
+### 4.12 Punktestand
 
-A **Bid** is the announced value a player commits to achieve as game maker.
+Der **Punktestand** ist der kumulierte Wertungsstand eines Spielers innerhalb eines laufenden oder abgeschlossenen Spiels.
 
-The documented rules also use the terms:
-- `gereizt bis`,
-- `Reizwert`.
+Er bildet den aufaddierten Stand nach jeder Runde ab.
 
-For English domain documentation, the preferred general term is **Bid**. For German-facing rule documentation and UI, `Reizwert` may be retained where it is clearer to target users.
+In den dokumentierten Tabellenbeispielen entspricht dies der Zeile **STAND**.
 
-**Use in code/docs:** `Bid`
+**Bevorzugte Verwendung im Code:** `Punktestand`
 
-**Synonym mapping:**
-- `Reizwert` → `Bid`
-- `gereizt bis` → `Bid`
+**Nicht verwechseln mit:**
+- einem einzelnen Rundenergebnis,
+- einer Rangliste über mehrere Spiele hinweg.
 
 ---
 
-### 4.15 Game Maker
+### 4.13 Endergebnis
 
-The **Game Maker** is the player who wins the bidding and must fulfill the bid.
+Das **Endergebnis** ist das persistierte Ergebnis eines abgeschlossenen Spiels.
 
-In German rule terminology, this is close to the role of the player who `spielt`.
+Es umfasst mindestens:
+- die endgültigen Punktestände,
+- den Gewinner bzw. die Gewinnbedingung,
+- das verwendete Regelwerk,
+- die abgeschlossene Folge von Runden.
 
-**Use in code/docs:** `Game Maker`
-
-**Possible German synonym in documentation:** `Spielmacher`
-
----
-
-### 4.16 Successful Game
-
-A **Successful Game** means the game maker reaches the required target and wins the round according to the rule set.
-
-In this outcome:
-- the game maker scores the actual round result,
-- opponents score according to their eligible points,
-- no Mit points are awarded.
-
-**Use in code/docs:** `Successful Game`
+**Bevorzugte Verwendung im Code:** `Endergebnis`
 
 ---
 
-### 4.17 Simple Loss
+### 4.14 Reizwert
 
-A **Simple Loss** is the scenario where the game maker gives up the game before the first trick after seeing the Dapp.
+Der **Reizwert** ist der angesagte Wert, den ein Spieler als Spielmacher erfüllen muss.
 
-In the documented German rules, this corresponds to **einfaches Abgehen**.
+In Quellen und Tabellen kann auch von:
+- `gereizt bis`
+- `Wert`
 
-**Use in code/docs:** `Simple Loss`
+gesprochen werden.
 
-**German synonym mapping:**
-- `einfaches Abgehen` → `Simple Loss`
+Im Projekt wird fachlich **Reizwert** bevorzugt.
+
+**Bevorzugte Verwendung im Code:** `reizwert`
 
 ---
 
-### 4.18 Double Loss
+### 4.15 Spielmacher
 
-A **Double Loss** is the scenario where the game maker plays the round but fails to reach the bid.
+Der **Spielmacher** ist der Spieler, der das Reizen gewinnt und das Spiel erfüllen muss.
 
-In the documented German rules, this corresponds to **doppeltes Abgehen**.
+**Bevorzugte Verwendung im Code:** `Spielmacher`
 
-**Use in code/docs:** `Double Loss`
+---
 
-**German synonym mapping:**
-- `doppeltes Abgehen` → `Double Loss`
+### 4.16 Gewonnenes Spiel
+
+Ein **gewonnenes Spiel** liegt vor, wenn der Spielmacher das geforderte Ziel erreicht und die Runde gemäß Regelwerk erfolgreich abschließt.
+
+In diesem Fall gilt:
+- der Spielmacher erhält sein tatsächliches Rundenergebnis,
+- die Gegner erhalten ihre zulässigen Punkte,
+- es werden keine Mitpunkte vergeben.
+
+**Bevorzugte Verwendung im Code:** `GewonnenesSpiel` oder Ausprägung des Rundenausgangs
+
+---
+
+### 4.17 Einfaches Abgehen
+
+**Einfaches Abgehen** ist der Fall, in dem der Spielmacher das Spiel nach Sicht des Dapps vor dem ersten Stich aufgibt.
+
+**Bevorzugte Verwendung im Code:** `EinfachesAbgehen`
+
+---
+
+### 4.18 Doppeltes Abgehen
+
+**Doppeltes Abgehen** ist der Fall, in dem der Spielmacher ausspielt, aber den Reizwert nicht erreicht.
+
+**Bevorzugte Verwendung im Code:** `DoppeltesAbgehen`
 
 ---
 
 ### 4.19 Tausender
 
-A **Tausender** is a special announced game outcome defined by the selected rule set.
+Ein **Tausender** ist ein besonderer angesagter Spielausgang gemäß dem gewählten Regelwerk.
 
-In the currently documented version:
-- normal point scoring is frozen,
-- no meld points are counted,
-- no trick points are counted,
-- no Mit points are counted,
-- a star is awarded depending on success or failure.
+In der derzeit dokumentierten Fassung gilt:
+- normale Punktewertung wird eingefroren,
+- keine Meldepunkte werden gezählt,
+- keine Stichpunkte werden gezählt,
+- keine Mitpunkte werden gezählt,
+- je nach Erfolg oder Misserfolg wird ein Stern vergeben.
 
-**Use in code/docs:** `Tausender`
+**Bevorzugte Verwendung im Code:** `Tausender`
 
-Because this is a highly domain-specific term, it should remain untranslated unless a later product decision introduces a user-facing alias.
-
----
-
-### 4.20 Star
-
-A **Star** is a non-numeric success marker awarded in the Tausender scenario.
-
-In the documented rules, this is shown as `★`.
-
-**Use in code/docs:** `Star`
-
-**Important:** A star is not the same as score points and must not be modeled as normal round score.
+Da dies ein stark fachgeprägter Begriff ist, soll er nicht ohne guten Grund übersetzt werden.
 
 ---
 
-### 4.21 Stitch Obligation
+### 4.20 Stern
 
-The **Stitch Obligation** is the rule that a player must win at least one trick for meld points to count.
+Ein **Stern** ist ein nicht-numerischer Erfolgsmarker im Zusammenhang mit dem Tausender.
 
-In the documented rules:
-- normally, a player with zero tricks loses their meld points,
-- in game-maker loss scenarios, opponents may keep their meld points even with zero tricks.
+In den dokumentierten Regeln wird er als `★` dargestellt.
 
-**Use in code/docs:** `Stitch Obligation`
+**Bevorzugte Verwendung im Code:** `Stern`
 
-**German synonym mapping:**
-- `Stich-Zwang` → `Stitch Obligation`
+**Wichtig:** Ein Stern ist nicht dasselbe wie normale Punkte und darf fachlich nicht als gewöhnlicher Zahlenwert modelliert werden.
 
 ---
 
-### 4.22 Game Status
+### 4.21 Stich-Zwang
 
-The **Game Status** describes the lifecycle state of a game.
+Der **Stich-Zwang** ist die Regel, dass ein Spieler mindestens einen Stich gewinnen muss, damit seine Meldepunkte zählen.
 
-Initial candidate values:
-- `planned`
-- `active`
-- `completed`
-- `cancelled`
+In den dokumentierten Regeln gilt:
+- normalerweise verfallen Meldepunkte bei 0 Stichen,
+- bei Verlustfällen des Spielmachers können Gegner ihre Meldepunkte auch ohne eigenen Stich behalten.
 
-**Use in code/docs:** `Game Status`
+**Bevorzugte Verwendung im Code:** `StichZwang`
 
 ---
 
-### 4.23 Round Outcome
+### 4.22 Spielstatus
 
-The **Round Outcome** is the classified result type of a round.
+Der **Spielstatus** beschreibt den Lebenszykluszustand eines Spiels.
 
-Initial candidate values based on current documentation:
-- `successful_game`
-- `simple_loss`
-- `double_loss`
-- `tausender_success`
-- `tausender_failure`
+Erste Kandidaten sind:
+- `geplant`
+- `aktiv`
+- `abgeschlossen`
+- `abgebrochen`
 
-**Use in code/docs:** `Round Outcome`
-
-This helps separate business meaning from raw numeric values.
+**Bevorzugte Verwendung im Code:** `Spielstatus`
 
 ---
 
-## 5. Preferred Term Mappings
+### 4.23 Rundenausgang
 
-The project may use German terms in source material and player-facing wording, but implementation and shared engineering documents should prefer stable mappings.
+Der **Rundenausgang** beschreibt die fachlich klassifizierte Ergebnisart einer Runde.
 
-| Source / informal term | Preferred project term |
+Erste Kandidaten auf Basis der bisherigen Dokumentation sind:
+- `gewonnenes_spiel`
+- `einfaches_abgehen`
+- `doppeltes_abgehen`
+- `tausender_gewonnen`
+- `tausender_verloren`
+
+**Bevorzugte Verwendung im Code:** `Rundenausgang`
+
+Dies hilft dabei, fachliche Bedeutung von bloßen Zahlenwerten zu trennen.
+
+---
+
+## 5. Bevorzugte Begriffsmappings
+
+Im Projekt können deutsche Begriffe, Quellbegriffe und informelle Begriffe nebeneinander vorkommen. Für die gemeinsame Fachsprache gelten die folgenden bevorzugten Zuordnungen:
+
+| Quell- oder Alltagsbegriff | Bevorzugter Projektbegriff |
 | --- | --- |
-| Match | Game |
-| Session | Game, only if it truly means a play session |
-| Spiel | Game |
-| Runde | Round |
-| Anschreiben | Score Tracking / Score Entry depending on context |
-| Spielmacher | Game Maker |
-| Gereizt bis | Bid |
-| Reizwert | Bid |
-| M | Meld Points |
-| S | Trick Points |
-| Mit | Mit Points |
-| Stand | Standing |
-| Abgehen einfach | Simple Loss |
-| Abgehen doppelt | Double Loss |
-| Stich-Zwang | Stitch Obligation |
+| Match | Spiel |
+| Session | Spiel, nur wenn wirklich eine Spielsession gemeint ist |
+| Spiel | Spiel |
+| Runde | Runde |
+| Anschreiben | Punkteerfassung oder Wertungseintrag, je nach Kontext |
+| Spielmacher | Spielmacher |
+| Gereizt bis | Reizwert |
+| Wert | Reizwert, wenn fachlich der Reizwert gemeint ist |
+| M | Meldepunkte |
+| S | Stichpunkte |
+| Mit | Mitpunkte |
+| Stand | Punktestand |
+| Abgehen einfach | Einfaches Abgehen |
+| Abgehen doppelt | Doppeltes Abgehen |
+| Stich-Zwang | Stich-Zwang |
 
 ---
 
-## 6. Terms to Avoid or Use Carefully
+## 6. Begriffe, die vermieden oder vorsichtig verwendet werden sollen
 
 ### 6.1 Session
 
-Use **Session** carefully.
+**Session** soll nur vorsichtig verwendet werden.
 
-In software, session can mean:
-- browser session,
-- login session,
-- application runtime session,
-- game session.
+In der Software kann Session bedeuten:
+- Browser-Session,
+- Login-Session,
+- Laufzeit-Session,
+- Spiel-Session.
 
-For the domain, prefer:
-- **Game** for a full match,
-- **Round** for a scoring cycle.
+Für die Fachdomäne sind in der Regel präziser:
+- **Spiel** für eine vollständige Partie,
+- **Runde** für einen Wertungszyklus.
 
 ---
 
 ### 6.2 Score
-n
-Use **Score** only when the context is clear.
 
-It may otherwise refer to:
-- round result,
-- cumulative standing,
-- points from a meld,
-- points from tricks,
-- final result.
+**Score** soll nur verwendet werden, wenn der Kontext absolut eindeutig ist.
 
-Prefer the more precise term when possible:
-- Meld Points
-- Trick Points
-- Standing
-- Final Result
-- Score Entry
+Der Begriff kann sonst meinen:
+- Rundenergebnis,
+- kumulierten Punktestand,
+- Meldepunkte,
+- Stichpunkte,
+- Endergebnis.
 
----
-
-### 6.3 User
-
-Avoid **User** as a synonym for **Player** unless the feature truly concerns authentication or application identity.
-
-A player is a domain role. A user account is a technical/application concept.
+Präziser sind je nach Kontext:
+- Meldepunkte
+- Stichpunkte
+- Punktestand
+- Endergebnis
+- Wertungseintrag
 
 ---
 
-## 7. Initial Candidate Enumerations
+### 6.3 Benutzer
 
-These are not final implementation details, but they are useful vocabulary anchors.
+**Benutzer** soll nicht als Synonym für **Spieler** verwendet werden, es sei denn, es geht tatsächlich um Authentifizierung oder technische Identität.
 
-### 7.1 Game Status
-
-- planned
-- active
-- completed
-- cancelled
-
-### 7.2 Round Outcome
-
-- successful_game
-- simple_loss
-- double_loss
-- tausender_success
-- tausender_failure
-
-### 7.3 Participant Role in Round
-
-- dealer
-- active_player
-- game_maker
+Ein Spieler ist eine fachliche Rolle. Ein Benutzerkonto ist ein technisches Anwendungskonzept.
 
 ---
 
-## 8. Open Vocabulary Questions
+## 7. Erste fachliche Kandidaten für Aufzählungstypen
 
-The following terms still require joint clarification before implementation hardens them:
+Dies sind noch keine endgültigen Implementierungsdetails, aber nützliche sprachliche Anker.
 
-1. Should the MVP vocabulary be primarily English in code and documentation, while preserving German terms in rule annexes?
-2. Is `Game Maker` the best long-term English term, or should `Declarer` / `Bid Winner` be preferred?
-3. Should `Stitch Obligation` remain the preferred English term, or is there a better wording closer to common card-game language?
-4. Should `Mit Points` remain untranslated because it is domain-familiar, or should a more descriptive English term be introduced?
-5. Do we need explicit vocabulary for teams in MVP, or is individual scoring the only V1 target?
+### 7.1 Spielstatus
+
+- geplant
+- aktiv
+- abgeschlossen
+- abgebrochen
+
+### 7.2 Rundenausgang
+
+- gewonnenes_spiel
+- einfaches_abgehen
+- doppeltes_abgehen
+- tausender_gewonnen
+- tausender_verloren
+
+### 7.3 Rollen in einer Runde
+
+- geber
+- aktiver_spieler
+- spielmacher
 
 ---
 
-## 9. Usage Rule
+## 8. Offene Fragen zur Fachsprache
 
-Before introducing a new business term in:
-- code,
-- tests,
+Die folgenden Punkte sollten gemeinsam geklärt werden, bevor die Begriffe zu fest in Implementierung und Tests verankert werden:
+
+1. Soll das MVP konsequent deutsch benannt bleiben – auch in fachnahen Code-Artefakten?
+2. Soll `Punktestand` der bevorzugte Begriff bleiben oder soll in einzelnen Kontexten weiterhin `Stand` verwendet werden?
+3. Soll `Wertungseintrag` der dauerhafte Begriff sein oder ist `Anschreibeeintrag` in dieser Domäne näher an der Fachpraxis?
+4. Brauchen wir für das MVP bereits explizite Fachbegriffe für Teams oder ist Einzelwertung die einzige V1-Zielausprägung?
+5. Welche Begriffe aus dem aktuellen Regelwerk müssen vor der Implementierung noch weiter präzisiert werden?
+
+---
+
+## 9. Anwendungsregel
+
+Bevor ein neuer fachlicher Begriff in:
+- Code,
+- Tests,
 - Gherkin,
-- UI labels,
-- architecture documents,
+- UI-Texten,
+- Architektur- oder Regeldokumenten
 
-check whether the concept already exists in this document.
+eingeführt wird, ist zu prüfen, ob das zugrunde liegende Konzept bereits in diesem Dokument definiert ist.
 
-If not, add or clarify the term here first when the concept is central to the domain.
+Falls nicht, soll der Begriff hier ergänzt oder präzisiert werden, wenn er für die Domäne zentral ist.
