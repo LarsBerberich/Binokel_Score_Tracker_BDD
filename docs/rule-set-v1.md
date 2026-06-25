@@ -124,7 +124,7 @@ Dies dient als fachliche Kontrollsumme.
 
 Der **Dapp** sind die 4 verdeckten Karten, um die gereizt wird.
 
-Bei 40 Karten erhalten die 4 Spieler zunächst zusammen 36 Karten. Die verbleibenden 4 Karten bilden den Dapp.
+Bei 40 Karten erhalten die 3 aktiven Spieler, also ohne Geber, zunächst zusammen 36 Karten. Die verbleibenden 4 Karten bilden den Dapp.
 
 ### 6.2 Spielmacher
 
