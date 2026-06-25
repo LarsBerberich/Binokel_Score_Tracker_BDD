@@ -127,6 +127,12 @@ Fachbegriffe müssen konsistent benannt und unabhängig von technischen Belangen
 
 Eine gemeinsame Fachsprache sollte früh definiert und stabil gehalten werden.
 
+### Verweis auf Sprachkonventionen
+
+Die gemeinsame Fachsprache des Projekts wird in `docs/ubiquitous-language.md` definiert.
+
+Die konkrete Anwendung dieser Fachsprache in Dokumentation, Gherkin, Domänenmodell und technischen Artefakten wird in `docs/language-conventions.md` festgelegt.
+
 ### Erste Kandidaten für die gemeinsame Fachsprache
 
 - **Spiel**: eine vollständige Partie
@@ -320,6 +326,7 @@ Ein Arbeitsergebnis gilt erst dann als fertig, wenn:
 - die Dokumentation bei Bedarf aktualisiert wurde,
 - die Änderung reviewbar und verständlich ist.
 
+
 ### Coding-Prinzipien
 
 - Klarheit vor Cleverness.
@@ -327,6 +334,7 @@ Ein Arbeitsergebnis gilt erst dann als fertig, wenn:
 - Versteckte Kopplung vermeiden.
 - Explizite Benennung verwenden.
 - Kontinuierlich refaktorisieren, wenn es die Klarheit verbessert.
+- Benennungen sollen der definierten gemeinsamen Fachsprache und den Sprachkonventionen des Projekts folgen.
 
 ### Review-Prinzipien
 
@@ -338,6 +346,7 @@ In Reviews soll geprüft werden:
 - Testabdeckung des beabsichtigten Verhaltens,
 - Konsistenz der Benennung,
 - unnötige Komplexität.
+- Benennungen sollen der definierten gemeinsamen Fachsprache und den Sprachkonventionen des Projekts folgen.
 
 ---
 
