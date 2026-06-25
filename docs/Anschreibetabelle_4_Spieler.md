@@ -105,4 +105,3 @@ $$\text{Neuer STAND} = \text{Vorheriger STAND} + \text{negativer Verlustwert in 
 
 
 
-
