@@ -66,12 +66,46 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
-## Auftrag für weitere Gherkin-Arbeit
-Bitte die Feature-Dateien unter `features/` entlang des V1-Regelwerks weiter ausarbeiten.
+## Stand 26.06.2026
 
-Ziele:
-- deutsche Fachbegriffe konsistent verwenden
-- Features fachlich klar schneiden
-- Szenarien gut lesbar formulieren
-- zunächst keine technischen Step-Definitionen annehmen
-- `docs/rule-set-v1.md` als normative Hauptquelle behandeln
+### Abgeschlossen
+Die Gherkin-Arbeit an den Feature-Dateien ist abgeschlossen.
+
+Alle sechs Feature-Dateien unter `features/` enthalten konkrete Szenarien:
+- `spiel_anlegen.feature`
+- `runde_normales_spiel.feature`
+- `runde_einfaches_abgehen_auswerten.feature`
+- `runde_deoppeltes_abgehen.feature`
+- `runde_tausender.feature`
+- `spielende_und_siegerermittlung.feature`
+
+Zusätzlich wurde `docs/gherkin-step-phrase-reference-v1.md` angelegt.
+Sie enthält alle kanonischen Step-Phrasen als Referenz für die spätere Testautomation.
+
+### Wichtige Sprachregeln für Gherkin
+- Rundenausgang wird ausschließlich über Zielerreichung des Spielmachers bestimmt.
+- Stich-Zwang ist eine Zählregel für Meldepunkte, keine Gewinnbedingung.
+- Gegenspieler können fachlich nicht verlieren; sie sammeln nur Punkte.
+- Terminologie: "geht ab", nicht "gibt ab".
+- Doppeltes Abgehen: Runde wird regulär vollständig ausgespielt.
+- Kein Szenario "Spielmacher mit 0 Stichen" in normaler Runde (würde in der Praxis zum einfachen Abgehen führen).
+
+### Offene Todos (nächster Schritt)
+
+1. **Fehlende Szenarien prüfen** (optional, fachlich)
+   - Geberrotation über mehrere Runden
+   - 250er-Kontrollsumme als Validierungsfehler bei falschen Eingaben
+   - Verlustwert-Darstellung mit Klammern
+
+2. **Projektstruktur aufsetzen** (technisch)
+   - BDD-Toolchain für Python/Django einrichten (z. B. `behave`)
+   - Projektgerüst anlegen
+   - Step-Definitionen als leere Stubs aus der Referenzdatei generieren
+
+3. **Step-Definitionen schreiben**
+   - Auf Basis von `docs/gherkin-step-phrase-reference-v1.md`
+   - Zunächst ohne Domänenlogik (pending)
+
+4. **Domänenlogik implementieren**
+   - Fachklassen für Rundenauswertung, Stich-Zwang, Punktestand
+   - Normative Quelle: `docs/rule-set-v1.md`
