@@ -479,4 +479,7 @@ Beim Tausender bleibt der numerische Punktestand unverändert.
 - `docs/ubiquitous-language.md` definiert die gemeinsame Fachsprache.
 - `docs/language-conventions.md` beschreibt die Sprachkonventionen des Projekts.
 - `docs/Anschreibetabelle_4_Spieler.md` enthält die tabellarische Herleitung und Beispiele.
+- `features/` enthält die normative Gherkin-Spezifikation, die dieses Regelwerk in ausführbare BDD-Szenarien übersetzt.
+- `docs/gherkin-step-phrase-reference-v1.md` enthält die kanonischen Step-Phrasen zur Implementierung der Szenarien.
+- `docs/development-approach-v1.md` benennt dieses Dokument als normative Quelle für alle Domänenlogik-Implementierungen.
 - Dieses Dokument definiert das verbindliche **V1-Regelwerk** für Produkt, Modell und Implementierung.

@@ -4,12 +4,21 @@
 Dieses Repository modelliert fachlich einen Binokel Score Tracker auf Basis von BDD.
 
 ## Führende Dokumente
-Die folgende Priorität gilt bei Unklarheiten:
+Die folgende Priorität gilt bei fachlichen Unklarheiten:
 
 1. `docs/rule-set-v1.md`
 2. `docs/ubiquitous-language.md`
 3. `docs/language-conventions.md`
 4. `docs/Anschreibetabelle_4_Spieler.md`
+
+## Engineering-Dokumente
+Für Entwicklungsprozess und technische Entscheidungen:
+
+- `docs/project-foundation.md` – Produktvision, BDD-Strategie, Architektur- und Technologieprinzipien
+- `docs/development-approach-v1.md` – Operativer Entwicklungsansatz: Outside-In, RED-Green-Refactor, Vertikale Slices, Phasenmodell
+- `docs/adr/ADR-001-backend-vor-frontend.md` – Backend vor Frontend in Phase 1
+- `docs/adr/ADR-002-vertikale-slices.md` – Vertikale Slices statt horizontaler Schichten
+- `docs/adr/ADR-003-behave-als-bdd-toolchain.md` – behave als BDD-Toolchain für Django
 
 ## V1-Scope
 V1 unterstützt ausschließlich:
@@ -90,22 +99,44 @@ Sie enthält alle kanonischen Step-Phrasen als Referenz für die spätere Testau
 - Doppeltes Abgehen: Runde wird regulär vollständig ausgespielt.
 - Kein Szenario "Spielmacher mit 0 Stichen" in normaler Runde (würde in der Praxis zum einfachen Abgehen führen).
 
+### Offene Todos (Stand 26.06.2026 — inzwischen abgeschlossen, siehe Stand 28.06.2026)
+
+1. ~~Fehlende Szenarien prüfen~~ → erledigt
+2. ~~Projektstruktur aufsetzen~~ → noch offen
+3. ~~Step-Definitionen schreiben~~ → noch offen
+4. ~~Domänenlogik implementieren~~ → noch offen
+
+---
+
+## Stand 28.06.2026
+
+### Abgeschlossen
+
+**Gherkin-Nacharbeiten:**
+Drei fehlende Szenarien in `features/` ergänzt:
+- `spiel_anlegen.feature`: Geberrotation streng reihum
+- `runde_normales_spiel.feature`: Validierungsfehler wenn Stichwert-Summe > 250
+- `runde_einfaches_abgehen_auswerten.feature` + `runde_deoppeltes_abgehen.feature`: Verlustwert-Darstellung `(-250)` / `(-400)`
+
+Neue Step-Phrasen in `docs/gherkin-step-phrase-reference-v1.md` (Geberrotation, Stichwert-Validierung, Verlustwert-Darstellung).
+
+**Engineering-Dokumentation:**
+- `docs/development-approach-v1.md` erstellt: Outside-In, RED-Green-Refactor, Vertikale Slices, Phasenmodell mit ausführlichen Begründungen
+- `docs/adr/` angelegt: ADR-001, ADR-002, ADR-003
+- `docs/project-foundation.md` §10 (BDD-Entwicklungszyklus) und §18 (Dokumentationsset) aktualisiert
+
 ### Offene Todos (nächster Schritt)
 
-1. **Fehlende Szenarien prüfen** (optional, fachlich)
-   - Geberrotation über mehrere Runden
-   - 250er-Kontrollsumme als Validierungsfehler bei falschen Eingaben
-   - Verlustwert-Darstellung mit Klammern
+1. **Projektstruktur aufsetzen** (technisch)
+   - Python-Projektstruktur und `behave` + `behave-django` einrichten
+   - Django-Grundgerüst anlegen
+   - Step-Stub-Dateien aus `docs/gherkin-step-phrase-reference-v1.md` generieren → `behave` ausführen → alles RED
+   - Feature-Reihenfolge: laut `docs/development-approach-v1.md` §5
 
-2. **Projektstruktur aufsetzen** (technisch)
-   - BDD-Toolchain für Python/Django einrichten (z. B. `behave`)
-   - Projektgerüst anlegen
-   - Step-Definitionen als leere Stubs aus der Referenzdatei generieren
-
-3. **Step-Definitionen schreiben**
+2. **Step-Definitionen schreiben**
    - Auf Basis von `docs/gherkin-step-phrase-reference-v1.md`
    - Zunächst ohne Domänenlogik (pending)
 
-4. **Domänenlogik implementieren**
-   - Fachklassen für Rundenauswertung, Stich-Zwang, Punktestand
+3. **Domänenlogik implementieren**
+   - Feature für Feature als vertikale Slice
    - Normative Quelle: `docs/rule-set-v1.md`

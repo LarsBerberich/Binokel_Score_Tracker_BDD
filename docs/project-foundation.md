@@ -204,6 +204,20 @@ BDD ist ein zentrales Projektprinzip und nicht nur eine Ergänzung für Tests.
 - **Integrations- bzw. Akzeptanztests** prüfen Verhalten über Systemgrenzen hinweg.
 - **Unit-Tests** prüfen interne Regeln und Randfälle.
 
+### BDD-Entwicklungszyklus
+
+Die BDD-Praxis in diesem Projekt folgt dem **Outside-In-Ansatz** in Verbindung mit **RED-Green-Refactor**:
+
+- **RED:** Gherkin-Szenario ist geschrieben, Step-Definition als Stub angelegt → Test schlägt fehl.
+- **GREEN:** Minimale Domänenlogik und Anwendungsschicht implementieren → Test besteht.
+- **REFACTOR:** Struktur und Lesbarkeit verbessern, ohne das Verhalten zu ändern.
+
+Die Entwicklung beginnt beim Akzeptanztest (außen) und arbeitet sich nach innen durch die Schichten. Kein Code wird geschrieben, der nicht durch einen fehlschlagenden Test gefordert wird.
+
+Implementierung erfolgt als **vertikale Slices**: Eine Feature-Datei treibt einen vollständigen Schnitt durch alle Schichten — Domänenlogik, Use Case, API, UI.
+
+Vollständige Beschreibung des Entwicklungsansatzes: `docs/development-approach-v1.md`
+
 ---
 
 ## 11. Architekturprinzipien
@@ -399,13 +413,36 @@ Vor dem Mergen soll eine Änderung:
 
 Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 
-### Empfohlenes Dokumentationsset
+### Vorhandene Dokumente
+
+#### Projektgrundlagen und Strategie
 
 - `README.md` – Einstiegspunkt und Projektüberblick
-- `docs/project-foundation.md` – grundlegende Entscheidungen
-- `docs/ubiquitous-language.md` – gemeinsame Fachsprache
-- `docs/architecture.md` – Architekturstruktur und Begründung
-- `docs/adr/` – Architecture Decision Records für wichtige Entscheidungen
+- `docs/project-foundation.md` – grundlegende Produkt- und Engineering-Entscheidungen (dieses Dokument)
+- `docs/development-approach-v1.md` – operativer Entwicklungsansatz: Outside-In, RED-Green-Refactor, Vertikale Slices, Phasenmodell mit ausführlichen Begründungen
+- `docs/copilot-handover-v1.md` – Projektüberblick und Handover-Kontext für KI-Assistenten
+
+#### Fachmodell und Regelwerk
+
+- `docs/rule-set-v1.md` – normatives V1-Regelwerk; primäre Quelle für alle Domänenlogik-Implementierungen
+- `docs/ubiquitous-language.md` – gemeinsame Fachsprache des Projekts
+- `docs/language-conventions.md` – Konventionen für Benennung in Dokumentation, Gherkin und Code
+- `docs/Anschreibetabelle_4_Spieler.md` – tabellarische Herleitung der Wertungslogik mit Beispielen
+
+#### BDD und Testspezifikation
+
+- `features/` – normative Gherkin-Spezifikation aller V1-Funktionalitäten (6 Feature-Dateien)
+- `docs/gherkin-step-phrase-reference-v1.md` – kanonische Step-Phrasen als Referenz für Step-Definitionen
+
+### Geplante Dokumente
+
+- `docs/architecture.md` – Architekturstruktur, Modulschnitt und Begründung
+
+### Vorhandene Architecture Decision Records (`docs/adr/`)
+
+- `ADR-001-backend-vor-frontend.md` – Backend vollständig vor Frontend entwickeln
+- `ADR-002-vertikale-slices.md` – Vertikale Slices statt horizontaler Schichten
+- `ADR-003-behave-als-bdd-toolchain.md` – behave + behave-django als BDD-Toolchain für Django
 
 ### Dokumentationsregel
 

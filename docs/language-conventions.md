@@ -281,4 +281,7 @@ Im Zweifel gilt:
 
 - `docs/project-foundation.md` beschreibt die grundlegenden Projektentscheidungen.
 - `docs/ubiquitous-language.md` definiert die gemeinsame Fachsprache.
+- `docs/rule-set-v1.md` definiert das verbindliche V1-Regelwerk; normative Quelle für alle Fachbegriffe im Kontext der Rundenauswertung.
+- `docs/gherkin-step-phrase-reference-v1.md` enthält die kanonischen Step-Phrasen, die die Sprachkonventionen dieses Dokuments auf Gherkin-Ebene umsetzen.
+- `docs/development-approach-v1.md` beschreibt den Entwicklungsansatz und verweist auf diese Konventionen als verbindlich für Code, Tests und technische Artefakte.
 - Dieses Dokument beschreibt, **wie** diese Fachsprache in Dokumentation, Code und technischen Artefakten angewendet wird.

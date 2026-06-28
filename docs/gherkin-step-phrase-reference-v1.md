@@ -7,6 +7,10 @@ Hinweise:
 - Variablen stehen in spitzen Klammern.
 - Diese Liste orientiert sich an den Feature-Dateien unter features/.
 
+Normative Quellen:
+- `docs/rule-set-v1.md` – verbindliches V1-Regelwerk; Grundlage für alle fachlichen Step-Formulierungen
+- `docs/development-approach-v1.md` – beschreibt, wie diese Phrasen als Step-Stubs zur RED-Phase verwendet werden
+
 ## Standard-Trigger
 
 ### Runde auswerten
