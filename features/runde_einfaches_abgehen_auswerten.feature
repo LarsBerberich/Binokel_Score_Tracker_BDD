@@ -35,4 +35,9 @@ Funktionalität: Einfaches Abgehen auswerten
     Gegeben der Rundenausgang ist "einfaches Abgehen"
     Wenn die Runde ausgewertet wird
     Dann erhält jeder aktive Gegenspieler 30 Mitpunkte
-  
+
+  Szenario: Verlustwert wird mit Minuszeichen und in Klammern dargestellt
+    Gegeben der Rundenausgang ist "einfaches Abgehen"
+    Und der Reizwert des Spielmachers ist 250
+    Wenn die Runde ausgewertet wird
+    Dann wird der Verlustwert als "(-250)" in der Tabelle dargestellt

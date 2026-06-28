@@ -36,3 +36,11 @@ Funktionalität: Spiel anlegen
     Und als Rundenzahl 10 angegeben wird
     Dann wird das Spiel nicht angelegt
     Und es wird ein Fehler angezeigt, dass die Rundenzahl ein Vielfaches von 4 sein muss
+
+  Szenario: Geber rotiert streng reihum entlang der festgelegten Spielerreihenfolge
+    Gegeben das Spiel wurde mit der Spielerreihenfolge "Anna, Bernd, Carla, Dirk" angelegt
+    Und Anna ist Geber in Runde 1
+    Dann ist Bernd Geber in Runde 2
+    Und Carla ist Geber in Runde 3
+    Und Dirk ist Geber in Runde 4
+    Und Anna ist erneut Geber in Runde 5

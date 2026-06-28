@@ -86,3 +86,17 @@ Hinweise:
 - Dann wird der Gesamtsieg nicht über die Sterne entschieden
 - Dann wird die Siegerermittlung mit den exakten 1er-Werten durchgeführt
 - Dann gibt es mehrere Sieger
+
+## Geberrotation
+- Gegeben das Spiel wurde mit der Spielerreihenfolge "<spieler_1>, <spieler_2>, <spieler_3>, <spieler_4>" angelegt
+- Und <spielername> ist Geber in Runde <rundennummer>
+- Dann ist <spielername> Geber in Runde <rundennummer>
+- Und <spielername> ist erneut Geber in Runde <rundennummer>
+
+## Stichwert-Validierung
+- Und die Stichwerte aller drei aktiven Spieler sind <wert_1>, <wert_2> und <wert_3>
+- Dann wird die Eingabe abgelehnt
+- Und es wird ein Fehler angezeigt, dass die Stichwerte in der Summe 250 ergeben müssen
+
+## Verlustwert-Darstellung in der Tabelle
+- Dann wird der Verlustwert als "<darstellungswert>" in der Tabelle dargestellt

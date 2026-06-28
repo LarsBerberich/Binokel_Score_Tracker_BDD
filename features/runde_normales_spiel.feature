@@ -39,3 +39,10 @@ Funktionalität: Normale Runde auswerten
     Wenn die Runde ausgewertet wird
     Dann wird der fehlende dritte Stichwert mit 60 ermittelt
     Und die Summe der drei Stichwerte beträgt 250
+
+  Szenario: Eingabe wird abgelehnt wenn die Summe aller drei Stichwerte die Kontrollsumme 250 überschreitet
+    Gegeben eine regulär ausgespielte Runde
+    Und die Stichwerte aller drei aktiven Spieler sind 90, 100 und 70
+    Wenn die Runde ausgewertet wird
+    Dann wird die Eingabe abgelehnt
+    Und es wird ein Fehler angezeigt, dass die Stichwerte in der Summe 250 ergeben müssen

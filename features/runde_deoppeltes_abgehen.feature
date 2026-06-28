@@ -38,4 +38,9 @@ Funktionalität: Doppeltes Abgehen auswerten
     Und der Gegenspieler hat 0 eigene Stiche
     Wenn die Runde ausgewertet wird
     Dann werden die Meldepunkte des Gegenspielers mit 0 gewertet
-  
+
+  Szenario: Verlustwert wird mit Minuszeichen und in Klammern dargestellt
+    Gegeben der Rundenausgang ist "doppeltes Abgehen"
+    Und der Reizwert des Spielmachers ist 200
+    Wenn die Runde ausgewertet wird
+    Dann wird der Verlustwert als "(-400)" in der Tabelle dargestellt
