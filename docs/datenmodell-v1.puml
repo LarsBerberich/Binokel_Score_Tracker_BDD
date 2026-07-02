@@ -1,0 +1,138 @@
+@startuml Datenmodell – Binokel Score Tracker V1
+
+!theme plain
+skinparam linetype ortho
+skinparam classBackgroundColor #FAFAFA
+skinparam classBorderColor #555555
+skinparam classFontSize 12
+skinparam packageBackgroundColor #F0F4FF
+skinparam packageBorderColor #8888BB
+skinparam arrowColor #444444
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor #CCAA00
+
+' ═══════════════════════════════════════════════════════════════════
+'  Schicht 1: Domänenmodell (scoring/domain.py)
+'  Kein Framework. Reines Python.
+' ═══════════════════════════════════════════════════════════════════
+
+package "Domäne  ·  scoring/domain.py" {
+
+  class Spiel <<dataclass>> {
+    + spieler_reihenfolge : list[str]
+    + rundenanzahl : int
+    ==
+    + geber_in_runde(runde : int) : str
+  }
+
+  enum Rundenausgang <<Enum>> {
+    GEWONNENES_SPIEL
+    DOPPELTES_ABGEHEN
+    EINFACHES_ABGEHEN
+    TAUSENDER_GEWONNEN
+    TAUSENDER_VERLOREN
+  }
+
+  class SpielFehler <<Exception>> {
+  }
+  class UngueltigeSpielerzahl <<Exception>> {
+  }
+  class UngueltigeRundenanzahl <<Exception>> {
+  }
+  class UngueltigeStichwerte <<Exception>> {
+  }
+
+  SpielFehler      <|-- UngueltigeSpielerzahl
+  SpielFehler      <|-- UngueltigeRundenanzahl
+  SpielFehler      <|-- UngueltigeStichwerte
+}
+
+
+' ═══════════════════════════════════════════════════════════════════
+'  Schicht 2: Anwendungsfälle (scoring/use_cases.py)
+'  Funktionen, keine Klassen. Als Notizblock dargestellt.
+' ═══════════════════════════════════════════════════════════════════
+
+note as UseCases
+  **Use Cases  ·  scoring/use_cases.py**
+  (zustandslose Funktionen)
+  ....
+  spiel_anlegen(spieler, rundenanzahl?) : Spiel
+  normales_spiel_auswerten(reizwert, melde, stich) : (Rundenausgang, int)
+  meldepunkte_mit_stich_zwang(punkte, hat_stich) : int
+  dritten_stichwert_ermitteln(wert1, wert2) : int
+  stichwerte_validieren(werte) : None | UngueltigeStichwerte
+  einfaches_abgehen_auswerten(reizwert) : (int, str)
+  doppeltes_abgehen_auswerten(reizwert) : (int, str)
+  sieger_ermitteln(punktestaende, exakte_stichwerte?) : list[str]
+end note
+
+Spiel          <.. UseCases : erzeugt / liest
+Rundenausgang  <.. UseCases : verwendet
+
+
+' ═══════════════════════════════════════════════════════════════════
+'  Schicht 3: Persistenzmodell (scoring/models.py) — GEPLANT
+'  Django ORM. Jede Klasse = eine Datenbanktabelle.
+' ═══════════════════════════════════════════════════════════════════
+
+package "Persistenz  ·  scoring/models.py  [geplant]" {
+
+  class SpielModel <<Django Model>> {
+    + id : AutoField  {PK}
+    + rundenanzahl : IntegerField
+    + angelegt_am : DateTimeField
+  }
+
+  class SpielerModel <<Django Model>> {
+    + id : AutoField  {PK}
+    + spiel : ForeignKey  {FK → SpielModel}
+    + name : CharField
+    + position : PositiveSmallIntegerField
+    ' position = 0..3 → Reihenfolge gegen Uhrzeigersinn
+  }
+
+  class RundeModel <<Django Model>> {
+    + id : AutoField  {PK}
+    + spiel : ForeignKey  {FK → SpielModel}
+    + rundennummer : PositiveSmallIntegerField
+    + reizwert : IntegerField
+    + rundenausgang : CharField
+    ' rundenausgang speichert Rundenausgang.value als String
+    + spielmacher : ForeignKey  {FK → SpielerModel}
+    + geber : ForeignKey  {FK → SpielerModel}
+    + spielmacher_punkte : IntegerField
+    + verlustwert : IntegerField
+    + mitpunkte_pro_gegenspieler : IntegerField
+    + spielmacher_stern : BooleanField
+    + gegenspieler_stern : BooleanField
+  }
+
+  class GegenspielerRundeModel <<Django Model>> {
+    + id : AutoField  {PK}
+    + runde : ForeignKey  {FK → RundeModel}
+    + spieler : ForeignKey  {FK → SpielerModel}
+    + meldepunkte : IntegerField
+    + stichwerte : IntegerField
+    + hat_eigenen_stich : BooleanField
+    ' meldepunkte_gewertet wird aus meldepunkte + hat_eigenen_stich berechnet
+  }
+
+  ' Beziehungen
+  SpielModel  "1" *-down- "4"    SpielerModel         : enthält >
+  SpielModel  "1" *-down- "1..*" RundeModel            : hat >
+  RundeModel  "1" *-down- "2..3" GegenspielerRundeModel : hat >
+
+  SpielerModel "1" -right[hidden]- RundeModel
+}
+
+
+' ═══════════════════════════════════════════════════════════════════
+'  Mapping: Domäne → Persistenz
+' ═══════════════════════════════════════════════════════════════════
+
+Spiel         ..> SpielModel  : wird persistiert als
+Rundenausgang ..> RundeModel  : .value gespeichert in
+
+
+@enduml

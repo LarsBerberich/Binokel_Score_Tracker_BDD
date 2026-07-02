@@ -434,6 +434,11 @@ Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 - `features/` – normative Gherkin-Spezifikation aller V1-Funktionalitäten (6 Feature-Dateien)
 - `docs/gherkin-step-phrase-reference-v1.md` – kanonische Step-Phrasen als Referenz für Step-Definitionen
 
+#### Technische Infrastruktur und Implementierung
+
+- `docs/datenmodell-v1.puml` – PlantUML-Klassendiagramm: Domäne, Use Cases, geplante Django-Modelle
+- `docs/engineering-notes/` – nummerierte Implementierungsfallstricke (ENG-NNN); werden bei jedem neu entdeckten Problem ergänzt
+
 ### Geplante Dokumente
 
 - `docs/architecture.md` – Architekturstruktur, Modulschnitt und Begründung
@@ -447,6 +452,23 @@ Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 ### Dokumentationsregel
 
 Dokumentiert werden soll nur das, was Entscheidungen, Onboarding, Wartung oder gemeinsames Verständnis wirklich unterstützt.
+
+### Pflicht zur Dokumentationsaktualisierung bei Codeänderungen
+
+Jede Änderung am Code, an der Architektur oder an Konventionen zieht eine synchrone Aktualisierung der betroffenen Dokumentation nach sich. Das gilt für menschliche Entwickler und KI-Assistenten gleichermaßen.
+
+| Art der Änderung | Zu prüfende / zu aktualisierende Dokumente |
+|---|---|
+| Neue Domänenklasse oder neues Modell | `docs/datenmodell-v1.puml` |
+| Neue Architekturentscheidung | `docs/adr/ADR-NNN-*.md` anlegen |
+| Neuer Implementierungsfallstrick | `docs/engineering-notes/ENG-NNN-*.md` anlegen |
+| Neue Gherkin-Schritte oder Konventionen | `docs/gherkin-step-phrase-reference-v1.md` |
+| Neue Sprachkonventionen oder Begriffe | `docs/ubiquitous-language.md`, `docs/language-conventions.md` |
+| Regeländerung im Fachmodell | `docs/rule-set-v1.md` |
+| Neues Werkzeug oder neue Abhängigkeit | `docs/development-approach-v1.md` oder neuer ADR |
+| Projektstand geändert | `docs/copilot-handover-v1.md` aktualisieren |
+
+Die Regel lautet: **kein Commit ohne synchrone Dokumentation der Auswirkungen.**
 
 ---
 

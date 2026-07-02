@@ -12,13 +12,13 @@ def before_all(context):
     import django
     django.setup()
 
-
-def before_scenario(context, scenario):
-    """Wird vor jedem Szenario ausgeführt — hält die Datenbank sauber."""
     from django.test.utils import setup_test_environment
     setup_test_environment()
 
 
+def before_scenario(context, scenario):
+    pass
+
+
 def after_scenario(context, scenario):
-    """Wird nach jedem Szenario ausgeführt."""
     pass
