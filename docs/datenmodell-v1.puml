@@ -122,7 +122,6 @@ package "Persistenz  ·  scoring/models.py  [geplant]" {
   SpielModel  "1" *-down- "4"    SpielerModel         : enthält >
   SpielModel  "1" *-down- "1..*" RundeModel            : hat >
   RundeModel  "1" *-down- "2..3" GegenspielerRundeModel : hat >
-
   SpielerModel "1" -right[hidden]- RundeModel
 }
 
