@@ -169,7 +169,43 @@ Der RED-Green-Refactor-Zyklus ist der mechanische Schutz: Wenn kein Test rot ist
 
 ---
 
-## 7. Verhältnis zu Architecture Decision Records (ADR)
+## 7. Gherkin-Sprachkonventionen für Deutsch (`# language: de`)
+
+Die Feature-Dateien dieses Projekts verwenden `# language: de`. Damit verarbeitet behave die Datei mit dem deutschen Keyword-Set gemäß der offiziellen Gherkin-Spezifikation unter [cucumber.io/docs/gherkin/languages](https://cucumber.io/docs/gherkin/languages).
+
+### Gültige deutsche Schlüsselwörter (offiziell, Stand 2026)
+
+| Gherkin-Rolle | Gültige Schlüsselwörter |
+|---|---|
+| **Given** | `Angenommen` · `Gegeben sei` · `Gegeben seien` |
+| **When** | `Wenn` |
+| **Then** | `Dann` |
+| **And** | `Und` |
+| **But** | `Aber` |
+| **Feature** | `Funktionalität` · `Funktion` |
+| **Background** | `Grundlage` · `Hintergrund` · `Voraussetzungen` · `Vorbedingungen` |
+| **Scenario** | `Szenario` · `Beispiel` |
+| **Scenario Outline** | `Szenariogrundriss` · `Szenarien` |
+| **Examples** | `Beispiele` |
+
+### Verbindliche Konvention für dieses Projekt
+
+**Given-Schritte werden ausschließlich mit `Angenommen` formuliert.**
+
+Begründung:
+- `Gegeben sei` / `Gegeben seien` sind grammatikalisch auf Sätze im Konjunktiv beschränkt und passen nicht zu allen Step-Formulierungen (z.B. *„Gegeben sei der Rundenausgang ist ..."* ist grammatikalisch falsch).
+- `Angenommen` ist grammatikalisch neutral und passt zu allen Satzstrukturen.
+- behave 1.3.3 erkennt `Gegeben` allein **nicht** als gültiges Given-Keyword — nur `Gegeben sei` und `Gegeben seien` sind registriert. `Gegeben` allein führt zu einem `ParserError`.
+
+### Praktische Konsequenz
+
+Alle Feature-Dateien unter `features/` sowie `docs/gherkin-step-phrase-reference-v1.md` verwenden `Angenommen` für alle Given-Schritte.
+
+---
+
+## 8. Verhältnis zu Architecture Decision Records (ADR)
+
+Dieses Dokument ist bewusst kein ADR, sondern ein **Entwicklungshandbuch**. Ein ADR dokumentiert genau eine Entscheidung knapp und strukturiert (Kontext → Entscheidung → Konsequenzen → Status). Dieses Dokument erklärt mehrere zusammenhängende Prinzipien ausführlich und mit Begründung.
 
 Dieses Dokument ist bewusst kein ADR, sondern ein **Entwicklungshandbuch**. Ein ADR dokumentiert genau eine Entscheidung knapp und strukturiert (Kontext → Entscheidung → Konsequenzen → Status). Dieses Dokument erklärt mehrere zusammenhängende Prinzipien ausführlich und mit Begründung.
 
@@ -183,7 +219,7 @@ Diese drei ADRs sind unter `docs/adr/` erfasst.
 
 ---
 
-## 8. Verbindung zu anderen Dokumenten
+## 9. Verbindung zu anderen Dokumenten
 
 | Dokument | Rolle |
 |---|---|

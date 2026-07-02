@@ -12,33 +12,33 @@ Funktionalität: Spiel anlegen
   - Wenn nichts anderes vereinbart wurde, werden 12 Runden gespielt.
 
   Szenario: Spiel mit 4 Spielern und Standardrundenzahl anlegen
-    Gegeben es wird ein neues V1-Spiel angelegt
+    Angenommen es wird ein neues V1-Spiel angelegt
     Wenn die Spielerreihenfolge "Anna, Bernd, Carla, Dirk" gegen den Uhrzeigersinn erfasst wird
     Und keine abweichende Rundenzahl angegeben wird
     Dann wird das Spiel mit 12 Runden angelegt
     Und die Spielerreihenfolge bleibt als "Anna, Bernd, Carla, Dirk" gespeichert
 
   Szenario: Spiel mit gültiger Rundenzahl als Vielfaches von 4 anlegen
-    Gegeben es wird ein neues V1-Spiel angelegt
+    Angenommen es wird ein neues V1-Spiel angelegt
     Wenn die Spielerreihenfolge "Anna, Bernd, Carla, Dirk" gegen den Uhrzeigersinn erfasst wird
     Und als Rundenzahl 16 angegeben wird
     Dann wird das Spiel mit 16 Runden angelegt
 
   Szenario: Spiel mit ungültiger Spielerzahl ablehnen
-    Gegeben es wird ein neues V1-Spiel angelegt
+    Angenommen es wird ein neues V1-Spiel angelegt
     Wenn nur die Spieler "Anna, Bernd, Carla" erfasst werden
     Dann wird das Spiel nicht angelegt
     Und es wird ein Fehler zur ungültigen Spielerzahl angezeigt
 
   Szenario: Spiel mit ungültiger Rundenzahl ablehnen
-    Gegeben es wird ein neues V1-Spiel angelegt
+    Angenommen es wird ein neues V1-Spiel angelegt
     Wenn die Spielerreihenfolge "Anna, Bernd, Carla, Dirk" gegen den Uhrzeigersinn erfasst wird
     Und als Rundenzahl 10 angegeben wird
     Dann wird das Spiel nicht angelegt
     Und es wird ein Fehler angezeigt, dass die Rundenzahl ein Vielfaches von 4 sein muss
 
   Szenario: Geber rotiert streng reihum entlang der festgelegten Spielerreihenfolge
-    Gegeben das Spiel wurde mit der Spielerreihenfolge "Anna, Bernd, Carla, Dirk" angelegt
+    Angenommen das Spiel wurde mit der Spielerreihenfolge "Anna, Bernd, Carla, Dirk" angelegt
     Und Anna ist Geber in Runde 1
     Dann ist Bernd Geber in Runde 2
     Und Carla ist Geber in Runde 3

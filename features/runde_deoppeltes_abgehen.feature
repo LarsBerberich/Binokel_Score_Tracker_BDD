@@ -11,14 +11,14 @@ Funktionalität: Doppeltes Abgehen auswerten
   - Für die Meldepunkte der Gegenspieler gilt weiterhin der normale Stich-Zwang.
 
   Szenario: Spielmacher geht nach vollständig ausgespielter Runde doppelt ab
-    Gegeben eine regulär vollständig ausgespielte Runde mit Reizwert 220
+    Angenommen eine regulär vollständig ausgespielte Runde mit Reizwert 220
     Und der Spielmacher hat 70 Meldepunkte und 140 Stichwerte einschließlich gedrückter Karten
     Wenn die Runde ausgewertet wird
     Dann ist der Rundenausgang "doppeltes Abgehen"
     Und der Spielmacher erreicht mit 210 Punkten den Reizwert nicht
 
   Szenario: Spielmacher erhält den negativen doppelten Reizwert als Verlustwert
-    Gegeben der Rundenausgang ist "doppeltes Abgehen"
+    Angenommen der Rundenausgang ist "doppeltes Abgehen"
     Und der Reizwert des Spielmachers ist 200
     Wenn die Runde ausgewertet wird
     Dann wird beim Spielmacher der Verlustwert "-400" eingetragen
@@ -26,21 +26,21 @@ Funktionalität: Doppeltes Abgehen auswerten
     Und die Stichwerte des Spielmachers werden mit 0 gewertet
 
   Szenario: Gegenspieler erhalten Stichwerte und jeweils 30 Mitpunkte
-    Gegeben der Rundenausgang ist "doppeltes Abgehen"
+    Angenommen der Rundenausgang ist "doppeltes Abgehen"
     Und ein Gegenspieler hat 120 Stichwerte
     Wenn die Runde ausgewertet wird
     Dann werden die 120 Stichwerte des Gegenspielers gewertet
     Und jeder aktive Gegenspieler erhält 30 Mitpunkte
 
   Szenario: Meldepunkte der Gegenspieler unterliegen normalem Stich-Zwang
-    Gegeben der Rundenausgang ist "doppeltes Abgehen"
+    Angenommen der Rundenausgang ist "doppeltes Abgehen"
     Und ein Gegenspieler hat 40 Meldepunkte
     Und der Gegenspieler hat 0 eigene Stiche
     Wenn die Runde ausgewertet wird
     Dann werden die Meldepunkte des Gegenspielers mit 0 gewertet
 
   Szenario: Verlustwert wird mit Minuszeichen und in Klammern dargestellt
-    Gegeben der Rundenausgang ist "doppeltes Abgehen"
+    Angenommen der Rundenausgang ist "doppeltes Abgehen"
     Und der Reizwert des Spielmachers ist 200
     Wenn die Runde ausgewertet wird
     Dann wird der Verlustwert als "(-400)" in der Tabelle dargestellt

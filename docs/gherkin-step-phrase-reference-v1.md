@@ -22,11 +22,11 @@ Normative Quellen:
 ## Rundenausgang
 
 ### Einfaches Abgehen
-- Gegeben der Rundenausgang ist "einfaches Abgehen"
+- Angenommen der Rundenausgang ist "einfaches Abgehen"
 - Dann ist der Rundenausgang "einfaches Abgehen"
 
 ### Doppeltes Abgehen
-- Gegeben der Rundenausgang ist "doppeltes Abgehen"
+- Angenommen der Rundenausgang ist "doppeltes Abgehen"
 - Dann ist der Rundenausgang "doppeltes Abgehen"
 
 ### Gewonnenes Spiel
@@ -63,7 +63,7 @@ Normative Quellen:
 - Dann erhält jeder aktive Gegenspieler 30 Mitpunkte
 
 ## Tausender
-- Gegeben eine Runde ist als Tausender angesagt
+- Angenommen eine Runde ist als Tausender angesagt
 - Und der Tausender-Ausgang ist "gewonnen"
 - Und der Tausender-Ausgang ist "verloren"
 - Dann erhält nur der Spielmacher einen Stern
@@ -76,7 +76,7 @@ Normative Quellen:
 - Dann bleibt der numerische Punktestand für alle Spieler unverändert
 
 ## Spiel anlegen
-- Gegeben es wird ein neues V1-Spiel angelegt
+- Angenommen es wird ein neues V1-Spiel angelegt
 - Wenn die Spielerreihenfolge "<spieler_1>, <spieler_2>, <spieler_3>, <spieler_4>" gegen den Uhrzeigersinn erfasst wird
 - Und keine abweichende Rundenzahl angegeben wird
 - Und als Rundenzahl <rundenanzahl> angegeben wird
@@ -85,14 +85,14 @@ Normative Quellen:
 - Dann wird das Spiel nicht angelegt
 
 ## Spielende und Siegerermittlung
-- Gegeben die letzte Runde ist ausgewertet
+- Angenommen die letzte Runde ist ausgewertet
 - Dann ist <spielername> alleiniger Sieger
 - Dann wird der Gesamtsieg nicht über die Sterne entschieden
 - Dann wird die Siegerermittlung mit den exakten 1er-Werten durchgeführt
 - Dann gibt es mehrere Sieger
 
 ## Geberrotation
-- Gegeben das Spiel wurde mit der Spielerreihenfolge "<spieler_1>, <spieler_2>, <spieler_3>, <spieler_4>" angelegt
+- Angenommen das Spiel wurde mit der Spielerreihenfolge "<spieler_1>, <spieler_2>, <spieler_3>, <spieler_4>" angelegt
 - Und <spielername> ist Geber in Runde <rundennummer>
 - Dann ist <spielername> Geber in Runde <rundennummer>
 - Und <spielername> ist erneut Geber in Runde <rundennummer>

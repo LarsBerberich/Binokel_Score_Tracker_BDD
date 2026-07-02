@@ -11,13 +11,13 @@ Funktionalität: Einfaches Abgehen auswerten
   - Die Gegenspieler erhalten jeweils +30 Mitpunkte.
 
   Szenario: Spielmacher geht vor dem ersten Stich einfach ab
-    Gegeben der Spielmacher hat den Dapp gesehen
+    Angenommen der Spielmacher hat den Dapp gesehen
     Und es wurde noch kein Stich gespielt
     Wenn der Spielmacher einfach abgeht
     Dann ist der Rundenausgang "einfaches Abgehen"
 
   Szenario: Spielmacher erhält den negativen einfachen Reizwert als Verlustwert
-    Gegeben der Rundenausgang ist "einfaches Abgehen"
+    Angenommen der Rundenausgang ist "einfaches Abgehen"
     Und der Reizwert des Spielmachers ist 250
     Wenn die Runde ausgewertet wird
     Dann wird beim Spielmacher der Verlustwert "-250" eingetragen
@@ -25,19 +25,19 @@ Funktionalität: Einfaches Abgehen auswerten
     Und die Stichwerte des Spielmachers werden mit 0 gewertet
 
   Szenario: Gegenspieler behalten Meldepunkte ohne eigenen Stich
-    Gegeben der Rundenausgang ist "einfaches Abgehen"
+    Angenommen der Rundenausgang ist "einfaches Abgehen"
     Und ein Gegenspieler hat 40 Meldepunkte
     Und der Gegenspieler hat 0 eigene Stiche
     Wenn die Runde ausgewertet wird
     Dann werden die Meldepunkte des Gegenspielers gewertet
 
   Szenario: Gegenspieler erhalten jeweils 30 Mitpunkte
-    Gegeben der Rundenausgang ist "einfaches Abgehen"
+    Angenommen der Rundenausgang ist "einfaches Abgehen"
     Wenn die Runde ausgewertet wird
     Dann erhält jeder aktive Gegenspieler 30 Mitpunkte
 
   Szenario: Verlustwert wird mit Minuszeichen und in Klammern dargestellt
-    Gegeben der Rundenausgang ist "einfaches Abgehen"
+    Angenommen der Rundenausgang ist "einfaches Abgehen"
     Und der Reizwert des Spielmachers ist 250
     Wenn die Runde ausgewertet wird
     Dann wird der Verlustwert als "(-250)" in der Tabelle dargestellt
