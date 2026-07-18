@@ -421,6 +421,7 @@ Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 - `docs/project-foundation.md` – grundlegende Produkt- und Engineering-Entscheidungen (dieses Dokument)
 - `docs/development-approach-v1.md` – operativer Entwicklungsansatz: Outside-In, RED-Green-Refactor, Vertikale Slices, Phasenmodell mit ausführlichen Begründungen
 - `docs/copilot-handover-v1.md` – Projektüberblick und Handover-Kontext für KI-Assistenten
+- `BACKLOG.md` – priorisierte Task-Liste (TASK-NNN); primärer Einstiegspunkt für jede neue Session
 
 #### Fachmodell und Regelwerk
 
@@ -466,7 +467,7 @@ Jede Änderung am Code, an der Architektur oder an Konventionen zieht eine synch
 | Neue Sprachkonventionen oder Begriffe | `docs/ubiquitous-language.md`, `docs/language-conventions.md` |
 | Regeländerung im Fachmodell | `docs/rule-set-v1.md` |
 | Neues Werkzeug oder neue Abhängigkeit | `docs/development-approach-v1.md` oder neuer ADR |
-| Projektstand geändert | `docs/copilot-handover-v1.md` aktualisieren |
+| Projektstand geändert | `BACKLOG.md` + `docs/copilot-handover-v1.md` + `/memories/repo/handover-status.md` synchron aktualisieren |
 
 Die Regel lautet: **kein Commit ohne synchrone Dokumentation der Auswirkungen.**
 

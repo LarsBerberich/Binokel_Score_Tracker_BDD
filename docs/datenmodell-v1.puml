@@ -1,4 +1,5 @@
-@startuml Datenmodell – Binokel Score Tracker V1
+@startuml Datenmodell_Binokel_Score_Tracker_V1
+title Datenmodell – Binokel Score Tracker V1
 
 !theme plain
 skinparam linetype ortho
@@ -25,7 +26,7 @@ package "Domäne  ·  scoring/domain.py" {
     + geber_in_runde(runde : int) : str
   }
 
-  enum Rundenausgang <<Enum>> {
+  enum Rundenausgang {
     GEWONNENES_SPIEL
     DOPPELTES_ABGEHEN
     EINFACHES_ABGEHEN
@@ -115,14 +116,14 @@ package "Persistenz  ·  scoring/models.py  [geplant]" {
     + meldepunkte : IntegerField
     + stichwerte : IntegerField
     + hat_eigenen_stich : BooleanField
-    ' meldepunkte_gewertet wird aus meldepunkte + hat_eigenen_stich berechnet
+    ' gewertet wird aus meldepunkte und hat_eigenen_stich berechnet
   }
 
   ' Beziehungen
   SpielModel  "1" *-down- "4"    SpielerModel         : enthält >
   SpielModel  "1" *-down- "1..*" RundeModel            : hat >
   RundeModel  "1" *-down- "2..3" GegenspielerRundeModel : hat >
-  SpielerModel "1" -right[hidden]- RundeModel
+  SpielerModel -right[hidden]- RundeModel
 }
 
 

@@ -203,7 +203,36 @@ Alle Feature-Dateien unter `features/` sowie `docs/gherkin-step-phrase-reference
 
 ---
 
-## 8. Verhältnis zu Architecture Decision Records (ADR)
+## 9. Session-Kontinuität und Backlog-Workflow
+
+Um zwischen Sessions (und zwischen verschiedenen KI-Assistenten) effizient weiterzumachen, gilt folgendes Workflow-Modell:
+
+### Pflichtlektüre zum Session-Start
+
+Jede Session beginnt mit dem Lesen von `BACKLOG.md` im Repo-Root. Diese Datei enthält:
+- den aktuellen Fokus (welche Task ist als nächstes dran)
+- alle offenen Tasks priorisiert und mit konkreten Aufgaben
+- abgeschlossene Tasks als Nachweis des bisherigen Fortschritts
+
+### Pflicht-Synchronisation zum Session-Ende
+
+Am Ende jeder Session werden **drei Quellen synchron** aktualisiert:
+
+| Datei | Inhalt | Lesepublikum |
+|---|---|---|
+| `BACKLOG.md` | Task-Status, nächster Fokus | Mensch + KI |
+| `docs/copilot-handover-v1.md` | `## Stand DD.MM.YYYY`-Block ergänzen | Mensch + KI |
+| `/memories/repo/handover-status.md` | Repo-Memory für KI-Assistenten | KI (Copilot) |
+
+### Warum drei Quellen?
+
+- `BACKLOG.md` ist die **operative Steuerdatei** – schnell lesbar, immer aktuell.
+- `copilot-handover-v1.md` ist die **vollständige Projekthistorie** – chronologisch, für Onboarding und Nachvollziehbarkeit.
+- `handover-status.md` ist **AI-natives Memory** – wird von Copilot automatisch in den Kontext geladen.
+
+---
+
+## 9. Verhältnis zu Architecture Decision Records (ADR)
 
 Dieses Dokument ist bewusst kein ADR, sondern ein **Entwicklungshandbuch**. Ein ADR dokumentiert genau eine Entscheidung knapp und strukturiert (Kontext → Entscheidung → Konsequenzen → Status). Dieses Dokument erklärt mehrere zusammenhängende Prinzipien ausführlich und mit Begründung.
 

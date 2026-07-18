@@ -108,6 +108,36 @@ Sie enthält alle kanonischen Step-Phrasen als Referenz für die spätere Testau
 
 ---
 
+## Stand 18.07.2026
+
+### Abgeschlossen
+
+**Domänenlogik vollständig — 28/28 Szenarien GREEN (02.07.2026):**
+- `backend/scoring/domain.py` — `Spiel` (dataclass), `Rundenausgang` (Enum), Fehlerklassen
+- `backend/scoring/use_cases.py` — alle Use Cases für Slices 1–6 implementiert
+- `features/steps/` — alle 7 Step-Dateien vollständig implementiert
+- `features/environment.py` — Django-Integration (setup_test_environment in before_all)
+- `docs/engineering-notes/ENG-001`, `ENG-002` — Implementierungs-Fallstricke dokumentiert
+
+**Persistenzschicht + Workflow-Dokumentation (18.07.2026):**
+- `docs/datenmodell-v1.puml` — PlantUML-Klassendiagramm repariert und bereinigt
+- `BACKLOG.md` — neues zentrales Steuerungsdokument für Session-Kontinuität angelegt
+- `docs/project-foundation.md` §18 — BACKLOG.md und 3-Quellen-Workflow dokumentiert
+- `docs/development-approach-v1.md` §8 — neuer Abschnitt „Session-Kontinuität und Backlog-Workflow“
+- `backend/scoring/models.py` — 4 Django ORM-Modelle implementiert
+  (SpielModel, SpielerModel, RundeModel, GegenspielerRundeModel)
+- `backend/scoring/migrations/0001_initial.py` — erzeugt und angewendet
+- 28/28 Behave-Szenarien weiterhin GREEN
+
+### Nächste Schritte (Priorität)
+
+1. **TASK-003** Use Cases an ORM ankoppeln (Slice für Slice, behave bleibt GREEN)
+2. **TASK-004** REST-Endpunkte (`views.py` + `urls.py`) — ADR für DRF vs. JsonResponse anlegen
+
+→ Vollständiger Backlog: `BACKLOG.md` im Repo-Root
+
+---
+
 ## Stand 28.06.2026
 
 ### Abgeschlossen
