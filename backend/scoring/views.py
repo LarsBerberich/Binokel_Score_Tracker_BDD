@@ -50,7 +50,7 @@ def _json_body(request) -> dict:
     try:
         return json.loads(request.body)
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise ValueError(f"Ungültiger JSON-Body: {exc}") from exc
+        raise ValueError("Ungültiger JSON-Body.") from exc
 
 
 def _fehler(nachricht: str, status: int = 400) -> JsonResponse:
