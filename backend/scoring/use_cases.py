@@ -177,39 +177,3 @@ def sieger_ermitteln(
         kandidaten = [k for k in kandidaten if exakte_stichwerte.get(k, 0) == max_exakt]
 
     return kandidaten
-
-    """
-    Legt ein neues V1-Binokel-Spiel an.
-
-    Validierungsregeln (normativ: docs/rule-set-v1.md §2, §3, §4):
-    - Es müssen genau 4 Spieler angegeben werden.
-    - Die Rundenzahl muss ein Vielfaches von 4 sein.
-    - Wird keine Rundenzahl angegeben, gilt der Standardwert 12.
-
-    Args:
-        spieler:      Namen der Spieler in Sitzreihenfolge gegen den Uhrzeigersinn.
-        rundenanzahl: Gewünschte Rundenanzahl oder None für Standardwert.
-
-    Returns:
-        Ein neu angelegtes Spiel-Objekt.
-
-    Raises:
-        UngueltigeSpielerzahl:  Wenn nicht genau 4 Spieler angegeben wurden.
-        UngueltigeRundenanzahl: Wenn die Rundenzahl kein Vielfaches von 4 ist.
-    """
-    if len(spieler) != GUELTIGE_SPIELERZAHL:
-        raise UngueltigeSpielerzahl(
-            f"Ein V1-Spiel erfordert genau {GUELTIGE_SPIELERZAHL} Spieler, "
-            f"aber {len(spieler)} wurden angegeben."
-        )
-
-    if rundenanzahl is None:
-        rundenanzahl = STANDARD_RUNDENANZAHL
-
-    if rundenanzahl % 4 != 0:
-        raise UngueltigeRundenanzahl(
-            f"Die Rundenzahl muss ein Vielfaches von 4 sein, "
-            f"aber {rundenanzahl} wurde angegeben."
-        )
-
-    return Spiel(spieler_reihenfolge=spieler, rundenanzahl=rundenanzahl)

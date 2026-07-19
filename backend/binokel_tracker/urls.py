@@ -17,6 +17,23 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
+from scoring.views import (
+    punktestaende_view,
+    runden_view,
+    sieger_view,
+    spiel_detail_view,
+    spiele_view,
+)
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path("admin/", admin.site.urls),
+    # Slice 1: Spiel anlegen / laden
+    path("api/spiele/", spiele_view, name="spiele"),
+    path("api/spiele/<int:spiel_id>/", spiel_detail_view, name="spiel-detail"),
+    # Slices 2–5: Runde auswerten
+    path("api/spiele/<int:spiel_id>/runden/", runden_view, name="runden"),
+    # Slice 6: Punktestände und Sieger
+    path("api/spiele/<int:spiel_id>/punktestaende/", punktestaende_view, name="punktestaende"),
+    path("api/spiele/<int:spiel_id>/sieger/", sieger_view, name="sieger"),
 ]
+

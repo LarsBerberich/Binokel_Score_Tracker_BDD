@@ -20,6 +20,7 @@ Für Entwicklungsprozess und technische Entscheidungen:
 - `docs/adr/ADR-001-backend-vor-frontend.md` – Backend vor Frontend in Phase 1
 - `docs/adr/ADR-002-vertikale-slices.md` – Vertikale Slices statt horizontaler Schichten
 - `docs/adr/ADR-003-behave-als-bdd-toolchain.md` – behave als BDD-Toolchain für Django
+- `docs/adr/ADR-004-repository-pattern.md` – Repository Pattern zur Trennung von Domäne und Persistenz
 
 ## V1-Scope
 V1 unterstützt ausschließlich:
@@ -109,6 +110,43 @@ Sie enthält alle kanonischen Step-Phrasen als Referenz für die spätere Testau
 
 ---
 
+## Stand 19.07.2026
+
+### Abgeschlossen
+
+**TASK-006: Behave HTTP-Blackbox-Infrastruktur + Slice-1-Migration (19.07.2026):**
+- `features/environment.py` — vollständig neu: `setup_databases()` + Migrationen in `before_all`, `context.client` (Django TestClient) in `before_scenario`, `SpielModel.objects.all().delete()` in `after_scenario` (Cascade)
+- `features/steps/spiel_anlegen_steps.py` — Slice 1 vollständig auf HTTP migriert: POST /api/spiele/ statt `spiel_anlegen()`, HTTP-400-Checks statt Exception-Fang, `Spiel`-Domänenobjekt aus API-Antwort rekonstruiert (für `geber_in_runde`)
+- Slices 2–5: Domain-Steps bleiben bewusst erhalten (testen interne Berechnungsregeln, Stich-Zwang, 250er-Kontrollsumme — nicht über HTTP-Response sichtbar)
+- Slice 6: Domain-Steps bleiben (Punktestände werden direkt als Dict gesetzt; kein passender API-Endpunkt)
+- 28/28 Behave GREEN, 18/18 Django GREEN
+
+### Nächste Schritte (Priorität)
+
+Alle definierten TASKs abgeschlossen. Keine offenen priorisierten Aufgaben.
+
+→ Vollständiger Backlog: `BACKLOG.md` im Repo-Root
+
+---
+
+## Stand 19.07.2026 (TASK-005)
+- `backend/scoring/tests.py` — 18 API-Integrationstests (Django TestCase + TestClient)
+  - `SpielAnlegenApiTest` (6 Tests): POST /api/spiele/, GET /api/spiele/{id}/, Fehlerbehandlung
+  - `RundeAuswertenApiTest` (8 Tests): alle 5 Rundentypen, Pflichtfeld- und Typ-Validierung
+  - `PunktestaendeUndSiegerApiTest` (4 Tests): Punktestände, Sieger, Tiebreaking, 404
+- 18/18 Django-Tests GREEN, 28/28 Behave-Szenarien weiterhin GREEN
+- Normative Quelle: ADR-006
+
+### Nächste Schritte (Priorität)
+
+1. **TASK-006** Behave-Steps schrittweise auf HTTP umstellen (ADR-006, Slice für Slice)
+   - Slice 1: `spiel_anlegen.feature` + `spiel_anlegen_steps.py`
+   - Dann Slices 2–6 analog
+
+→ Vollständiger Backlog: `BACKLOG.md` im Repo-Root
+
+---
+
 ## Stand 18.07.2026
 
 ### Abgeschlossen
@@ -132,8 +170,8 @@ Sie enthält alle kanonischen Step-Phrasen als Referenz für die spätere Testau
 
 ### Nächste Schritte (Priorität)
 
-1. **TASK-003** Use Cases an ORM ankoppeln (Slice für Slice, behave bleibt GREEN)
-2. **TASK-004** REST-Endpunkte (`views.py` + `urls.py`) — ADR für DRF vs. JsonResponse anlegen
+1. **TASK-005** API-Integrationstests in `scoring/tests.py` (TestCase + TestClient)
+2. **TASK-006** Behave-Steps schrittweise auf HTTP umstellen (ADR-006, Slice für Slice)
 
 → Vollständiger Backlog: `BACKLOG.md` im Repo-Root
 
