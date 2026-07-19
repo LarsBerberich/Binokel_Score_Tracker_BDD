@@ -168,5 +168,7 @@ Wenn ein Agent auf eine Entscheidung stößt, die außerhalb seines Verantwortun
 | `docs/project-foundation.md` §17 | Mindestanforderungen an CI |
 | `docs/development-approach-v1.md` | Entwicklungszyklus, Phasenmodell |
 | `BACKLOG.md` | Aktueller Arbeitsfokus |
+| `docs/agents/coding-agent.md` | Detailbeschreibung Coding-Agent |
+| `docs/agents/rubber-duck-agent.md` | Detailbeschreibung Rubber-Duck-Agent |
 | `docs/agents/devops-agent.md` | Detailbeschreibung Dev/Ops-Agent |
 | `deploy/README.md` | Deployment-Runbook |

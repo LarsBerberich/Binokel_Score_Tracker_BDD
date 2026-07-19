@@ -78,6 +78,8 @@ müssen GitHub-Secrets und die VM eingerichtet werden (siehe `deploy/README.md`)
   - `deploy/README.md` — vollständiges Betriebsrunbook
 
 - [x] **TASK-CI-005** Agenten-Orchestrierung dokumentiert (19.07.2026)
+  - `docs/agents/coding-agent.md` — Rollenbeschreibung Coding-Agent
+  - `docs/agents/rubber-duck-agent.md` — Rollenbeschreibung Rubber-Duck-Agent
   - `docs/agents/devops-agent.md` — Rollenbeschreibung Dev/Ops-Agent
   - `docs/agents/orchestration.md` — Workflow für alle 3 Agenten (Coding, Rubber-Duck, Dev/Ops)
   - ADR-007 (GitHub Actions CI/CD), ADR-008 (VM-Deployment-Strategie)
