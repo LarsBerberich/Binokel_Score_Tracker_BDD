@@ -41,9 +41,11 @@ jobs:
           ssh-private-key: ${{ secrets.VM_SSH_KEY }}
 
       - name: VM-Host zu known_hosts hinzufügen
+        env:
+          KNOWN_HOSTS: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
         run: |
-          if [ -n "${{ secrets.VM_SSH_KNOWN_HOSTS }}" ]; then
-            echo "${{ secrets.VM_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          if [ -n "$KNOWN_HOSTS" ]; then
+            echo "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
           else
             ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
           fi

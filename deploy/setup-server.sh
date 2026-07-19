@@ -14,6 +14,12 @@
 
 set -euo pipefail
 
+# Dieses Skript muss als root ausgeführt werden.
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Fehler: Dieses Skript muss als root ausgeführt werden." >&2
+    exit 1
+fi
+
 DOMAIN="${1:?Fehler: Domain als erstes Argument angeben, z. B. binokel.example.com}"
 REPO_URL="${2:?Fehler: GitHub-Repo-URL als zweites Argument angeben}"
 APP_DIR="/opt/binokel/app"
