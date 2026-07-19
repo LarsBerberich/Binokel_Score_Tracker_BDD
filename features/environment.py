@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 
 # backend/ zum Python-Pfad hinzufügen, damit Django die Settings findet
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
