@@ -45,12 +45,14 @@ Der Dev/Ops-Agent liefert bei jeder Aufgabe:
 
 ## Leitlinien
 
-1. **Kein Downtime ohne Not**: Bei jeder Änderung die minimale Downtime anstreben. Beim Neustart von Diensten immer Healthcheck danach einplanen.
-2. **Secrets niemals im Code**: Alle Secrets in GitHub-Secrets oder `/etc/binokel/env` — nie im Repository.
-3. **12-Factor-Prinzipien**: Konfiguration ausschließlich über Umgebungsvariablen.
-4. **Least Privilege**: Jeder Prozess und Benutzer bekommt nur die minimal benötigten Rechte.
-5. **Dokumentation nach Änderung**: Nach jeder Infrastruktur-Änderung `deploy/README.md` und `BACKLOG.md` aktualisieren.
-6. **Rollback ist Pflicht**: Kein Deployment-Prozess ohne definierte Rollback-Strategie.
+1. **Session beginnt mit `BACKLOG.md`**: Jede Session startet mit dem Lesen von `BACKLOG.md`, um den aktuellen Arbeitsfokus zu erfassen.
+2. **Kein Downtime ohne Not**: Bei jeder Änderung die minimale Downtime anstreben. Beim Neustart von Diensten immer Healthcheck danach einplanen.
+3. **Secrets niemals im Code**: Alle Secrets in GitHub-Secrets oder `/etc/binokel/env` — nie im Repository.
+4. **12-Factor-Prinzipien**: Konfiguration ausschließlich über Umgebungsvariablen.
+5. **Least Privilege**: Jeder Prozess und Benutzer bekommt nur die minimal benötigten Rechte.
+6. **Dokumentation nach Änderung**: Nach jeder Infrastruktur-Änderung `deploy/README.md` aktualisieren. Zum Session-Ende zusätzlich `BACKLOG.md`, `docs/copilot-handover-v1.md` und die Repo-Memory (`/memories/repo/handover-status.md`) synchron aktualisieren (Normative Quelle: `docs/project-foundation.md` §18).
+7. **Rollback ist Pflicht**: Kein Deployment-Prozess ohne definierte Rollback-Strategie.
+8. **Nicht-triviale Entscheidungen nicht still durchentscheiden**: Infrastruktur- oder Release-Entscheidungen, die die vorhandene Dokumentation nicht eindeutig deckt, explizit benennen, vom Rubber-Duck-Agent prüfen lassen und bei Bedarf als ADR (`docs/adr/ADR-NNN-*.md`) festhalten, bevor sie umgesetzt werden.
 
 ---
 

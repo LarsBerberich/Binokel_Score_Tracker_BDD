@@ -150,6 +150,15 @@ Rückgabe-Artefakt:
 
 ---
 
+## Session-Start- und Session-Ende-Konvention
+
+Für alle Agenten verbindlich (Normative Quelle: `docs/project-foundation.md` §18):
+
+- **Session-Start**: Zuerst `BACKLOG.md` im Repo-Root lesen, um den aktuellen Arbeitsfokus zu erfassen.
+- **Session-Ende**: `BACKLOG.md`, `docs/copilot-handover-v1.md` und die Repo-Memory (`/memories/repo/handover-status.md`) immer **synchron** aktualisieren, damit der Projektstand konsistent bleibt.
+
+---
+
 ## Nicht-triviale Entscheidungen — Eskalationsregel
 
 Wenn ein Agent auf eine Entscheidung stößt, die außerhalb seines Verantwortungsbereichs liegt oder auf die die vorhandene Dokumentation keine klare Antwort gibt:

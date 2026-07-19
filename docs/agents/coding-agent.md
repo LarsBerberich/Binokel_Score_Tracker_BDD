@@ -50,7 +50,9 @@ Bei jeder relevanten Aenderung synchron aktualisieren:
 | Neuer Begriff | `docs/ubiquitous-language.md`, `docs/language-conventions.md` |
 | Regeländerung | `docs/rule-set-v1.md` |
 | Neues Werkzeug oder neue Abhängigkeit | `docs/development-approach-v1.md` oder ADR |
-| Projektstand geändert | `docs/copilot-handover-v1.md` und Repo-Memory |
+| Projektstand geändert | `BACKLOG.md`, `docs/copilot-handover-v1.md` und Repo-Memory (`/memories/repo/handover-status.md`) synchron |
+
+Zum Session-Ende werden `BACKLOG.md`, `docs/copilot-handover-v1.md` und die Repo-Memory (`/memories/repo/handover-status.md`) immer synchron aktualisiert.
 
 Normative Quelle: `docs/project-foundation.md` §18.
 
