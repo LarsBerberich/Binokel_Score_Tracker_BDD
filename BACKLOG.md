@@ -7,12 +7,14 @@
 
 ## ▶ Aktueller Fokus
 
-**TASK-006 ist abgeschlossen. Nächster Schritt noch offen — siehe Open/Priorisiert.**
+**TASK-006 ist abgeschlossen. Aktueller Dev/Ops-Fokus: TASK-CI-006 (erster Produktions-Deploy) — geplant, Runbook liegt vor.**
 
-**TASK-CI-001–004 — CI/CD-Pipeline aufgebaut (19.07.2026 — bereit zur Aktivierung)**
+**TASK-CI-001–005 — CI/CD-Pipeline + Betriebsfundament fertig.**
 
-GitHub Actions CI/CD ist implementiert. Vor dem ersten Produktions-Deployment
-müssen GitHub-Secrets und die VM eingerichtet werden (siehe `deploy/README.md`).
+**TASK-CI-006 — Runbook `deploy/runbook-task-ci-006.md` erstellt (19.07.2026).**
+Der Erst-Deploy ist vollständig geplant und dokumentiert (inkl. Internet-Hardening,
+ADR-009), aber **noch nicht auf einer realen VM ausgeführt**. Vor der Ausführung:
+Rubber-Duck-Review der Härtungsentscheidungen (siehe Runbook-Ende).
 
 ---
 
@@ -84,12 +86,17 @@ müssen GitHub-Secrets und die VM eingerichtet werden (siehe `deploy/README.md`)
   - `docs/agents/orchestration.md` — Workflow für alle 3 Agenten (Coding, Rubber-Duck, Dev/Ops)
   - ADR-007 (GitHub Actions CI/CD), ADR-008 (VM-Deployment-Strategie)
 
-- [ ] **TASK-CI-006** VM einrichten + erster Produktions-Deploy
-  - VM mit `deploy/setup-server.sh` initialisieren
-  - `/etc/binokel/env` mit Produktionskonfiguration befüllen
-  - GitHub-Secrets `VM_SSH_KEY`, `VM_HOST`, `VM_USER` hinterlegen
-  - Branch Protection für `main` aktivieren (ADR-007)
-  - Ersten Deploy manuell auslösen und verifizieren
+- [ ] **TASK-CI-006** VM einrichten + erster Produktions-Deploy — **geplant** (Runbook liegt vor, noch nicht ausgeführt)
+  - **Ausführungsanleitung:** `deploy/runbook-task-ci-006.md` (Phasen 0–6 mit Verifikation + Rollback)
+  - Ziel-Infrastruktur: neue 1&1/IONOS-VM mit frischem Ubuntu LTS (z. B. 24.04)
+  - Phase 1: Internet-Hardening (Admin-User, SSH-Key-only, sshd-Härtung) — manuell (ADR-009)
+  - Phase 2: VM mit `deploy/setup-server.sh` initialisieren (inkl. fail2ban, unattended-upgrades, chrony)
+  - Phase 3: `/etc/binokel/env` mit Produktionskonfiguration befüllen (640 root:binokel-app)
+  - Phase 4: Deploy-SSH-Key + GitHub-Secrets `VM_SSH_KEY`, `VM_HOST`, `VM_USER`, `VM_SSH_KNOWN_HOSTS`
+  - Phase 5: Branch Protection für `main` aktivieren (ADR-007)
+  - Phase 6: Ersten Deploy manuell auslösen (CD → workflow_dispatch, confirm=yes) und verifizieren
+  - **Offen:** Ausführung auf realer VM (benötigt Zugangsdaten, Domain); Rubber-Duck-Review der Härtung (Punkte am Ende des Runbooks)
+  - V1 nutzt SQLite; Docker + PostgreSQL als späterer Meilenstein (ADR-008)
 
 ### Phase 2 – Frontend (Vue) — noch nicht gestartet
 
@@ -138,6 +145,7 @@ müssen GitHub-Secrets und die VM eingerichtet werden (siehe `deploy/README.md`)
 | ADR-006 | Behave-Tests via HTTP (Blackbox) statt direkter Use-Case-Aufrufe |
 | ADR-007 | GitHub Actions als CI/CD-Toolchain |
 | ADR-008 | VM-Deployment: systemd/Gunicorn/Nginx, kein Docker |
+| ADR-009 | Internet-Hardening-Baseline der VM |
 
 ---
 

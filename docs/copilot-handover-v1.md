@@ -16,15 +16,10 @@ Für Entwicklungsprozess und technische Entscheidungen:
 
 - `docs/project-foundation.md` – Produktvision, BDD-Strategie, Architektur- und Technologieprinzipien
 - `docs/development-approach-v1.md` – Operativer Entwicklungsansatz: Outside-In, RED-Green-Refactor, Vertikale Slices, Phasenmodell
-<<<<<<< HEAD
-- `docs/rubber-duck-agent-v1.md` – Rollen- und Prompt-Guide für den ergänzenden Rubber-Duck-Agenten
-- `docs/devops-agent-v1.md` – Rollen- und Prompt-Guide für den DevOps-Agenten (CI/CD, Deployment, Infrastruktur)
-=======
 - `docs/agents/coding-agent.md` – Rollenbeschreibung Coding-Agent
 - `docs/agents/rubber-duck-agent.md` – Rollen- und Prompt-Guide für den ergänzenden Rubber-Duck-Agenten
 - `docs/agents/devops-agent.md` – Rollenbeschreibung Dev/Ops-Agent
 - `docs/agents/orchestration.md` – Orchestrierungs-Workflow der Agenten
->>>>>>> a7e724b (alle Agentenbeschreibungen in einem Verzeichnis und deconflicted)
 - `docs/adr/ADR-001-backend-vor-frontend.md` – Backend vor Frontend in Phase 1
 - `docs/adr/ADR-002-vertikale-slices.md` – Vertikale Slices statt horizontaler Schichten
 - `docs/adr/ADR-003-behave-als-bdd-toolchain.md` – behave als BDD-Toolchain für Django
@@ -33,6 +28,7 @@ Für Entwicklungsprozess und technische Entscheidungen:
 - `docs/adr/ADR-006-behave-http-blackbox-tests.md` – Behave-Akzeptanztests via HTTP (Blackbox)
 - `docs/adr/ADR-007-github-actions-ci-cd.md` – GitHub Actions als CI/CD-Toolchain
 - `docs/adr/ADR-008-vm-deployment-strategie.md` – VM-Deployment via systemd/Gunicorn/Nginx
+- `docs/adr/ADR-009-internet-hardening-baseline.md` – Internet-Hardening-Baseline der VM
 
 ## V1-Scope
 V1 unterstützt ausschließlich:
@@ -88,6 +84,38 @@ Nicht Teil von V1 sind insbesondere:
 - Kein Einfluss auf den numerischen Punktestand
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
+
+## Stand 19.07.2026 (TASK-CI-006 geplant — Dev/Ops)
+
+### Erledigt (reine Planung/Dokumentation, KEINE Ausführung auf realer VM)
+
+Für den ersten Produktions-Deploy wurde ein vollständiges Runbook erstellt. Es wurden
+**keine** SSH-Verbindungen aufgebaut, **keine** echten Secrets erzeugt und **kein**
+Deploy ausgelöst.
+
+- `deploy/runbook-task-ci-006.md` — **neu**: Schritt-für-Schritt-Runbook (Phasen 0–6)
+  mit Verifikation + Rollback je Phase, Betriebsrisiken-Tabelle, V2-Migrationsausblick
+  (Docker + PostgreSQL) und Rubber-Duck-Review-Punkten.
+- `docs/adr/ADR-009-internet-hardening-baseline.md` — **neu**: Internet-Hardening-
+  Baseline der VM (SSH-Key-only, sshd-Hardening, UFW, fail2ban, unattended-upgrades,
+  chrony, TLS). Ergänzt ADR-008 (deckt SQLite-für-V1 + Docker/PostgreSQL-Pfad ab).
+- `deploy/setup-server.sh` — **geändert**: idempotent um `fail2ban`,
+  `unattended-upgrades` und `chrony` ergänzt (Schritt 10/10). sshd-Hardening bleibt
+  bewusst manuell (Lockout-Risiko, ADR-009).
+- `deploy/README.md` — **geändert**: Hardening-Abschnitt + Verweis auf das Runbook.
+- `BACKLOG.md` — TASK-CI-006 präzisiert (Status: geplant), ADR-009 ergänzt.
+
+**Nebenbefund:** In diesem Dokument standen unaufgelöste Merge-Konflikt-Marker
+(`<<<<<<<`/`>>>>>>>`) im Abschnitt „Engineering-Dokumente" — beim Update bereinigt
+(deconflictete `docs/agents/*`-Variante übernommen).
+
+### Nächste Schritte (Dev/Ops)
+
+1. **Rubber-Duck-Review** der Härtungsentscheidungen (Punkte am Ende des Runbooks).
+2. **TASK-CI-006 ausführen** auf realer 1&1/IONOS-VM (benötigt Zugangsdaten, Domain,
+   DNS). Ablauf strikt nach `deploy/runbook-task-ci-006.md`.
+
+---
 
 ## Stand 26.06.2026
 

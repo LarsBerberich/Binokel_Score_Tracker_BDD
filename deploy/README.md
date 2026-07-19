@@ -1,6 +1,11 @@
 # Deploy-Dokumentation — Binokel Score Tracker
 
-Dieses Verzeichnis enthält alle Artefakte für das Production-Deployment auf einer **1&1 Linux-VM** (Debian/Ubuntu).
+Dieses Verzeichnis enthält alle Artefakte für das Production-Deployment auf einer **1&1 / IONOS Linux-VM** (Ubuntu LTS, z. B. 24.04).
+
+> **Erster Produktions-Deploy (TASK-CI-006):** Die vollständige, phasenweise
+> Schritt-für-Schritt-Anleitung inklusive **Internet-Hardening**, Verifikation und
+> Rollback je Phase steht in **[`runbook-task-ci-006.md`](runbook-task-ci-006.md)**.
+> Dieses README bleibt die laufende Betriebsreferenz.
 
 ---
 
@@ -8,21 +13,49 @@ Dieses Verzeichnis enthält alle Artefakte für das Production-Deployment auf ei
 
 | Datei | Zweck |
 |---|---|
+| `runbook-task-ci-006.md` | Schritt-für-Schritt-Runbook für den erstmaligen Aufbau + Erst-Deploy |
 | `setup-server.sh` | Einmaliges Server-Initialsetup (als root ausführen) |
 | `binokel-tracker.service` | systemd-Unit: startet die Django-App via Gunicorn |
 | `nginx.conf.template` | Nginx Reverse-Proxy-Konfiguration mit TLS (Platzhalter ersetzen) |
 
 ---
 
+## Internet-Hardening der VM
+
+Vor dem Anwendungsbetrieb im offenen Internet wird die VM gemäß
+**[ADR-009](../docs/adr/ADR-009-internet-hardening-baseline.md)** gehärtet. Die
+Baseline und die genaue Aufgabenteilung stehen im
+[Runbook, Phase 1 + 2](runbook-task-ci-006.md).
+
+| Maßnahme | Wo eingerichtet |
+|---|---|
+| Non-root Admin-User + sudo, SSH-Key-only | **manuell**, Runbook Phase 1 |
+| sshd-Hardening (Root-/Passwort-Login aus, `MaxAuthTries`) | **manuell**, Runbook Phase 1 |
+| UFW-Firewall (nur SSH/HTTP/HTTPS) | `setup-server.sh` |
+| fail2ban (SSH-Brute-Force-Schutz) | `setup-server.sh` |
+| unattended-upgrades (automatische Sicherheitsupdates) | `setup-server.sh` |
+| chrony (Zeit-Synchronisation) | `setup-server.sh` |
+| TLS/HTTPS-Erzwingung + HSTS | `setup-server.sh` + `nginx.conf.template` |
+
+> **Warum das sshd-Hardening manuell bleibt:** Ein Skript kann sich nicht selbst
+> gegen einen SSH-Lockout absichern; das sichere Vorgehen erfordert eine zweite,
+> parallel offene Sitzung zur Verifikation (menschliche Kontrollhandlung). Begründung
+> siehe ADR-009. `fail2ban`, `unattended-upgrades` und `chrony` sind idempotent und
+> ohne Lockout-Risiko und werden daher automatisiert.
+
+---
+
 ## Erstmaliges Server-Setup
 
+> Ausführliche Fassung mit Verifikation und Rollback: [Runbook](runbook-task-ci-006.md).
+
 ```bash
-# 1. Per SSH als root anmelden
+# 1. Per SSH als root anmelden (Erst-Login; danach Hardening laut Runbook Phase 1)
 ssh root@IHRE_VM_IP
 
-# 2. Setup-Skript herunterladen und ausführen
+# 2. Setup-Skript herunterladen und ausführen (nach abgeschlossenem Hardening)
 curl -LO https://raw.githubusercontent.com/LarsBerberich/Binokel_Score_Tracker_BDD/main/deploy/setup-server.sh
-bash setup-server.sh IHRE_DOMAIN https://github.com/LarsBerberich/Binokel_Score_Tracker_BDD.git
+sudo bash setup-server.sh IHRE_DOMAIN https://github.com/LarsBerberich/Binokel_Score_Tracker_BDD.git
 ```
 
 Das Skript richtet folgendes ein:
@@ -30,6 +63,7 @@ Das Skript richtet folgendes ein:
 - Verzeichnisstruktur unter `/opt/binokel/`
 - systemd-Dienst und Nginx mit TLS (Let's Encrypt via Certbot)
 - Firewall (UFW: nur SSH, HTTP, HTTPS)
+- **fail2ban, unattended-upgrades, chrony** (Härtung, siehe oben)
 - Logrotation
 
 ---

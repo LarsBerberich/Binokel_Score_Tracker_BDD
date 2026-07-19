@@ -249,13 +249,7 @@ Verbindliche Rollen:
 | Rubber-Duck-Agent | Kritische Gegenprüfung von Logik, Fachsprache und Risiko | Eigenständiges Implementieren |
 | DevOps-Agent | CI/CD-Pipelines, Deployment, Infrastruktur-Konfiguration | Fachliche Domänenlogik |
 
-<<<<<<< HEAD
-Die operativen Leitfäden sowie wiederverwendbare Prompt-Templates sind in den jeweiligen Agent-Dokumenten abgelegt:
-- `docs/rubber-duck-agent-v1.md`
-- `docs/devops-agent-v1.md`
-=======
 Die Rollenbeschreibungen liegen gebündelt unter `docs/agents/`: `coding-agent.md`, `rubber-duck-agent.md`, `devops-agent.md` und `orchestration.md`.
->>>>>>> a7e724b (alle Agentenbeschreibungen in einem Verzeichnis und deconflicted)
 
 ---
 
