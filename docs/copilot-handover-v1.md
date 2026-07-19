@@ -21,6 +21,10 @@ Für Entwicklungsprozess und technische Entscheidungen:
 - `docs/adr/ADR-002-vertikale-slices.md` – Vertikale Slices statt horizontaler Schichten
 - `docs/adr/ADR-003-behave-als-bdd-toolchain.md` – behave als BDD-Toolchain für Django
 - `docs/adr/ADR-004-repository-pattern.md` – Repository Pattern zur Trennung von Domäne und Persistenz
+- `docs/adr/ADR-005-jsonresponse-statt-drf.md` – JsonResponse statt Django REST Framework für V1
+- `docs/adr/ADR-006-behave-http-blackbox-tests.md` – Behave-Akzeptanztests via HTTP (Blackbox)
+- `docs/adr/ADR-007-github-actions-ci-cd.md` – GitHub Actions als CI/CD-Toolchain
+- `docs/adr/ADR-008-vm-deployment-strategie.md` – VM-Deployment via systemd/Gunicorn/Nginx
 
 ## V1-Scope
 V1 unterstützt ausschließlich:
@@ -107,6 +111,37 @@ Sie enthält alle kanonischen Step-Phrasen als Referenz für die spätere Testau
 2. ~~Projektstruktur aufsetzen~~ → noch offen
 3. ~~Step-Definitionen schreiben~~ → noch offen
 4. ~~Domänenlogik implementieren~~ → noch offen
+
+---
+
+## Stand 19.07.2026 (CI/CD)
+
+### Abgeschlossen
+
+**CI/CD-Pipeline + Dev/Ops-Fundament:**
+- `backend/binokel_tracker/settings.py` — produktionsreife Konfiguration via Env-Vars (12-Factor)
+  - `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_DB_PATH`,
+    `DJANGO_STATIC_ROOT`, `DJANGO_CSRF_TRUSTED_ORIGINS`
+  - Automatische HSTS/Secure-Cookie-Aktivierung bei `DEBUG=False`
+- `backend/binokel_tracker/urls.py` — `/health/`-Endpunkt für Deployment-Healthchecks
+- `.github/workflows/ci.yml` — CI: Django-Check + BDD-Szenarien bei jedem Push/PR
+- `.github/workflows/cd.yml` — CD: rsync auf 1&1-VM, Migrationen, Neustart, Healthcheck, Rollback
+- `deploy/binokel-tracker.service` — systemd-Unit (Gunicorn)
+- `deploy/nginx.conf.template` — Nginx Reverse Proxy mit TLS
+- `deploy/setup-server.sh` — einmaliges Server-Initialsetup
+- `deploy/README.md` — vollständiges Betriebsrunbook
+- `docs/agents/devops-agent.md` — Rollenbeschreibung Dev/Ops-Agent
+- `docs/agents/orchestration.md` — Orchestrierungs-Workflow der 3 Agenten
+- `docs/adr/ADR-007-github-actions-ci-cd.md`
+- `docs/adr/ADR-008-vm-deployment-strategie.md`
+- 28/28 Behave-Szenarien weiterhin GREEN
+
+### Nächste Schritte (Priorität)
+
+1. **TASK-CI-006** VM einrichten und ersten Produktions-Deploy durchführen
+   - Benötigt: Zugangsdaten zur 1&1-VM, Domain, GitHub-Secrets
+   - Schritte: `deploy/README.md`
+2. Weitere Priorisierung siehe `BACKLOG.md` im Repo-Root
 
 ---
 

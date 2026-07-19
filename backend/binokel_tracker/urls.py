@@ -15,6 +15,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import path
 
 from scoring.views import (
@@ -25,8 +26,15 @@ from scoring.views import (
     spiele_view,
 )
 
+
+def healthcheck(request):
+    """Minimaler Healthcheck-Endpunkt für den Deployment-Pipeline-Check."""
+    return JsonResponse({"status": "ok"})
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("health/", healthcheck, name="healthcheck"),
     # Slice 1: Spiel anlegen / laden
     path("api/spiele/", spiele_view, name="spiele"),
     path("api/spiele/<int:spiel_id>/", spiel_detail_view, name="spiel-detail"),
@@ -36,4 +44,3 @@ urlpatterns = [
     path("api/spiele/<int:spiel_id>/punktestaende/", punktestaende_view, name="punktestaende"),
     path("api/spiele/<int:spiel_id>/sieger/", sieger_view, name="sieger"),
 ]
-

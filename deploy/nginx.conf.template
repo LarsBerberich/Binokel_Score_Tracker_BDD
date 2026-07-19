@@ -1,0 +1,77 @@
+# Nginx-Konfiguration für den Binokel Score Tracker
+#
+# Vor dem Einsatz alle REPLACE_WITH_... Platzhalter ersetzen:
+#   REPLACE_WITH_YOUR_DOMAIN  — z. B. binokel.example.com
+#
+# TLS-Zertifikat mit Certbot einrichten:
+#   certbot --nginx -d REPLACE_WITH_YOUR_DOMAIN
+# (Certbot schreibt die ssl_certificate-Pfade automatisch ein)
+
+upstream binokel_app {
+    server unix:/run/binokel/binokel.sock fail_timeout=0;
+}
+
+# ── HTTP → HTTPS-Weiterleitung ─────────────────────────────────────────────
+server {
+    listen 80;
+    listen [::]:80;
+    server_name REPLACE_WITH_YOUR_DOMAIN;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ── HTTPS-Server ───────────────────────────────────────────────────────────
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name REPLACE_WITH_YOUR_DOMAIN;
+
+    # Zertifikatspfade (von Certbot automatisch gesetzt):
+    ssl_certificate     /etc/letsencrypt/live/REPLACE_WITH_YOUR_DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/REPLACE_WITH_YOUR_DOMAIN/privkey.pem;
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Sicherheits-Header
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+    # Statische Dateien direkt aus dem Dateisystem
+    location /static/ {
+        alias /opt/binokel/static/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # Healthcheck (intern, kein Logging)
+    location /health/ {
+        proxy_pass http://binokel_app;
+        access_log off;
+    }
+
+    # Django-Anwendung
+    location / {
+        proxy_pass         http://binokel_app;
+        proxy_redirect     off;
+
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 60s;
+        proxy_read_timeout    90s;
+        proxy_send_timeout    90s;
+
+        client_max_body_size 10M;
+    }
+}

@@ -9,6 +9,11 @@
 
 **TASK-006 ist abgeschlossen. Nächster Schritt noch offen — siehe Open/Priorisiert.**
 
+**TASK-CI-001–004 — CI/CD-Pipeline aufgebaut (19.07.2026 — bereit zur Aktivierung)**
+
+GitHub Actions CI/CD ist implementiert. Vor dem ersten Produktions-Deployment
+müssen GitHub-Secrets und die VM eingerichtet werden (siehe `deploy/README.md`).
+
 ---
 
 ## Offen / Priorisiert
@@ -50,6 +55,39 @@
   - Slices 2–5: Domänen-Steps bleiben (testen interne Berechnungsregeln, nicht HTTP-sichtbar)
   - Slice 6: Domänen-Steps bleiben (Punktestände werden direkt gesetzt, keine passenden HTTP-Endpunkte)
   - Normative Quelle: ADR-006
+
+### Phase 1 – DevOps / CI/CD
+
+- [x] **TASK-CI-001** GitHub Actions CI-Workflow (19.07.2026)
+  - `.github/workflows/ci.yml` — Django-Check + 28 BDD-Szenarien auf jedem Push/PR
+  - Verwendet `uv` und Python 3.14 (entspricht `.python-version`)
+
+- [x] **TASK-CI-002** GitHub Actions CD-Workflow (19.07.2026)
+  - `.github/workflows/cd.yml` — SSH-Deploy auf 1&1 VM nach CI-Erfolg auf `main`
+  - rsync + Migrationen + collectstatic + systemd-Restart + Healthcheck + Rollback
+
+- [x] **TASK-CI-003** Django-Settings produktionsreif (19.07.2026)
+  - `settings.py` liest Konfiguration aus Env-Vars (SECRET_KEY, DEBUG, ALLOWED_HOSTS, …)
+  - Production-Sicherheitseinstellungen (HSTS, Secure Cookies) bei `DEBUG=False`
+  - `/health/`-Endpunkt in `urls.py` für Deployment-Healthchecks
+
+- [x] **TASK-CI-004** Server-Setup und Betriebsdokumentation (19.07.2026)
+  - `deploy/setup-server.sh` — Einmal-Setup für VM (Debian/Ubuntu)
+  - `deploy/binokel-tracker.service` — systemd-Unit (Gunicorn)
+  - `deploy/nginx.conf.template` — Nginx mit TLS
+  - `deploy/README.md` — vollständiges Betriebsrunbook
+
+- [x] **TASK-CI-005** Agenten-Orchestrierung dokumentiert (19.07.2026)
+  - `docs/agents/devops-agent.md` — Rollenbeschreibung Dev/Ops-Agent
+  - `docs/agents/orchestration.md` — Workflow für alle 3 Agenten (Coding, Rubber-Duck, Dev/Ops)
+  - ADR-007 (GitHub Actions CI/CD), ADR-008 (VM-Deployment-Strategie)
+
+- [ ] **TASK-CI-006** VM einrichten + erster Produktions-Deploy
+  - VM mit `deploy/setup-server.sh` initialisieren
+  - `/etc/binokel/env` mit Produktionskonfiguration befüllen
+  - GitHub-Secrets `VM_SSH_KEY`, `VM_HOST`, `VM_USER` hinterlegen
+  - Branch Protection für `main` aktivieren (ADR-007)
+  - Ersten Deploy manuell auslösen und verifizieren
 
 ### Phase 2 – Frontend (Vue) — noch nicht gestartet
 
@@ -96,6 +134,8 @@
 | ADR-004 | Repository Pattern (Trennung Domäne/Persistenz) |
 | ADR-005 | JsonResponse statt DRF für V1-API |
 | ADR-006 | Behave-Tests via HTTP (Blackbox) statt direkter Use-Case-Aufrufe |
+| ADR-007 | GitHub Actions als CI/CD-Toolchain |
+| ADR-008 | VM-Deployment: systemd/Gunicorn/Nginx, kein Docker |
 
 ---
 

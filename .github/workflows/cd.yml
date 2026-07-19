@@ -1,0 +1,131 @@
+name: CD – Deploy auf 1&1 VM
+
+# Auslieferung erfolgt nur manuell oder nach explizitem Push auf den main-Branch.
+# Automatisch wird NUR deployed, wenn alle CI-Tests bestehen.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Deploy auf Production bestätigen (yes)'
+        required: true
+        default: 'no'
+
+jobs:
+  deploy:
+    name: Production-Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    # Bei workflow_run: nur wenn CI erfolgreich war.
+    # Bei manuellem Dispatch: nur wenn explizit bestätigt.
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.confirm == 'yes')
+
+    environment:
+      name: production
+      url: https://${{ secrets.VM_HOST }}
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: SSH-Schlüssel einrichten
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VM_SSH_KEY }}
+
+      - name: VM-Host zu known_hosts hinzufügen
+        env:
+          KNOWN_HOSTS: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
+        run: |
+          if [ -n "$KNOWN_HOSTS" ]; then
+            echo "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
+          fi
+
+      - name: Deploy-Preflight prüfen
+        run: |
+          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" << 'REMOTE'
+            set -e
+            echo "--- uv verfügbar?"
+            command -v uv
+            echo "--- App-Verzeichnis vorhanden?"
+            test -d /opt/binokel/app
+            echo "--- Umgebungsdatei vorhanden?"
+            test -f /etc/binokel/env
+            echo "--- systemd-Unit vorhanden?"
+            test -f /etc/systemd/system/binokel-tracker.service
+            echo "✅ Alle Preflight-Prüfungen bestanden"
+          REMOTE
+
+      - name: Code auf VM synchronisieren
+        run: |
+          rsync -az --delete \
+            --exclude='.git/' \
+            --exclude='*.pyc' \
+            --exclude='__pycache__/' \
+            --exclude='backend/db.sqlite3' \
+            --exclude='backend/staticfiles/' \
+            --exclude='backend/.venv/' \
+            ./ \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/opt/binokel/app/"
+
+      - name: Abhängigkeiten installieren, Migrationen anwenden, Static Files sammeln
+        run: |
+          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" << 'REMOTE'
+            set -e
+            cd /opt/binokel/app/backend
+            uv sync --no-dev
+            uv run python manage.py migrate --noinput
+            uv run python manage.py collectstatic --noinput
+          REMOTE
+
+      - name: Dienst neu starten
+        run: |
+          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+            "sudo systemctl restart binokel-tracker.service"
+
+      - name: Healthcheck (max. 30 Sekunden warten)
+        run: |
+          for i in $(seq 1 10); do
+            STATUS=$(ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+              "curl -s -o /dev/null -w '%{http_code}' http://localhost/health/")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Healthcheck erfolgreich (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "⏳ Warte auf Dienst... ($i/10, HTTP $STATUS)"
+            sleep 3
+          done
+          echo "❌ Healthcheck fehlgeschlagen — Diagnoseinformationen:"
+          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+            "sudo systemctl status binokel-tracker.service --no-pager || true"
+          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+            "journalctl -u binokel-tracker.service --no-pager -n 50 || true"
+          exit 1
+
+# ── Benötigte GitHub-Secrets ──────────────────────────────────────────────────
+# Repository Settings → Secrets and Variables → Actions:
+#
+#   VM_SSH_KEY            — SSH-Private-Key des Deploy-Benutzers (ohne Passphrase)
+#   VM_HOST               — Hostname oder IP der 1&1 VM (z. B. 192.0.2.10)
+#   VM_USER               — Deploy-Benutzername auf der VM (z. B. binokel-deploy)
+#   VM_SSH_KNOWN_HOSTS    — (optional) Bekannte Host-Keys der VM (empfohlen für Produktion).
+#                           Inhalt: Zeile(n) im known_hosts-Format, z. B. aus
+#                           `ssh-keyscan -H <VM_HOST>`. Wenn nicht gesetzt, wird
+#                           ssh-keyscan beim Deploy ausgeführt (weniger sicher).
+#
+# Auf der VM als Umgebungsvariablen in /etc/binokel/env:
+#   DJANGO_SECRET_KEY          — sicherer, zufälliger Schlüssel (min. 50 Zeichen)
+#   DJANGO_DEBUG               — False
+#   DJANGO_ALLOWED_HOSTS       — VM-Hostname oder Domain (z. B. binokel.example.com)
+#   DJANGO_DB_PATH             — /opt/binokel/data/db.sqlite3
+#   DJANGO_STATIC_ROOT         — /opt/binokel/static
+#   DJANGO_CSRF_TRUSTED_ORIGINS — https://binokel.example.com
