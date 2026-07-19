@@ -205,7 +205,7 @@ def punktestaende_laden(spiel_id: int) -> dict[str, int]:
             # Einfaches oder doppeltes Abgehen: nur Spielmacher trägt Verlust
             punkte[runde.spielmacher.name] += runde.verlustwert  # verlustwert ist negativ
 
-        # Gegenspieler: gewertet Meldepunkte + Stichwerte + Mitpunkte (normativ: §12.2, §13.3, §14.3)
+        # Gegenspieler: gewertete Meldepunkte + Stichwerte + Mitpunkte (normativ: §12.2, §13.3, §14.3)
         # Hinweis: meldepunkte in GegenspielerRundeModel sind bereits stich-zwang-gewertet gespeichert.
         for gs in runde.gegenspieler.all():
             punkte[gs.spieler.name] += (
