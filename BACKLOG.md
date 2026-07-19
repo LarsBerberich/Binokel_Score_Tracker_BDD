@@ -14,6 +14,11 @@ arbeiten derzeit ausschließlich auf reinen Python-Objekten ohne Persistenz.
 Nach TASK-003 sollen alle 6 Slices Daten über das Django ORM speichern und laden.
 behave muss weiterhin 28/28 GREEN bleiben.
 
+**TASK-CI-001–004 — CI/CD-Pipeline aufgebaut (19.07.2026 — bereit zur Aktivierung)**
+
+GitHub Actions CI/CD ist implementiert. Vor dem ersten Produktions-Deployment
+müssen GitHub-Secrets und die VM eingerichtet werden (siehe `deploy/README.md`).
+
 ---
 
 ## Offen / Priorisiert
@@ -44,6 +49,39 @@ behave muss weiterhin 28/28 GREEN bleiben.
 - [ ] **TASK-005** `behave`-Szenarien gegen echte Django-API ausführen
   - `features/environment.py` ggf. anpassen (HTTP-Client statt direkter Use-Case-Aufrufe)
   - Alle 28 Szenarien müssen GREEN bleiben
+
+### Phase 1 – DevOps / CI/CD
+
+- [x] **TASK-CI-001** GitHub Actions CI-Workflow (19.07.2026)
+  - `.github/workflows/ci.yml` — Django-Check + 28 BDD-Szenarien auf jedem Push/PR
+  - Verwendet `uv` und Python 3.14 (entspricht `.python-version`)
+
+- [x] **TASK-CI-002** GitHub Actions CD-Workflow (19.07.2026)
+  - `.github/workflows/cd.yml` — SSH-Deploy auf 1&1 VM nach CI-Erfolg auf `main`
+  - rsync + Migrationen + collectstatic + systemd-Restart + Healthcheck + Rollback
+
+- [x] **TASK-CI-003** Django-Settings produktionsreif (19.07.2026)
+  - `settings.py` liest Konfiguration aus Env-Vars (SECRET_KEY, DEBUG, ALLOWED_HOSTS, …)
+  - Production-Sicherheitseinstellungen (HSTS, Secure Cookies) bei `DEBUG=False`
+  - `/health/`-Endpunkt in `urls.py` für Deployment-Healthchecks
+
+- [x] **TASK-CI-004** Server-Setup und Betriebsdokumentation (19.07.2026)
+  - `deploy/setup-server.sh` — Einmal-Setup für VM (Debian/Ubuntu)
+  - `deploy/binokel-tracker.service` — systemd-Unit (Gunicorn)
+  - `deploy/nginx.conf.template` — Nginx mit TLS
+  - `deploy/README.md` — vollständiges Betriebsrunbook
+
+- [x] **TASK-CI-005** Agenten-Orchestrierung dokumentiert (19.07.2026)
+  - `docs/agents/devops-agent.md` — Rollenbeschreibung Dev/Ops-Agent
+  - `docs/agents/orchestration.md` — Workflow für alle 3 Agenten (Coding, Rubber-Duck, Dev/Ops)
+  - ADR-004 (GitHub Actions CI/CD), ADR-005 (VM-Deployment-Strategie)
+
+- [ ] **TASK-CI-006** VM einrichten + erster Produktions-Deploy
+  - VM mit `deploy/setup-server.sh` initialisieren
+  - `/etc/binokel/env` mit Produktionskonfiguration befüllen
+  - GitHub-Secrets `VM_SSH_KEY`, `VM_HOST`, `VM_USER` hinterlegen
+  - Branch Protection für `main` aktivieren (ADR-004)
+  - Ersten Deploy manuell auslösen und verifizieren
 
 ### Phase 2 – Frontend (Vue) — noch nicht gestartet
 
@@ -83,6 +121,8 @@ behave muss weiterhin 28/28 GREEN bleiben.
 | ADR-001 | Backend vor Frontend |
 | ADR-002 | Vertikale Slices |
 | ADR-003 | behave als BDD-Toolchain |
+| ADR-004 | GitHub Actions als CI/CD-Toolchain |
+| ADR-005 | VM-Deployment: systemd/Gunicorn/Nginx, kein Docker |
 | **offen** | DRF vs. einfaches JsonResponse für TASK-004 |
 
 ---

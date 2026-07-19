@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    name: BDD Akzeptanztests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: uv einrichten
+        uses: astral-sh/setup-uv@v5
+
+      - name: Python 3.14 installieren
+        working-directory: backend
+        run: uv python install
+
+      - name: Abhängigkeiten installieren
+        working-directory: backend
+        run: uv sync --dev
+
+      - name: Django-Systemprüfung
+        working-directory: backend
+        run: uv run python manage.py check
+
+      - name: Datenbankmigrationen prüfen (keine ausstehenden)
+        working-directory: backend
+        run: uv run python manage.py migrate --check
+
+      - name: BDD-Akzeptanztests ausführen (28/28 müssen GREEN sein)
+        env:
+          PYTHONPATH: backend
+        run: backend/.venv/bin/python -m behave

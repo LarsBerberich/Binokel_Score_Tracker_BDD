@@ -1,0 +1,49 @@
+[Unit]
+Description=Binokel Score Tracker – Django via Gunicorn
+Documentation=https://github.com/LarsBerberich/Binokel_Score_Tracker_BDD
+After=network.target
+
+[Service]
+Type=notify
+
+# Betriebsbenutzer – darf NICHT root sein
+User=binokel-app
+Group=binokel-app
+
+# Arbeitsverzeichnis = Django-Backend
+WorkingDirectory=/opt/binokel/app/backend
+
+# Django-Konfiguration über EnvironmentFile (nie im Service-File hart kodieren!)
+Environment="DJANGO_SETTINGS_MODULE=binokel_tracker.settings"
+EnvironmentFile=/etc/binokel/env
+
+# Prozessstart: Gunicorn mit UNIX-Socket (Nginx kommuniziert darüber)
+ExecStart=/opt/binokel/app/backend/.venv/bin/gunicorn \
+    --workers 3 \
+    --bind unix:/run/binokel/binokel.sock \
+    --access-logfile /var/log/binokel/access.log \
+    --error-logfile /var/log/binokel/error.log \
+    --capture-output \
+    binokel_tracker.wsgi:application
+
+# Sauberes Reload ohne Downtime (SIGHUP sendet neuen Master-Prozess)
+ExecReload=/bin/kill -s HUP $MAINPID
+
+# Temporäres Verzeichnis für den UNIX-Socket
+RuntimeDirectory=binokel
+RuntimeDirectoryMode=0755
+
+# Sicherheitshärtung
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=full
+
+KillMode=mixed
+TimeoutStopSec=5
+
+# Automatischer Neustart bei Absturz (nicht bei manuellem Stop)
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

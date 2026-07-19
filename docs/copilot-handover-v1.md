@@ -108,6 +108,42 @@ Sie enthält alle kanonischen Step-Phrasen als Referenz für die spätere Testau
 
 ---
 
+---
+
+## Stand 19.07.2026
+
+### Abgeschlossen
+
+**CI/CD-Pipeline + Dev/Ops-Fundament:**
+- `backend/binokel_tracker/settings.py` — produktionsreife Konfiguration via Env-Vars (12-Factor)
+  - `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_DB_PATH`,
+    `DJANGO_STATIC_ROOT`, `DJANGO_CSRF_TRUSTED_ORIGINS`
+  - Automatische HSTS/Secure-Cookie-Aktivierung bei `DEBUG=False`
+- `backend/binokel_tracker/urls.py` — `/health/`-Endpunkt für Deployment-Healthchecks
+- `.github/workflows/ci.yml` — CI: Django-Check + BDD-Szenarien bei jedem Push/PR
+- `.github/workflows/cd.yml` — CD: rsync auf 1&1-VM, Migrationen, Neustart, Healthcheck, Rollback
+- `deploy/binokel-tracker.service` — systemd-Unit (Gunicorn)
+- `deploy/nginx.conf.template` — Nginx Reverse Proxy mit TLS
+- `deploy/setup-server.sh` — einmaliges Server-Initialsetup
+- `deploy/README.md` — vollständiges Betriebsrunbook
+- `docs/agents/devops-agent.md` — Rollenbeschreibung Dev/Ops-Agent
+- `docs/agents/orchestration.md` — Orchestrierungs-Workflow der 3 Agenten
+- `docs/adr/ADR-004-github-actions-ci-cd.md`
+- `docs/adr/ADR-005-vm-deployment-strategie.md`
+- 28/28 Behave-Szenarien weiterhin GREEN
+
+### Nächste Schritte (Priorität)
+
+1. **TASK-CI-006** VM einrichten und ersten Produktions-Deploy durchführen
+   - Benötigt: Zugangsdaten zur 1&1-VM, Domain, GitHub-Secrets
+   - Schritte: `deploy/README.md`
+2. **TASK-003** Use Cases an ORM ankoppeln (Slice für Slice, behave bleibt GREEN)
+3. **TASK-004** REST-Endpunkte (`views.py` + `urls.py`) — ADR für DRF vs. JsonResponse anlegen
+
+→ Vollständiger Backlog: `BACKLOG.md` im Repo-Root
+
+---
+
 ## Stand 18.07.2026
 
 ### Abgeschlossen
