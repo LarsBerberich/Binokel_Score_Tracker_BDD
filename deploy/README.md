@@ -116,7 +116,7 @@ Ein automatischer Rollback auf eine vorherige Anwendungsversion ist nicht implem
 
 1. Diagnoseinformationen im GitHub Actions-Log prüfen
 2. Fix entwickeln und auf `main` pushen (löst neuen Deploy aus)
-3. **Oder:** Letzten bekannt-guten Commit per `git revert` oder `git reset` auf `main` bringen
+3. **Oder:** Letzten bekannten guten Commit per `git revert` oder `git reset` auf `main` bringen
 
 ---
 
