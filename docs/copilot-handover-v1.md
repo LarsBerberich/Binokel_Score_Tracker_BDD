@@ -16,8 +16,15 @@ Für Entwicklungsprozess und technische Entscheidungen:
 
 - `docs/project-foundation.md` – Produktvision, BDD-Strategie, Architektur- und Technologieprinzipien
 - `docs/development-approach-v1.md` – Operativer Entwicklungsansatz: Outside-In, RED-Green-Refactor, Vertikale Slices, Phasenmodell
+<<<<<<< HEAD
 - `docs/rubber-duck-agent-v1.md` – Rollen- und Prompt-Guide für den ergänzenden Rubber-Duck-Agenten
 - `docs/devops-agent-v1.md` – Rollen- und Prompt-Guide für den DevOps-Agenten (CI/CD, Deployment, Infrastruktur)
+=======
+- `docs/agents/coding-agent.md` – Rollenbeschreibung Coding-Agent
+- `docs/agents/rubber-duck-agent.md` – Rollen- und Prompt-Guide für den ergänzenden Rubber-Duck-Agenten
+- `docs/agents/devops-agent.md` – Rollenbeschreibung Dev/Ops-Agent
+- `docs/agents/orchestration.md` – Orchestrierungs-Workflow der Agenten
+>>>>>>> a7e724b (alle Agentenbeschreibungen in einem Verzeichnis und deconflicted)
 - `docs/adr/ADR-001-backend-vor-frontend.md` – Backend vor Frontend in Phase 1
 - `docs/adr/ADR-002-vertikale-slices.md` – Vertikale Slices statt horizontaler Schichten
 - `docs/adr/ADR-003-behave-als-bdd-toolchain.md` – behave als BDD-Toolchain für Django
@@ -131,6 +138,8 @@ Sie enthält alle kanonischen Step-Phrasen als Referenz für die spätere Testau
 - `deploy/nginx.conf.template` — Nginx Reverse Proxy mit TLS
 - `deploy/setup-server.sh` — einmaliges Server-Initialsetup
 - `deploy/README.md` — vollständiges Betriebsrunbook
+- `docs/agents/coding-agent.md` — Rollenbeschreibung Coding-Agent
+- `docs/agents/rubber-duck-agent.md` — Rollenbeschreibung Rubber-Duck-Agent
 - `docs/agents/devops-agent.md` — Rollenbeschreibung Dev/Ops-Agent
 - `docs/agents/orchestration.md` — Orchestrierungs-Workflow der 3 Agenten
 - `docs/adr/ADR-007-github-actions-ci-cd.md`
