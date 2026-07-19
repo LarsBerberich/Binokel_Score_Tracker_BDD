@@ -34,7 +34,7 @@ jobs:
 
       - name: Datenbankmigrationen prüfen (keine neuen Migrationen erforderlich)
         working-directory: backend
-        run: uv run python manage.py makemigrations --check --dry-run
+        run: uv run python manage.py makemigrations --check
 
       - name: BDD-Akzeptanztests ausführen (28/28 müssen GREEN sein)
         env:
