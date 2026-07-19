@@ -247,7 +247,7 @@ Verbindliche Rollen:
 | Coding Agent | Umsetzung, Tests, Dokumentationspflege | Grundsatzdebatten ohne direkten Task-Bezug |
 | Rubber-Duck-Agent | Kritische Gegenprüfung von Logik, Fachsprache und Risiko | Eigenständiges Implementieren |
 
-Der operative Leitfaden und ein wiederverwendbares Prompt-Template sind in `docs/rubber-duck-agent-v1.md` festgehalten.
+Der operative Leitfaden sowie ein wiederverwendbares Prompt-Template sind in `docs/rubber-duck-agent-v1.md` dokumentiert.
 
 ---
 
