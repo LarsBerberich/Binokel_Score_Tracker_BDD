@@ -230,6 +230,25 @@ Am Ende jeder Session werden **drei Quellen synchron** aktualisiert:
 - `copilot-handover-v1.md` ist die **vollständige Projekthistorie** – chronologisch, für Onboarding und Nachvollziehbarkeit.
 - `handover-status.md` ist **AI-natives Memory** – wird von Copilot automatisch in den Kontext geladen.
 
+### Dual-Agenten-Workflow: Coding Agent + Rubber-Duck-Agent
+
+Für Implementierungsarbeit wird ein **2-Agenten-Modus** verwendet:
+
+1. Coding Agent erstellt oder aktualisiert den Umsetzungsplan pro Slice.
+2. Rubber-Duck-Agent prüft den Plan gegen `docs/rule-set-v1.md`, Architekturprinzipien und bekannte Edge Cases.
+3. Coding Agent implementiert die Änderungen.
+4. Rubber-Duck-Agent macht ein Abschluss-Review vor Session-Ende.
+5. Coding Agent übernimmt nur fachlich sinnvolle Findings und aktualisiert anschließend `BACKLOG.md` und `docs/copilot-handover-v1.md`.
+
+Verbindliche Rollen:
+
+| Agent | Fokus | Nicht-Ziel |
+|---|---|---|
+| Coding Agent | Umsetzung, Tests, Dokumentationspflege | Grundsatzdebatten ohne direkten Task-Bezug |
+| Rubber-Duck-Agent | Kritische Gegenprüfung von Logik, Fachsprache und Risiko | Eigenständiges Implementieren |
+
+Der operative Leitfaden und ein wiederverwendbares Prompt-Template sind in `docs/rubber-duck-agent-v1.md` festgehalten.
+
 ---
 
 ## 9. Verhältnis zu Architecture Decision Records (ADR)

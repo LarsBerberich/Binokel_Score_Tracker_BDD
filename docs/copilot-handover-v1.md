@@ -16,6 +16,7 @@ Für Entwicklungsprozess und technische Entscheidungen:
 
 - `docs/project-foundation.md` – Produktvision, BDD-Strategie, Architektur- und Technologieprinzipien
 - `docs/development-approach-v1.md` – Operativer Entwicklungsansatz: Outside-In, RED-Green-Refactor, Vertikale Slices, Phasenmodell
+- `docs/rubber-duck-agent-v1.md` – Rollen- und Prompt-Guide für den ergänzenden Rubber-Duck-Agenten
 - `docs/adr/ADR-001-backend-vor-frontend.md` – Backend vor Frontend in Phase 1
 - `docs/adr/ADR-002-vertikale-slices.md` – Vertikale Slices statt horizontaler Schichten
 - `docs/adr/ADR-003-behave-als-bdd-toolchain.md` – behave als BDD-Toolchain für Django
