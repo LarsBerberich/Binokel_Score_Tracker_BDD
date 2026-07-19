@@ -18,6 +18,8 @@ jobs:
   deploy:
     name: Production-Deploy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     # Bei workflow_run: nur wenn CI erfolgreich war.
     # Bei manuellem Dispatch: nur wenn explizit bestätigt.

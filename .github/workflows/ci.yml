@@ -10,6 +10,8 @@ jobs:
   test:
     name: BDD Akzeptanztests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Repository auschecken
