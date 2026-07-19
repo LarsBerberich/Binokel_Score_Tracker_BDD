@@ -24,7 +24,7 @@ Alternativen wurden verglichen:
 2. GitHub Actions läuft direkt auf dem Repository-Kontext und hat Zugriff auf Secrets ohne externen Secret-Store.
 3. Der Free-Tier reicht für den aktuellen Projektumfang (kleines Projekt, wenige Commits pro Tag).
 4. Die GitHub-Environments-Funktion bietet ein Deployment-Gate für `main` ohne zusätzliche Tooling.
-5. Workflow-Dateien liegen im Repo (`/home/runner/work/Binokel_Score_Tracker_BDD/Binokel_Score_Tracker_BDD/.github/workflows/`) und sind versioniert.
+5. Workflow-Dateien liegen im Repo (`.github/workflows/`) und sind versioniert.
 
 ## Konsequenzen
 

@@ -57,6 +57,16 @@ def _fehler(nachricht: str, status: int = 400) -> JsonResponse:
     return JsonResponse({"fehler": nachricht}, status=status)
 
 
+def _validierungsfehler_nachricht(exc: Exception) -> str:
+    if isinstance(exc, UngueltigeSpielerzahl):
+        return "Ungültige Spielerzahl: Es müssen genau 4 Spieler angegeben werden."
+    if isinstance(exc, UngueltigeRundenanzahl):
+        return "Ungültige Rundenzahl: Die Rundenzahl muss ein Vielfaches von 4 sein."
+    if isinstance(exc, UngueltigeStichwerte):
+        return "Ungültige Stichwerte."
+    return "Ungültige Eingabedaten."
+
+
 def _pflichtfeld(body: dict, *felder: str) -> str | None:
     """Gibt den Namen des ersten fehlenden Pflichtfelds zurück, oder None."""
     for feld in felder:
@@ -75,8 +85,8 @@ def spiele_view(request) -> JsonResponse:
 
     try:
         body = _json_body(request)
-    except ValueError as exc:
-        return _fehler(str(exc))
+    except ValueError:
+        return _fehler("Ungültiger JSON-Body.")
 
     fehlendes = _pflichtfeld(body, "spieler")
     if fehlendes:
@@ -88,7 +98,7 @@ def spiele_view(request) -> JsonResponse:
             rundenanzahl=body.get("rundenanzahl"),
         )
     except (UngueltigeSpielerzahl, UngueltigeRundenanzahl) as exc:
-        return _fehler(str(exc))
+        return _fehler(_validierungsfehler_nachricht(exc))
 
     spiel_model = spiel_persistieren(spiel)
 
@@ -148,8 +158,8 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
 
     try:
         body = _json_body(request)
-    except ValueError as exc:
-        return _fehler(str(exc))
+    except ValueError:
+        return _fehler("Ungültiger JSON-Body.")
 
     fehlendes = _pflichtfeld(body, "typ", "rundennummer", "spielmacher", "geber")
     if fehlendes:
@@ -280,8 +290,8 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
         )
     except ObjectDoesNotExist:
         return _fehler(f"Spiel {spiel_id} nicht gefunden.", status=404)
-    except (IntegrityError, ValueError) as exc:
-        return _fehler(str(exc), status=400)
+    except (IntegrityError, ValueError, UngueltigeStichwerte) as exc:
+        return _fehler(_validierungsfehler_nachricht(exc), status=400)
 
     return JsonResponse(
         {
