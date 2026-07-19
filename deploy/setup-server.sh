@@ -34,8 +34,9 @@ apt-get install -y -qq \
 
 echo "=== [3/9] uv installieren (Python-Paketmanager) ==="
 curl -LsSf https://astral.sh/uv/install.sh | sh
-# uv zum PATH hinzufügen (gilt für dieses Skript)
-export PATH="$HOME/.cargo/bin:$PATH"
+# uv systemweit verfügbar machen, damit auch nicht-interaktive SSH-Sessions
+# (z. B. der CD-Workflow) uv ohne Anpassung des PATH nutzen können.
+install -m 0755 "$HOME/.cargo/bin/uv" /usr/local/bin/uv
 
 echo "=== [4/9] Betriebsbenutzer anlegen ==="
 # Anwendungsbenutzer (keine Login-Shell, kein Home)
@@ -49,7 +50,6 @@ chmod 700 "/home/$DEPLOY_USER/.ssh"
 # Deploy-Benutzer darf systemctl für den App-Dienst ausführen (passwordlos)
 cat > "/etc/sudoers.d/binokel-deploy" << EOF
 $DEPLOY_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart binokel-tracker.service
-$DEPLOY_USER ALL=(ALL) NOPASSWD: /bin/systemctl rollback binokel-tracker.service
 $DEPLOY_USER ALL=(ALL) NOPASSWD: /bin/systemctl stop binokel-tracker.service
 $DEPLOY_USER ALL=(ALL) NOPASSWD: /bin/systemctl status binokel-tracker.service
 EOF
