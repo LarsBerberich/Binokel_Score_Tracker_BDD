@@ -7,12 +7,7 @@
 
 ## ▶ Aktueller Fokus
 
-**TASK-003 — Use Cases an ORM ankoppeln (Slice für Slice)**
-
-`models.py` und Migrationen sind fertig (18.07.2026). Die Use Cases in `use_cases.py`
-arbeiten derzeit ausschließlich auf reinen Python-Objekten ohne Persistenz.
-Nach TASK-003 sollen alle 6 Slices Daten über das Django ORM speichern und laden.
-behave muss weiterhin 28/28 GREEN bleiben.
+**TASK-006 ist abgeschlossen. Nächster Schritt noch offen — siehe Open/Priorisiert.**
 
 **TASK-CI-001–004 — CI/CD-Pipeline aufgebaut (19.07.2026 — bereit zur Aktivierung)**
 
@@ -35,20 +30,31 @@ müssen GitHub-Secrets und die VM eingerichtet werden (siehe `deploy/README.md`)
   - `python3 manage.py migrate` — alle Migrationen OK
   - 28/28 Behave-Szenarien weiterhin GREEN
 
-- [ ] **TASK-003** Use Cases an ORM ankoppeln
-  - Repository-Funktionen oder direkte ORM-Aufrufe in `use_cases.py`
-  - Slices 1–6 nacheinander anbinden
-  - Akzeptanztests (behave) müssen weiter GREEN bleiben
+- [x] **TASK-003** Use Cases an ORM ankoppeln (18.07.2026)
+  - `backend/scoring/repositories.py` neu angelegt
+  - `spiel_persistieren`, `spiel_laden`, `runde_persistieren`, `punktestaende_laden`
+  - Use cases bleiben pure Funktionen (keine Änderung an `use_cases.py`)
+  - 28/28 Behave-Szenarien weiterhin GREEN
 
-- [ ] **TASK-004** REST-Endpunkte — `views.py` + `urls.py`
-  - Slice 1: `POST /api/spiele/` → spiel_anlegen
-  - Slice 2: `POST /api/spiele/{id}/runden/` → normales_spiel_auswerten
-  - Slices 3–6 analog
-  - Entscheidung: DRF (Django REST Framework) oder einfaches JsonResponse? → ADR anlegen
+- [x] **TASK-004** REST-Endpunkte implementiert (18.07.2026)
+  - `backend/scoring/views.py` — 5 Views (JsonResponse, keine DRF-Abhängigkeit)
+  - `backend/binokel_tracker/urls.py` — 6 URL-Muster registriert
+  - `docs/adr/ADR-005-jsonresponse-statt-drf.md` — Entscheidung dokumentiert
+  - Toten Code in `use_cases.py` entfernt
+  - Bug in `repositories.py` behoben (Gegenspieler-Punkte korrekt aggregiert)
+  - 28/28 Behave-Szenarien weiterhin GREEN
 
-- [ ] **TASK-005** `behave`-Szenarien gegen echte Django-API ausführen
-  - `features/environment.py` ggf. anpassen (HTTP-Client statt direkter Use-Case-Aufrufe)
-  - Alle 28 Szenarien müssen GREEN bleiben
+- [x] **TASK-005** API-Integrationstests in `scoring/tests.py` (TestCase + TestClient) — 19.07.2026
+  - 18 Tests, alle GREEN
+  - `SpielAnlegenApiTest`, `RundeAuswertenApiTest`, `PunktestaendeUndSiegerApiTest`
+  - Normative Quelle: ADR-006
+
+- [x] **TASK-006** Behave-Steps Slice 1 auf HTTP umgestellt, Infrastruktur für alle weiteren Slices bereitgestellt — 19.07.2026
+  - `features/environment.py`: Test-Datenbank-Setup + `context.client` pro Szenario + Cleanup
+  - `features/steps/spiel_anlegen_steps.py`: vollständige HTTP-Migration (ADR-006)
+  - Slices 2–5: Domänen-Steps bleiben (testen interne Berechnungsregeln, nicht HTTP-sichtbar)
+  - Slice 6: Domänen-Steps bleiben (Punktestände werden direkt gesetzt, keine passenden HTTP-Endpunkte)
+  - Normative Quelle: ADR-006
 
 ### Phase 1 – DevOps / CI/CD
 
@@ -74,22 +80,22 @@ müssen GitHub-Secrets und die VM eingerichtet werden (siehe `deploy/README.md`)
 - [x] **TASK-CI-005** Agenten-Orchestrierung dokumentiert (19.07.2026)
   - `docs/agents/devops-agent.md` — Rollenbeschreibung Dev/Ops-Agent
   - `docs/agents/orchestration.md` — Workflow für alle 3 Agenten (Coding, Rubber-Duck, Dev/Ops)
-  - ADR-004 (GitHub Actions CI/CD), ADR-005 (VM-Deployment-Strategie)
+  - ADR-007 (GitHub Actions CI/CD), ADR-008 (VM-Deployment-Strategie)
 
 - [ ] **TASK-CI-006** VM einrichten + erster Produktions-Deploy
   - VM mit `deploy/setup-server.sh` initialisieren
   - `/etc/binokel/env` mit Produktionskonfiguration befüllen
   - GitHub-Secrets `VM_SSH_KEY`, `VM_HOST`, `VM_USER` hinterlegen
-  - Branch Protection für `main` aktivieren (ADR-004)
+  - Branch Protection für `main` aktivieren (ADR-007)
   - Ersten Deploy manuell auslösen und verifizieren
 
 ### Phase 2 – Frontend (Vue) — noch nicht gestartet
 
-- [ ] **TASK-006** Vue-Anwendung aufsetzen, API-Client konfigurieren
-- [ ] **TASK-007** Spiel anlegen (UI)
-- [ ] **TASK-008** Runde eingeben und auswerten (UI)
-- [ ] **TASK-009** Spielstand anzeigen (UI)
-- [ ] **TASK-010** Spiel abschließen / Sieger anzeigen (UI)
+- [ ] **TASK-007** Vue-Anwendung aufsetzen, API-Client konfigurieren
+- [ ] **TASK-008** Spiel anlegen (UI)
+- [ ] **TASK-009** Runde eingeben und auswerten (UI)
+- [ ] **TASK-010** Spielstand anzeigen (UI)
+- [ ] **TASK-011** Spiel abschließen / Sieger anzeigen (UI)
 
 ---
 
@@ -112,6 +118,10 @@ müssen GitHub-Secrets und die VM eingerichtet werden (siehe `deploy/README.md`)
   - Entscheidung: Bleibt die API-Sprache Deutsch oder wird sie ebenfalls übersetzt? → ADR anlegen
   - Fachbegriffe im Code (Ubiquitous Language) bleiben bewusst Deutsch — nur UI-Strings werden übersetzt
 
+- [ ] **FUTURE-002** DRF (Django REST Framework) als Upgrade
+  - Kandidat wenn: Auth, Throttling, Pagination oder OpenAPI-Schema benötigt werden
+  - Normative Quelle: ADR-005 (JsonResponse für V1)
+
 ---
 
 ## Architektur-Entscheidungen (ADRs)
@@ -121,9 +131,11 @@ müssen GitHub-Secrets und die VM eingerichtet werden (siehe `deploy/README.md`)
 | ADR-001 | Backend vor Frontend |
 | ADR-002 | Vertikale Slices |
 | ADR-003 | behave als BDD-Toolchain |
-| ADR-004 | GitHub Actions als CI/CD-Toolchain |
-| ADR-005 | VM-Deployment: systemd/Gunicorn/Nginx, kein Docker |
-| **offen** | DRF vs. einfaches JsonResponse für TASK-004 |
+| ADR-004 | Repository Pattern (Trennung Domäne/Persistenz) |
+| ADR-005 | JsonResponse statt DRF für V1-API |
+| ADR-006 | Behave-Tests via HTTP (Blackbox) statt direkter Use-Case-Aufrufe |
+| ADR-007 | GitHub Actions als CI/CD-Toolchain |
+| ADR-008 | VM-Deployment: systemd/Gunicorn/Nginx, kein Docker |
 
 ---
 

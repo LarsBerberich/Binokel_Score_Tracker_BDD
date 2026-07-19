@@ -1,4 +1,4 @@
-# ADR-004 – GitHub Actions als CI/CD-Toolchain
+# ADR-007 – GitHub Actions als CI/CD-Toolchain
 
 ## Status
 

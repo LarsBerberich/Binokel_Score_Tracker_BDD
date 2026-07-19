@@ -449,6 +449,9 @@ Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 - `ADR-001-backend-vor-frontend.md` – Backend vollständig vor Frontend entwickeln
 - `ADR-002-vertikale-slices.md` – Vertikale Slices statt horizontaler Schichten
 - `ADR-003-behave-als-bdd-toolchain.md` – behave + behave-django als BDD-Toolchain für Django
+- `ADR-004-repository-pattern.md` – Repository Pattern zur Trennung von Domäne und Persistenz
+- `ADR-005-jsonresponse-statt-drf.md` – JsonResponse statt Django REST Framework für V1
+- `ADR-006-behave-http-blackbox-tests.md` – Behave-Akzeptanztests via HTTP (Blackbox) statt direkter Use-Case-Aufrufe
 
 ### Dokumentationsregel
 

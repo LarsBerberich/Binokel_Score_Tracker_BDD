@@ -1,4 +1,4 @@
-# ADR-005 – VM-Deployment-Strategie: Direktes Systemd-Deployment ohne Container
+# ADR-008 – VM-Deployment-Strategie: Direktes Systemd-Deployment ohne Container
 
 ## Status
 
