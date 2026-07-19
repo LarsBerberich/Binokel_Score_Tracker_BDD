@@ -230,15 +230,16 @@ Am Ende jeder Session werden **drei Quellen synchron** aktualisiert:
 - `copilot-handover-v1.md` ist die **vollständige Projekthistorie** – chronologisch, für Onboarding und Nachvollziehbarkeit.
 - `handover-status.md` ist **AI-natives Memory** – wird von Copilot automatisch in den Kontext geladen.
 
-### Dual-Agenten-Workflow: Coding Agent + Rubber-Duck-Agent
+### 3-Agenten-Workflow: Coding Agent + Rubber-Duck-Agent + DevOps-Agent
 
-Für Implementierungsarbeit wird ein **2-Agenten-Modus** verwendet:
+Für Implementierungsarbeit wird ein **3-Agenten-Modus** verwendet:
 
 1. Coding Agent erstellt oder aktualisiert den Umsetzungsplan pro Slice.
 2. Rubber-Duck-Agent prüft den Plan gegen `docs/rule-set-v1.md`, Architekturprinzipien und bekannte Edge Cases.
 3. Coding Agent implementiert die Änderungen.
 4. Rubber-Duck-Agent macht ein Abschluss-Review vor Session-Ende.
 5. Coding Agent übernimmt nur fachlich sinnvolle Findings und aktualisiert anschließend `BACKLOG.md` und `docs/copilot-handover-v1.md`.
+6. DevOps-Agent übernimmt nach Implementierung CI/CD-, Deployment- und Infrastruktur-Aufgaben.
 
 Verbindliche Rollen:
 
@@ -246,8 +247,11 @@ Verbindliche Rollen:
 |---|---|---|
 | Coding Agent | Umsetzung, Tests, Dokumentationspflege | Grundsatzdebatten ohne direkten Task-Bezug |
 | Rubber-Duck-Agent | Kritische Gegenprüfung von Logik, Fachsprache und Risiko | Eigenständiges Implementieren |
+| DevOps-Agent | CI/CD-Pipelines, Deployment, Infrastruktur-Konfiguration | Fachliche Domänenlogik |
 
-Der operative Leitfaden sowie ein wiederverwendbares Prompt-Template sind in `docs/rubber-duck-agent-v1.md` dokumentiert.
+Die operativen Leitfäden sowie wiederverwendbare Prompt-Templates sind in den jeweiligen Agent-Dokumenten abgelegt:
+- `docs/rubber-duck-agent-v1.md`
+- `docs/devops-agent-v1.md`
 
 ---
 
