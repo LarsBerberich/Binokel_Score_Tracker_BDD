@@ -42,7 +42,26 @@ jobs:
 
       - name: VM-Host zu known_hosts hinzufügen
         run: |
-          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
+          if [ -n "${{ secrets.VM_SSH_KNOWN_HOSTS }}" ]; then
+            echo "${{ secrets.VM_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
+          fi
+
+      - name: Deploy-Preflight prüfen
+        run: |
+          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" << 'REMOTE'
+            set -e
+            echo "--- uv verfügbar?"
+            command -v uv
+            echo "--- App-Verzeichnis vorhanden?"
+            test -d /opt/binokel/app
+            echo "--- Umgebungsdatei vorhanden?"
+            test -f /etc/binokel/env
+            echo "--- systemd-Unit vorhanden?"
+            test -f /etc/systemd/system/binokel-tracker.service
+            echo "✅ Alle Preflight-Prüfungen bestanden"
+          REMOTE
 
       - name: Code auf VM synchronisieren
         run: |
@@ -83,17 +102,23 @@ jobs:
             echo "⏳ Warte auf Dienst... ($i/10, HTTP $STATUS)"
             sleep 3
           done
-          echo "❌ Healthcheck fehlgeschlagen — Rollback wird ausgelöst"
+          echo "❌ Healthcheck fehlgeschlagen — Diagnoseinformationen:"
           ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
-            "sudo systemctl rollback binokel-tracker.service || sudo systemctl stop binokel-tracker.service"
+            "sudo systemctl status binokel-tracker.service --no-pager || true"
+          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+            "journalctl -u binokel-tracker.service --no-pager -n 50 || true"
           exit 1
 
 # ── Benötigte GitHub-Secrets ──────────────────────────────────────────────────
 # Repository Settings → Secrets and Variables → Actions:
 #
-#   VM_SSH_KEY       — SSH-Private-Key des Deploy-Benutzers (ohne Passphrase)
-#   VM_HOST          — Hostname oder IP der 1&1 VM (z. B. 192.0.2.10)
-#   VM_USER          — Deploy-Benutzername auf der VM (z. B. binokel-deploy)
+#   VM_SSH_KEY            — SSH-Private-Key des Deploy-Benutzers (ohne Passphrase)
+#   VM_HOST               — Hostname oder IP der 1&1 VM (z. B. 192.0.2.10)
+#   VM_USER               — Deploy-Benutzername auf der VM (z. B. binokel-deploy)
+#   VM_SSH_KNOWN_HOSTS    — (optional) Bekannte Host-Keys der VM (empfohlen für Produktion).
+#                           Inhalt: Zeile(n) im known_hosts-Format, z. B. aus
+#                           `ssh-keyscan -H <VM_HOST>`. Wenn nicht gesetzt, wird
+#                           ssh-keyscan beim Deploy ausgeführt (weniger sicher).
 #
 # Auf der VM als Umgebungsvariablen in /etc/binokel/env:
 #   DJANGO_SECRET_KEY          — sicherer, zufälliger Schlüssel (min. 50 Zeichen)

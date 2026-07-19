@@ -43,6 +43,7 @@ In **GitHub → Repository → Settings → Secrets and Variables → Actions** 
 | `VM_SSH_KEY` | Privater SSH-Schlüssel des `binokel-deploy`-Benutzers |
 | `VM_HOST` | IP-Adresse oder Domain der VM (z. B. `192.0.2.10`) |
 | `VM_USER` | `binokel-deploy` |
+| `VM_SSH_KNOWN_HOSTS` | *(optional, empfohlen)* Bekannte Host-Keys der VM im `known_hosts`-Format. Erzeugen mit `ssh-keyscan -H <VM_HOST>`. Wenn nicht gesetzt, führt der Workflow `ssh-keyscan` automatisch aus – das ist praktisch, bietet aber keinen Schutz vor einem Man-in-the-Middle beim ersten Verbindungsaufbau. |
 
 ---
 
@@ -80,11 +81,42 @@ python3 -c "import secrets; print(secrets.token_urlsafe(60))"
 1. Entwickler pushed auf `main`
 2. CI-Workflow läuft (BDD-Tests müssen GREEN sein)
 3. Bei Erfolg startet CD automatisch:
+   - **Preflight:** Prüft, dass `uv`, App-Verzeichnis, `/etc/binokel/env` und systemd-Unit auf der VM vorhanden sind
    - Quellcode per `rsync` auf VM übertragen
    - `uv sync`, `migrate`, `collectstatic`
    - `systemctl restart binokel-tracker`
    - Healthcheck auf `http://localhost/health/`
-   - Bei Fehler: automatischer Rollback
+   - **Bei Fehler:** Workflow schlägt fehl; `systemctl status` und `journalctl`-Ausgabe werden zur Diagnose im Workflow-Log angezeigt. Ein automatischer Rollback auf eine vorherige Anwendungsversion ist nicht implementiert — bei einem fehlgeschlagenen Deploy muss der Fix gepusht oder der letzte funktionierende Commit auf `main` gebracht werden.
+
+---
+
+## Deploy-Voraussetzungen (Preflight)
+
+Der CD-Workflow prüft vor jedem Deploy automatisch, dass die folgenden Voraussetzungen auf der VM erfüllt sind:
+
+- `uv` ist systemweit verfügbar (`/usr/local/bin/uv`)
+- App-Verzeichnis `/opt/binokel/app` existiert
+- Umgebungsdatei `/etc/binokel/env` existiert
+- systemd-Unit `/etc/systemd/system/binokel-tracker.service` ist vorhanden
+
+Schlägt eine dieser Prüfungen fehl, bricht der Workflow vor dem eigentlichen Deploy ab. In diesem Fall muss das Server-Setup erneut ausgeführt oder die fehlende Voraussetzung manuell nachgezogen werden.
+
+> **Hinweis zu `uv`:** Das Setup-Skript (`setup-server.sh`) installiert `uv` systemweit nach `/usr/local/bin/uv`, damit auch nicht-interaktive SSH-Sessions (wie die CD-Pipeline) `uv` ohne Anpassung des `PATH` nutzen können.
+
+---
+
+## Fehlerbehandlung bei fehlgeschlagenem Healthcheck
+
+Besteht der Dienst den Healthcheck nach dem Deploy nicht, schlägt der Workflow fehl und gibt folgende Diagnoseinformationen im Workflow-Log aus:
+
+- `systemctl status binokel-tracker.service`
+- `journalctl -u binokel-tracker.service` (letzte 50 Zeilen)
+
+Ein automatischer Rollback auf eine vorherige Anwendungsversion ist nicht implementiert. Vorgehen bei einem fehlgeschlagenen Deploy:
+
+1. Diagnoseinformationen im GitHub Actions-Log prüfen
+2. Fix entwickeln und auf `main` pushen (löst neuen Deploy aus)
+3. **Oder:** Letzten bekannt-guten Commit per `git revert` oder `git reset` auf `main` bringen
 
 ---
 
