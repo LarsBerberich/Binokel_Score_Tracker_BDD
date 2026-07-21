@@ -132,3 +132,21 @@ gefunden und behoben:
    Dies schwächt Least Privilege nicht: `binokel-deploy` rsynct ohnehin den App-Code
    und startet den Dienst, könnte den `SECRET_KEY` also ohnehin erlangen — der
    Lesezugriff macht die bestehende Vertrauensgrenze nur explizit.
+
+## Nachtrag (21.07.2026) — Trockenlauf-Ausführung: Dienst-User-Ausführungsrechte
+
+Der reale Trockenlauf gegen eine Wegwerf-VM deckte eine Kette von Rechte-Blockern
+auf, die den Dienststart verhinderten (`systemd status=203/EXEC`, Healthcheck `502`).
+Sie sind in ENG-004 im Detail dokumentiert; die Baseline-relevante Konsequenz:
+
+6. **Der Dienst-User muss den venv-Interpreter erreichen und ausführen können.**
+   Der Dienst läuft als `binokel-app`, der venv wird aber von `binokel-deploy` erzeugt.
+   Zwei Ebenen waren betroffen: (a) der App-Baum (`.venv/bin/gunicorn`) — behoben per
+   `setfacl -R (-d) -m u:binokel-app:rX /opt/binokel/app`; und (b) der **eigentliche
+   Übeltäter** — der von `uv` verwaltete Python-Interpreter, auf den der venv nur per
+   Symlink zeigt, lag unter `~binokel-deploy/.local/share/uv/python` (Home = `0750`,
+   für `binokel-app` nicht traversierbar). Fix: `uv` installiert den Interpreter jetzt
+   in ein geteiltes Verzeichnis (`UV_PYTHON_INSTALL_DIR=/opt/binokel/python`), das
+   `setup-server.sh` mit `setfacl -R (-d) -m u:binokel-app:rX` absichert. Least Privilege
+   bleibt gewahrt: `binokel-app` erhält nur Lese-/Ausführungsrecht (`rX`), kein
+   Schreibrecht — es schreibt zur Laufzeit ausschließlich in `data`/`static`.

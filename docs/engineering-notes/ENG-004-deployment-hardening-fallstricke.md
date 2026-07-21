@@ -206,6 +206,40 @@ Privilege; er schreibt zur Laufzeit nur in `data`/`static`).
 muss sein Lese-/Ausführungsrecht per Default-ACL abgesichert sein — sonst entscheidet
 die zufällige `umask` des Deploy-Users über den Dienststart.
 
+**Nachtrag — der eigentliche Übeltäter: uv-Interpreter im Deploy-Home:** Die App-Baum-ACL
+allein behob den `203/EXEC` **nicht**. `namei -l` auf die gunicorn-Binary zeigte, dass alle
+Pfad-Komponenten und die Binary selbst world-executable waren — trotzdem `EACCES` beim
+`execve`. Grund: gunicorn ist ein Skript mit Shebang
+`#!/opt/binokel/app/backend/.venv/bin/python`, und dieser venv-Python ist nur ein **Symlink**
+auf den von uv verwalteten Interpreter unter
+`/home/binokel-deploy/.local/share/uv/python/cpython-3.14.../bin/python3.14`. Das
+Deploy-Home ist `0750` (`drwxr-x---`); `binokel-app` ist nicht in dessen Gruppe und „other"
+hat kein Traversal-Recht → der Interpreter ist unerreichbar → der Kernel scheitert beim
+`execve` des Skripts mit *Permission denied*. Diagnose-Kommando:
+`namei -l "$(readlink -f .venv/bin/python)"` — es deckt das `drwxr-x---`-Home sofort auf.
+
+**Lösung:** uv anweisen, den verwalteten Interpreter in ein **geteiltes**, world-traversierbares
+Verzeichnis unter `/opt` zu legen, statt ins Deploy-Home. In `/etc/binokel/env`:
+
+```bash
+UV_PYTHON_INSTALL_DIR=/opt/binokel/python
+```
+
+Der CD-Deploy und der manuelle Deploy sourcen die env-Datei vor `uv sync`, sodass
+Interpreter-Installation **und** venv-Symlink dorthin zeigen. `setup-server.sh` legt
+`/opt/binokel/python` an und vergibt `setfacl -R (-d) -m u:binokel-app:rX` (Default-ACL,
+damit der von uv als binokel-deploy entpackte Interpreter-Baum das Recht erbt). **Wichtig
+bei bestehenden VMs:** Ein bereits erzeugtes `.venv` behält seinen alten Interpreter-Symlink;
+`uv sync` repointet ihn nicht. Einmalig `.venv` löschen und neu synchen:
+`rm -rf .venv && uv sync --no-dev` (mit gesourcter env). Bei einem frischen Produktions-Deploy
+existiert noch kein `.venv`, sodass der Symlink von Anfang an korrekt zeigt.
+
+**Regel:** venv-Interpreter sind Symlinks auf einen **externen** Basis-Python. Wenn ein
+anderer User als der venv-Erzeuger den venv ausführt, muss dieser externe Interpreter in
+einem für ihn erreichbaren Pfad liegen — Home-Verzeichnisse (`0750`) sind es nicht.
+Werkzeug-verwaltete Interpreter (uv, pyenv, asdf) gehören bei Multi-User-Deployment in ein
+geteiltes Verzeichnis (`UV_PYTHON_INSTALL_DIR` o. Ä.).
+
 ---
 
 ## Präventionsregel (übergreifend)

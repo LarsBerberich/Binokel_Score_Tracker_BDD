@@ -52,6 +52,10 @@ APP_DIR="/opt/binokel/app"
 DATA_DIR="/opt/binokel/data"
 STATIC_DIR="/opt/binokel/static"
 LOG_DIR="/var/log/binokel"
+# Geteiltes Zielverzeichnis für den von uv verwalteten Python-Interpreter, damit der
+# Dienst-User binokel-app ihn erreichen kann (siehe UV_PYTHON_INSTALL_DIR in der
+# env-Datei und Schritt [5/10]).
+PYTHON_DIR="/opt/binokel/python"
 APP_USER="binokel-app"
 DEPLOY_USER="binokel-deploy"
 
@@ -114,8 +118,15 @@ chmod 440 "/etc/sudoers.d/binokel-deploy"
 echo "=== [5/10] Verzeichnisstruktur anlegen ==="
 mkdir -p "$APP_DIR" "$DATA_DIR" "$STATIC_DIR" "$LOG_DIR"
 mkdir -p /etc/binokel
+# Geteiltes Verzeichnis für den von uv verwalteten Python-Interpreter (siehe
+# UV_PYTHON_INSTALL_DIR in /etc/binokel/env). uv lädt den Interpreter sonst nach
+# ~binokel-deploy/.local/share/uv/python (Home = 0750) — dort kommt der Dienst-User
+# binokel-app nicht hin und kann den venv-Python (Shebang-Ziel von gunicorn) nicht
+# ausführen (systemd: status=203/EXEC). Ein Verzeichnis unter /opt (world-traversierbar)
+# löst das; die ACL sichert es umask-unabhängig ab.
+mkdir -p "$PYTHON_DIR"
 
-chown "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
+chown "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR" "$PYTHON_DIR"
 chown "$APP_USER:$APP_USER" "$DATA_DIR" "$STATIC_DIR" "$LOG_DIR"
 chmod 750 /etc/binokel
 
@@ -135,6 +146,14 @@ setfacl -m u:"$APP_USER":x -m u:"$DEPLOY_USER":x /etc/binokel
 # das Recht erben — umask-unabhängig.
 setfacl -R -m u:"$APP_USER":rX "$APP_DIR"
 setfacl -R -d -m u:"$APP_USER":rX "$APP_DIR"
+
+# Lese-/Ausführungsrecht für binokel-app auf das geteilte Interpreter-Verzeichnis.
+# uv legt den Python-Interpreter dorthin (UV_PYTHON_INSTALL_DIR); der venv-Python ist
+# nur ein Symlink darauf. Ohne Zugriff kann binokel-app gunicorn (Shebang → dieser
+# Python) nicht ausführen (status=203/EXEC). Die Default-ACL sorgt dafür, dass der von
+# uv beim Deploy als binokel-deploy entpackte Interpreter-Baum das Recht erbt.
+setfacl -R -m u:"$APP_USER":rX "$PYTHON_DIR"
+setfacl -R -d -m u:"$APP_USER":rX "$PYTHON_DIR"
 
 # Gemeinsamer Schreibzugriff auf Daten- und Static-Verzeichnis:
 # Der Dienst läuft als binokel-app, der CD-Deploy (migrate/collectstatic) als
@@ -161,6 +180,12 @@ DJANGO_ALLOWED_HOSTS=REPLACE_WITH_YOUR_DOMAIN
 DJANGO_DB_PATH=/opt/binokel/data/db.sqlite3
 DJANGO_STATIC_ROOT=/opt/binokel/static
 DJANGO_CSRF_TRUSTED_ORIGINS=https://REPLACE_WITH_YOUR_DOMAIN
+
+# uv installiert den verwalteten Python-Interpreter in dieses geteilte Verzeichnis
+# (statt ~binokel-deploy/.local/share/uv/python, wo der Dienst-User binokel-app nicht
+# hinkommt). Der CD-Deploy und der manuelle Deploy sourcen diese Datei vor `uv sync`,
+# sodass Interpreter-Installation und venv-Symlink hierhin zeigen.
+UV_PYTHON_INSTALL_DIR=/opt/binokel/python
 ENV_TEMPLATE
     chmod 600 /etc/binokel/env
     echo "⚠️  /etc/binokel/env wurde angelegt. Bitte vor dem ersten Start befüllen!"
