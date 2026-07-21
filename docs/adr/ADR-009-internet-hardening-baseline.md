@@ -126,6 +126,9 @@ gefunden und behoben:
    leere DB gestartet. Die Deploy-Schritte (`cd.yml`, manueller Not-Deploy) laden nun
    die Env (`set -a; . /etc/binokel/env; set +a`). Dazu erhält `binokel-deploy` per
    gezielter ACL (`setfacl -m u:binokel-deploy:r /etc/binokel/env`) **Lesezugriff**.
+   Zusätzlich braucht das Verzeichnis `/etc/binokel` (root:root, 750) ein
+   Such-Recht per ACL (`setfacl -m u:binokel-app:x -m u:binokel-deploy:x /etc/binokel`),
+   sonst greift die Datei-ACL wegen fehlender Verzeichnis-Traversierung nicht.
    Dies schwächt Least Privilege nicht: `binokel-deploy` rsynct ohnehin den App-Code
    und startet den Dienst, könnte den `SECRET_KEY` also ohnehin erlangen — der
    Lesezugriff macht die bestehende Vertrauensgrenze nur explizit.

@@ -119,6 +119,13 @@ chown "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
 chown "$APP_USER:$APP_USER" "$DATA_DIR" "$STATIC_DIR" "$LOG_DIR"
 chmod 750 /etc/binokel
 
+# Such-/Traversal-Recht (nur x, kein Lesen/Listen) auf /etc/binokel für App- und
+# Deploy-User. Das Verzeichnis gehört root:root (750); ohne Verzeichnis-x können
+# binokel-app und binokel-deploy die env-Datei trotz Datei-ACL nicht erreichen.
+# (Der systemd-Dienst liest die Datei als root — betroffen ist nur der direkte
+#  Zugriff, z. B. `. /etc/binokel/env` im CD-Deploy und im Phase-3-Check.)
+setfacl -m u:"$APP_USER":x -m u:"$DEPLOY_USER":x /etc/binokel
+
 # Gemeinsamer Schreibzugriff auf Daten- und Static-Verzeichnis:
 # Der Dienst läuft als binokel-app, der CD-Deploy (migrate/collectstatic) als
 # binokel-deploy. Beide müssen dieselben Dateien schreiben (SQLite-DB zur Laufzeit

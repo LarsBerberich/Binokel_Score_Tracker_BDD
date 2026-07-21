@@ -162,9 +162,18 @@ ACL-Lesezugriff (`setfacl -m u:binokel-deploy:r /etc/binokel/env`). Least Privil
 bleibt gewahrt (der Deploy-User kontrolliert ohnehin Code und Dienst — siehe
 ADR-009-Nachtrag).
 
+**Nachtrag (im Trockenlauf aufgetreten):** Die Datei-ACL allein genügt nicht — das
+**Verzeichnis** `/etc/binokel` gehört `root:root` (750) und gab Nicht-root-Usern kein
+Such-/Traversal-Recht. `. /etc/binokel/env` als `binokel-deploy` scheiterte daher mit
+*Permission denied*, obwohl die Datei-ACL Lesen erlaubte (der systemd-Dienst war nicht
+betroffen, da er die Datei als root liest). Zusätzlich nötig:
+`setfacl -m u:binokel-app:x -m u:binokel-deploy:x /etc/binokel` (nur `x`, kein Lesen
+des Verzeichnisinhalts).
+
 **Regel:** Offline-Management-Kommandos (`migrate`, `collectstatic`) müssen mit
 **derselben** Konfiguration laufen wie der Dienst — sonst divergieren DB-/Static-Pfade
-lautlos.
+lautlos. Und: Datei-ACLs greifen nur, wenn **jedes Elternverzeichnis** das
+Such-Recht (`x`) für den Zugreifenden gewährt.
 
 ---
 
