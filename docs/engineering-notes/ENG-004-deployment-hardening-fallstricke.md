@@ -242,6 +242,51 @@ geteiltes Verzeichnis (`UV_PYTHON_INSTALL_DIR` o. Ä.).
 
 ---
 
+## Nebenpunkt — Gunicorn-Control-Server scheitert am fehlenden Home (Errno 13)
+
+**Symptom (im Trockenlauf aufgetreten):** Der Dienst läuft und liefert über HTTP-localhost
+`200`, aber `error.log` enthält bei jedem Start:
+`[ERROR] Control server error: [Errno 13] Permission denied: '/home/binokel-app'`.
+
+**Ursache:** Gunicorn ≥26 startet einen internen „Control Server" und legt dafür einen
+Socket unter `$HOME` an. Der Dienst-User `binokel-app` ist ein System-User **ohne** Home
+(`useradd --no-create-home`); `$HOME` zeigt auf das nicht existierende `/home/binokel-app`,
+das Anlegen scheitert mit `EACCES`. Die Worker laufen zwar trotzdem, aber der Fehler
+wiederholt sich bei jedem (Re)Start und verrauscht das Log.
+
+**Lösung:** In der systemd-Unit `HOME` auf ein beschreibbares Verzeichnis setzen — das
+ohnehin vorhandene `RuntimeDirectory` (`/run/binokel`, gehört `binokel-app`) bietet sich an:
+
+```ini
+Environment="HOME=/run/binokel"
+```
+
+**Regel:** System-User ohne Home (`--no-create-home`) brauchen für Prozesse, die in `$HOME`
+schreiben (Gunicorn-Control-Server, Caches, `.config`), ein explizit gesetztes, beschreibbares
+`HOME` in der systemd-Unit.
+
+---
+
+## Nebenpunkt — HTTPS liefert 400, obwohl HTTP-localhost 200 liefert (DisallowedHost)
+
+**Symptom (im Trockenlauf aufgetreten):** `curl http://localhost/health/` → `200`, aber
+`curl -k https://<domain>/health/` → `400`.
+
+**Ursache:** Über localhost trägt der Request `Host: localhost` (in `settings.py` immer in
+`ALLOWED_HOSTS`), über die Domain aber `Host: <domain>`. Steht die reale Domain nicht in
+`DJANGO_ALLOWED_HOSTS` (`/etc/binokel/env`, Platzhalter `REPLACE_WITH_YOUR_DOMAIN` nicht
+ersetzt), antwortet Django mit `400 Bad Request` (`DisallowedHost`). Der HTTP-localhost-Health
+verdeckt das, weil localhost immer erlaubt ist.
+
+**Lösung:** `DJANGO_ALLOWED_HOSTS` (und `DJANGO_CSRF_TRUSTED_ORIGINS`) in `/etc/binokel/env`
+auf die echte Domain setzen, Dienst neu starten.
+
+**Regel:** Den Healthcheck immer **auch** über den echten Host-Namen (nicht nur localhost)
+prüfen — sonst bleibt ein leeres/falsches `ALLOWED_HOSTS` bis zum ersten echten Browser-Zugriff
+unbemerkt.
+
+---
+
 ## Präventionsregel (übergreifend)
 
 > Vor einem Erst-Deploy den gesamten Pfad **einmal gegen eine Wegwerf-VM** durchspielen

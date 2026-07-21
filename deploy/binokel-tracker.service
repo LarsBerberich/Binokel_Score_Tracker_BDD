@@ -15,6 +15,10 @@ WorkingDirectory=/opt/binokel/app/backend
 
 # Django-Konfiguration über EnvironmentFile (nie im Service-File hart kodieren!)
 Environment="DJANGO_SETTINGS_MODULE=binokel_tracker.settings"
+# HOME auf das beschreibbare RuntimeDirectory setzen. binokel-app ist ein System-User
+# ohne Home (--no-create-home); Gunicorn ≥26 legt jedoch einen Control-Socket unter
+# $HOME an und scheitert sonst mit "[Errno 13] Permission denied: '/home/binokel-app'".
+Environment="HOME=/run/binokel"
 EnvironmentFile=/etc/binokel/env
 
 # Prozessstart: Gunicorn mit UNIX-Socket (Nginx kommuniziert darüber)
