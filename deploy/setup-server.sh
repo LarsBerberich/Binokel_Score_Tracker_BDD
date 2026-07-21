@@ -126,6 +126,16 @@ chmod 750 /etc/binokel
 #  Zugriff, z. B. `. /etc/binokel/env` im CD-Deploy und im Phase-3-Check.)
 setfacl -m u:"$APP_USER":x -m u:"$DEPLOY_USER":x /etc/binokel
 
+# Der Dienst läuft als binokel-app, der App-Code (inkl. des von binokel-deploy beim
+# Deploy erzeugten .venv mit der gunicorn-Binary) liegt unter APP_DIR und gehört
+# binokel-deploy. Ohne Lese-/Ausführungsrecht kann binokel-app gunicorn nicht starten
+# (systemd: status=203/EXEC, "Permission denied") — je nach umask des Deploy-Users.
+# rX = Lesen + x-Bit nur auf Verzeichnissen/ausführbaren Dateien. Die Default-ACL sorgt
+# dafür, dass von git clone / uv sync neu erzeugte Dateien (z. B. .venv/bin/gunicorn)
+# das Recht erben — umask-unabhängig.
+setfacl -R -m u:"$APP_USER":rX "$APP_DIR"
+setfacl -R -d -m u:"$APP_USER":rX "$APP_DIR"
+
 # Gemeinsamer Schreibzugriff auf Daten- und Static-Verzeichnis:
 # Der Dienst läuft als binokel-app, der CD-Deploy (migrate/collectstatic) als
 # binokel-deploy. Beide müssen dieselben Dateien schreiben (SQLite-DB zur Laufzeit

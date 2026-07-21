@@ -177,6 +177,37 @@ Such-Recht (`x`) für den Zugreifenden gewährt.
 
 ---
 
+## Nebenpunkt — Dienst-User darf die `gunicorn`-Binary nicht ausführen (203/EXEC)
+
+**Symptom (im Trockenlauf aufgetreten):** Der systemd-Dienst startet nicht,
+`systemctl status` zeigt `status=203/EXEC`, das Journal:
+`Failed to execute …/.venv/bin/gunicorn: Permission denied`. Der Healthcheck liefert
+`502` (Nginx läuft, App-Socket fehlt). Kein `error.log`, da Gunicorn nie startet.
+
+**Ursache:** Der Dienst läuft als `binokel-app`, das `.venv` (inkl. `gunicorn`) wird
+aber vom Deploy-User `binokel-deploy` unter `APP_DIR` erzeugt. Je nach `umask` des
+Deploy-Users sind die neuen Dateien für „other" nicht les-/ausführbar, sodass
+`binokel-app` die Binary nicht starten kann.
+
+**Lösung:** `binokel-app` per ACL Lese-/Ausführungsrecht auf den App-Baum geben,
+inklusive **Default-ACL**, damit von `git clone`/`uv sync` neu erzeugte Dateien es
+erben — umask-unabhängig:
+
+```bash
+setfacl -R -m u:binokel-app:rX /opt/binokel/app
+setfacl -R -d -m u:binokel-app:rX /opt/binokel/app
+```
+
+`rX` (großes X) vergibt das x-Bit nur auf Verzeichnissen und ohnehin ausführbaren
+Dateien — der Dienst-User bekommt Traversal + Ausführung, ohne Schreibrecht (Least
+Privilege; er schreibt zur Laufzeit nur in `data`/`static`).
+
+**Regel:** Wenn ein Dienst-User Code/venv eines *anderen* Erzeuger-Users ausführt,
+muss sein Lese-/Ausführungsrecht per Default-ACL abgesichert sein — sonst entscheidet
+die zufällige `umask` des Deploy-Users über den Dienststart.
+
+---
+
 ## Präventionsregel (übergreifend)
 
 > Vor einem Erst-Deploy den gesamten Pfad **einmal gegen eine Wegwerf-VM** durchspielen
