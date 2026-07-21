@@ -64,7 +64,12 @@ server {
 
     # Healthcheck (intern, kein Logging)
     location /health/ {
-        proxy_pass http://binokel_app;
+        proxy_pass         http://binokel_app;
+        # WICHTIG: Ohne explizites Host-Header-Setzen verwendet nginx als Default
+        # den Upstream-Namen ("binokel_app") als Host. Der steht nicht in Djangos
+        # ALLOWED_HOSTS → DisallowedHost → HTTP 400. Daher Host + Proto explizit setzen.
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Forwarded-Proto $scheme;
         access_log off;
     }
 

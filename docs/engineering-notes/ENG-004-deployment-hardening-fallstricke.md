@@ -285,6 +285,19 @@ auf die echte Domain setzen, Dienst neu starten.
 prüfen — sonst bleibt ein leeres/falsches `ALLOWED_HOSTS` bis zum ersten echten Browser-Zugriff
 unbemerkt.
 
+**Nachtrag — die eigentliche 400-Ursache: fehlender `proxy_set_header Host` im 443-Block:**
+`ALLOWED_HOSTS` enthielt die Domain korrekt, HTTPS-Health blieb dennoch `400`. Ursache war
+nicht Django, sondern **Nginx**: der `location /health/`-Block im 443-Server rief `proxy_pass`
+**ohne** `proxy_set_header Host` auf. Nginx setzt dann den Default `Host: $proxy_host` — und das
+ist der **Upstream-Block-Name** (`binokel_app`), nicht die Domain. Django empfing also
+`Host: binokel_app` → nicht in `ALLOWED_HOSTS` → `DisallowedHost` → `400`. Der Port-80-Health-Block
+setzte `Host $host` bereits korrekt, weshalb HTTP-localhost `200` lieferte und den Fehler verdeckte.
+Fix: im 443-Health-Block `proxy_set_header Host $host;` (+ `X-Forwarded-Proto $scheme;`) ergänzen.
+
+**Regel:** Jeder `proxy_pass`-Block, der eine `upstream {}`-Gruppe anspricht, muss den
+`Host`-Header explizit setzen (`proxy_set_header Host $host;`) — sonst leakt der Upstream-Name als
+Host-Header und Djangos `ALLOWED_HOSTS`-Prüfung schlägt fehl.
+
 ---
 
 ## Präventionsregel (übergreifend)
