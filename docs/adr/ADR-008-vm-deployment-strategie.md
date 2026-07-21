@@ -15,6 +15,7 @@ Die Anwendung soll auf einer 1&1 Linux-VM produktiv betrieben werden. Für die A
 ## Entscheidung
 
 **Direktes Deployment** ohne Container wird gewählt:
+- Betriebssystem-Basis: **Ubuntu 24.04 LTS (Noble)** als getestete Referenzplattform
 - Django-App als **systemd-Dienst** (via Gunicorn)
 - **Nginx** als Reverse Proxy mit TLS (Let's Encrypt)
 - Code via **rsync** aus GitHub Actions
@@ -36,6 +37,22 @@ Docker bietet mehr Vorteile, sobald das Projekt:
 - Horizontal skaliert werden soll.
 
 Bis dahin erhöht Docker die Komplexität, ohne klaren Mehrwert zu liefern.
+
+### Betriebssystem-Basis: Ubuntu 24.04 LTS
+
+Als Referenzplattform wird **Ubuntu 24.04 LTS (Noble)** gewählt (Entscheidung 21.07.2026):
+
+- **Reife statt Neuheit:** 24.04 ist seit April 2024 im Feld und stabil; das jüngste
+  LTS (26.04, April 2026) wird als `.0`-Release für einen Erst-Deploy bewusst gemieden.
+- **Python-Version irrelevant für die Wahl:** Die App zieht ihre Python-Version über
+  `uv python install` unabhängig vom System-Python — der Hauptvorteil neuerer Distros
+  entfällt hier.
+- **Supportfenster ausreichend:** Standard-Support bis 2029 (ESM bis 2034) deckt V1 ab.
+- **Skript-Kompatibilität:** `deploy/setup-server.sh` ist auf 24.04 abgestimmt
+  (u. a. `/usr/bin/systemctl`-Pfad in der sudoers-Regel, usrmerge).
+
+Eine spätere Anhebung auf 26.04 LTS erfolgt frühestens nach dessen `.1`-Point-Release
+und mit erneutem Trockenlauf.
 
 ## Konsequenzen
 

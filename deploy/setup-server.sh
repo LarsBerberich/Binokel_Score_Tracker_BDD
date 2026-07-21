@@ -2,7 +2,9 @@
 # setup-server.sh — Einmaliges Initialsetup für die 1&1 Linux-VM
 #
 # Voraussetzungen:
-#   - Frisch installiertes Debian 12 (Bookworm) oder Ubuntu 22.04/24.04
+#   - Referenzplattform: frisch installiertes Ubuntu 24.04 LTS (Noble), siehe ADR-008.
+#     Debian 12 (Bookworm) / Ubuntu 22.04 sind grundsätzlich kompatibel, aber nicht
+#     die getestete Zielplattform.
 #   - Root-Zugriff per SSH (bzw. sudo als Admin-User)
 #   - Domain zeigt bereits auf die Server-IP (für Certbot)
 #   - Phase 1 des Runbooks (deploy/runbook-task-ci-006.md) ist abgeschlossen:
@@ -15,11 +17,20 @@
 # Beispiel:
 #   bash setup-server.sh binokel.example.com https://github.com/LarsBerberich/Binokel_Score_Tracker_BDD.git
 #
+# TROCKENLAUF (Wegwerf-VM): Certbot im Staging-Modus ausführen, um die strengen
+# Let's-Encrypt-Produktions-Rate-Limits zu schonen. Das erzeugte Zertifikat ist
+# BEWUSST UNGÜLTIG (Test-CA) — Browser/curl zeigen eine Zertifikatswarnung:
+#   CERTBOT_STAGING=1 bash setup-server.sh test.example.com https://github.com/.../repo.git
+# Staging und Produktion NICHT auf derselben VM mischen — die Trockenlauf-VM wird
+# nach dem Test verworfen.
+#
 # Dieses Skript ist idempotent und richtet u. a. ein:
 #   - Betriebsbenutzer, Verzeichnisse, uv, systemd, Nginx+TLS, UFW, Logrotation
+#   - POSIX-ACLs für gemeinsamen Schreibzugriff (App- und Deploy-User)
 #   - fail2ban (SSH-Brute-Force-Schutz)
 #   - unattended-upgrades (automatische Sicherheitsupdates)
 #   - chrony (Zeit-Synchronisation)
+#   - tägliches SQLite-Backup (cron.d)
 #
 # BEWUSSTE ABGRENZUNG (siehe ADR-009 + deploy/runbook-task-ci-006.md, Phase 1):
 #   Das SSH-Daemon-Hardening (PermitRootLogin no, PasswordAuthentication no, ggf.
@@ -44,6 +55,17 @@ LOG_DIR="/var/log/binokel"
 APP_USER="binokel-app"
 DEPLOY_USER="binokel-deploy"
 
+# Optionaler Certbot-Staging-Modus für den Trockenlauf (siehe Header).
+# Aktivierung über die Umgebungsvariable CERTBOT_STAGING=1|true|yes|on.
+CERTBOT_STAGING="${CERTBOT_STAGING:-}"
+CERTBOT_STAGING_FLAG=""
+case "${CERTBOT_STAGING,,}" in
+    1|true|yes|on)
+        CERTBOT_STAGING_FLAG="--staging"
+        echo "⚠️  CERTBOT_STAGING aktiv: Es wird ein UNGÜLTIGES Test-Zertifikat (Let's Encrypt Staging) ausgestellt."
+        ;;
+esac
+
 echo "=== [1/10] Systempakete aktualisieren ==="
 apt-get update -qq
 apt-get upgrade -y -qq
@@ -51,14 +73,24 @@ apt-get upgrade -y -qq
 echo "=== [2/10] Benötigte Pakete installieren ==="
 apt-get install -y -qq \
     git curl nginx certbot python3-certbot-nginx \
-    ufw logrotate \
+    ufw logrotate acl \
     fail2ban unattended-upgrades apt-listchanges chrony
 
 echo "=== [3/10] uv installieren (Python-Paketmanager) ==="
 curl -LsSf https://astral.sh/uv/install.sh | sh
 # uv systemweit verfügbar machen, damit auch nicht-interaktive SSH-Sessions
 # (z. B. der CD-Workflow) uv ohne Anpassung des PATH nutzen können.
-install -m 0755 "$HOME/.cargo/bin/uv" /usr/local/bin/uv
+# Der Installationspfad variiert je nach uv-Version (~/.local/bin vs. ~/.cargo/bin),
+# daher beide Kandidaten prüfen, statt einen festen Pfad anzunehmen.
+UV_BIN=""
+for _uv_candidate in "$HOME/.local/bin/uv" "$HOME/.cargo/bin/uv"; do
+    if [ -x "$_uv_candidate" ]; then UV_BIN="$_uv_candidate"; break; fi
+done
+if [ -z "$UV_BIN" ]; then
+    echo "Fehler: uv-Binary nach Installation nicht gefunden." >&2
+    exit 1
+fi
+install -m 0755 "$UV_BIN" /usr/local/bin/uv
 
 echo "=== [4/10] Betriebsbenutzer anlegen ==="
 # Anwendungsbenutzer (keine Login-Shell, kein Home)
@@ -69,11 +101,13 @@ useradd --create-home --shell /bin/bash "$DEPLOY_USER" || echo "Benutzer $DEPLOY
 mkdir -p "/home/$DEPLOY_USER/.ssh"
 chmod 700 "/home/$DEPLOY_USER/.ssh"
 
-# Deploy-Benutzer darf systemctl für den App-Dienst ausführen (passwordlos)
+# Deploy-Benutzer darf systemctl für den App-Dienst ausführen (passwordlos).
+# Kanonischer Pfad ist /usr/bin/systemctl (Ubuntu 24.04 / Debian usrmerge);
+# sudo löst über secure_path genau diesen Pfad auf und vergleicht ihn literal.
 cat > "/etc/sudoers.d/binokel-deploy" << EOF
-$DEPLOY_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart binokel-tracker.service
-$DEPLOY_USER ALL=(ALL) NOPASSWD: /bin/systemctl stop binokel-tracker.service
-$DEPLOY_USER ALL=(ALL) NOPASSWD: /bin/systemctl status binokel-tracker.service
+$DEPLOY_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart binokel-tracker.service
+$DEPLOY_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop binokel-tracker.service
+$DEPLOY_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl status binokel-tracker.service
 EOF
 chmod 440 "/etc/sudoers.d/binokel-deploy"
 
@@ -84,6 +118,14 @@ mkdir -p /etc/binokel
 chown "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
 chown "$APP_USER:$APP_USER" "$DATA_DIR" "$STATIC_DIR" "$LOG_DIR"
 chmod 750 /etc/binokel
+
+# Gemeinsamer Schreibzugriff auf Daten- und Static-Verzeichnis:
+# Der Dienst läuft als binokel-app, der CD-Deploy (migrate/collectstatic) als
+# binokel-deploy. Beide müssen dieselben Dateien schreiben (SQLite-DB zur Laufzeit
+# durch binokel-app, Migrationen/Static durch binokel-deploy). POSIX-ACLs inkl.
+# Default-ACLs stellen das umask-unabhängig auch für neu erzeugte Dateien sicher.
+setfacl -R -m u:"$APP_USER":rwX -m u:"$DEPLOY_USER":rwX "$DATA_DIR" "$STATIC_DIR"
+setfacl -R -d -m u:"$APP_USER":rwX -m u:"$DEPLOY_USER":rwX "$DATA_DIR" "$STATIC_DIR"
 
 echo "=== [6/10] Repository klonen ==="
 sudo -u "$DEPLOY_USER" git clone "$REPO_URL" "$APP_DIR" || echo "Repo existiert bereits"
@@ -107,13 +149,59 @@ ENV_TEMPLATE
     echo "⚠️  /etc/binokel/env wurde angelegt. Bitte vor dem ersten Start befüllen!"
 fi
 
+# Deploy-User Lesezugriff auf die Produktionskonfiguration geben, damit der
+# CD-Deploy migrate/collectstatic mit denselben Pfaden (DJANGO_DB_PATH,
+# DJANGO_STATIC_ROOT) wie der systemd-Dienst ausführt. Least Privilege bleibt
+# gewahrt: binokel-deploy rsynct ohnehin den App-Code und startet den Dienst neu,
+# der Key-Lesezugriff erhöht das reale Risiko daher nicht (siehe ADR-009-Nachtrag).
+setfacl -m u:"$DEPLOY_USER":r /etc/binokel/env
+
 echo "=== [8/10] systemd-Dienst installieren ==="
 cp "$APP_DIR/deploy/binokel-tracker.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable binokel-tracker.service
 
 echo "=== [9/10] Nginx konfigurieren und TLS-Zertifikat anfordern ==="
-# Nginx-Config einrichten
+mkdir -p /var/www/certbot
+
+CERT_LIVE_DIR="/etc/letsencrypt/live/$DOMAIN"
+if [ ! -f "$CERT_LIVE_DIR/fullchain.pem" ]; then
+    # Henne-Ei-Problem: Das vollständige Template referenziert TLS-Zertifikate
+    # und von Certbot bereitgestellte Include-Dateien, die es beim Erstlauf noch
+    # nicht gibt. Deshalb zuerst einen minimalen HTTP-only-Serverblock ausrollen,
+    # damit nginx startet und Certbot die ACME-Challenge über Port 80 beantworten
+    # kann. Andernfalls schlägt "nginx -t" fehl und bricht das Skript ab.
+    cat > /etc/nginx/sites-available/binokel-tracker << BOOTSTRAP
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $DOMAIN;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 200 'bootstrap ok';
+        add_header Content-Type text/plain;
+    }
+}
+BOOTSTRAP
+    ln -sf /etc/nginx/sites-available/binokel-tracker /etc/nginx/sites-enabled/binokel-tracker
+    rm -f /etc/nginx/sites-enabled/default
+    nginx -t
+    systemctl reload nginx
+
+    # Zertifikat anfordern. Der --nginx-Installer legt zusätzlich
+    # /etc/letsencrypt/options-ssl-nginx.conf und ssl-dhparams.pem an, die das
+    # vollständige Template per include benötigt. $CERTBOT_STAGING_FLAG ist im
+    # Trockenlauf "--staging" (Test-CA), sonst leer (Produktions-CA).
+    certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos \
+        --email "admin@$DOMAIN" --redirect $CERTBOT_STAGING_FLAG
+fi
+
+# Vollständiges Template (inkl. 443/TLS) ausrollen — die Zertifikate und
+# Certbot-Include-Dateien existieren jetzt.
 sed "s/REPLACE_WITH_YOUR_DOMAIN/$DOMAIN/g" \
     "$APP_DIR/deploy/nginx.conf.template" \
     > "/etc/nginx/sites-available/binokel-tracker"
@@ -121,10 +209,6 @@ ln -sf /etc/nginx/sites-available/binokel-tracker /etc/nginx/sites-enabled/binok
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl reload nginx
-
-# TLS-Zertifikat (interaktiv — E-Mail-Adresse eingeben)
-certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos \
-    --email "admin@$DOMAIN" --redirect
 
 # Logrotation
 cat > /etc/logrotate.d/binokel << 'LOGROTATE'
@@ -151,7 +235,7 @@ ufw allow http
 ufw allow https
 ufw --force enable
 
-echo "=== [10/10] Härtung: fail2ban, automatische Sicherheitsupdates, Zeit-Sync ==="
+echo "=== [10/10] Betriebshärtung & Backup: fail2ban, Sicherheitsupdates, Zeit-Sync, DB-Backup ==="
 # Idempotente Härtungsmaßnahmen, die OHNE SSH-Lockout-Risiko automatisierbar sind.
 # (Das sshd-Daemon-Hardening selbst bleibt bewusst manuell — siehe Skript-Header
 #  und deploy/runbook-task-ci-006.md, Phase 1 / ADR-009.)
@@ -183,7 +267,17 @@ systemctl restart unattended-upgrades
 # chrony: Zeit-Synchronisation (wichtig für TLS-Gültigkeit und Log-Korrelation)
 systemctl enable chrony
 systemctl restart chrony
-
+# Tägliches SQLite-Backup per cron.d (idempotent überschrieben). Läuft als
+# binokel-app (Eigentümer der DB). Das '|| true' unterdrückt Fehler-Mails, solange
+# die DB (vor dem ersten Deploy) noch nicht existiert. Backups > 30 Tage werden gelöscht.
+cat > /etc/cron.d/binokel-backup << 'BACKUP'
+# Binokel Score Tracker — tägliches SQLite-Backup
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 3 * * * binokel-app cp /opt/binokel/data/db.sqlite3 /opt/binokel/data/db.sqlite3.bak.$(date +\%Y\%m\%d) 2>/dev/null || true
+5 3 * * * binokel-app find /opt/binokel/data/ -name "db.sqlite3.bak.*" -mtime +30 -delete
+BACKUP
+chmod 644 /etc/cron.d/binokel-backup
 echo ""
 echo "══════════════════════════════════════════════════════════"
 echo "✅ Server-Setup abgeschlossen!"

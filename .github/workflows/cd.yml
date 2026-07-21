@@ -44,11 +44,19 @@ jobs:
         env:
           KNOWN_HOSTS: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
         run: |
-          if [ -n "$KNOWN_HOSTS" ]; then
-            echo "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
-          else
-            ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
+          # VM_SSH_KNOWN_HOSTS ist verpflichtend. Ein ssh-keyscan-Fallback zur
+          # Laufzeit wäre blindes Trust-on-first-use bei JEDEM Deploy und böte
+          # keinen MITM-Schutz — daher bewusst kein Fallback (siehe ADR-009).
+          if [ -z "$KNOWN_HOSTS" ]; then
+            echo "❌ Secret VM_SSH_KNOWN_HOSTS ist nicht gesetzt." >&2
+            echo "   Aus Sicherheitsgründen wird kein ssh-keyscan-Fallback verwendet." >&2
+            echo "   Host-Keys einmalig mit 'ssh-keyscan -H <VM_HOST>' erzeugen und als Secret hinterlegen." >&2
+            exit 1
           fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Deploy-Preflight prüfen
         run: |
@@ -81,6 +89,12 @@ jobs:
         run: |
           ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" << 'REMOTE'
             set -e
+            # Produktionskonfiguration laden, damit migrate/collectstatic exakt
+            # dieselben Pfade (DJANGO_DB_PATH, DJANGO_STATIC_ROOT) verwenden wie der
+            # systemd-Dienst. Ohne dies fielen die Werte auf die Repo-Defaults zurück
+            # (backend/db.sqlite3, backend/staticfiles) und der Dienst startete gegen
+            # eine leere DB. binokel-deploy hat dafür Lesezugriff per ACL (setup-server.sh).
+            set -a; . /etc/binokel/env; set +a
             cd /opt/binokel/app/backend
             uv sync --no-dev
             uv run python manage.py migrate --noinput
@@ -117,10 +131,10 @@ jobs:
 #   VM_SSH_KEY            — SSH-Private-Key des Deploy-Benutzers (ohne Passphrase)
 #   VM_HOST               — Hostname oder IP der 1&1 VM (z. B. 192.0.2.10)
 #   VM_USER               — Deploy-Benutzername auf der VM (z. B. binokel-deploy)
-#   VM_SSH_KNOWN_HOSTS    — (optional) Bekannte Host-Keys der VM (empfohlen für Produktion).
+#   VM_SSH_KNOWN_HOSTS    — (PFLICHT) Bekannte Host-Keys der VM (MITM-Schutz).
 #                           Inhalt: Zeile(n) im known_hosts-Format, z. B. aus
-#                           `ssh-keyscan -H <VM_HOST>`. Wenn nicht gesetzt, wird
-#                           ssh-keyscan beim Deploy ausgeführt (weniger sicher).
+#                           `ssh-keyscan -H <VM_HOST>`. Ohne dieses Secret bricht
+#                           der Deploy bewusst ab (kein ssh-keyscan-Fallback).
 #
 # Auf der VM als Umgebungsvariablen in /etc/binokel/env:
 #   DJANGO_SECRET_KEY          — sicherer, zufälliger Schlüssel (min. 50 Zeichen)

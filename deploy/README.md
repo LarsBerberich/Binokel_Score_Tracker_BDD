@@ -1,6 +1,6 @@
 # Deploy-Dokumentation — Binokel Score Tracker
 
-Dieses Verzeichnis enthält alle Artefakte für das Production-Deployment auf einer **1&1 / IONOS Linux-VM** (Ubuntu LTS, z. B. 24.04).
+Dieses Verzeichnis enthält alle Artefakte für das Production-Deployment auf einer **1&1 / IONOS Linux-VM** (**Ubuntu 24.04 LTS**, siehe [ADR-008](../docs/adr/ADR-008-vm-deployment-strategie.md)).
 
 > **Erster Produktions-Deploy (TASK-CI-006):** Die vollständige, phasenweise
 > Schritt-für-Schritt-Anleitung inklusive **Internet-Hardening**, Verifikation und
@@ -58,12 +58,18 @@ curl -LO https://raw.githubusercontent.com/LarsBerberich/Binokel_Score_Tracker_B
 sudo bash setup-server.sh IHRE_DOMAIN https://github.com/LarsBerberich/Binokel_Score_Tracker_BDD.git
 ```
 
+> **Trockenlauf zuerst:** Vor dem echten Deploy den kompletten Pfad einmal risikofrei
+> gegen eine Wegwerf-VM mit Certbot-Staging durchspielen (`CERTBOT_STAGING=1`).
+> Schritt-für-Schritt-Anleitung: [Trockenlauf-Runbook](runbook-dry-run.md).
+
 Das Skript richtet folgendes ein:
 - Betriebsbenutzer `binokel-app` (App-Prozess) und `binokel-deploy` (CI/CD-Pipeline)
 - Verzeichnisstruktur unter `/opt/binokel/`
 - systemd-Dienst und Nginx mit TLS (Let's Encrypt via Certbot)
 - Firewall (UFW: nur SSH, HTTP, HTTPS)
 - **fail2ban, unattended-upgrades, chrony** (Härtung, siehe oben)
+- POSIX-ACLs für gemeinsamen Schreibzugriff (`binokel-app` + `binokel-deploy`) auf `data`/`static`
+- Tägliches SQLite-Backup (`cron.d`)
 - Logrotation
 
 ---
@@ -77,7 +83,7 @@ In **GitHub → Repository → Settings → Secrets and Variables → Actions** 
 | `VM_SSH_KEY` | Privater SSH-Schlüssel des `binokel-deploy`-Benutzers |
 | `VM_HOST` | IP-Adresse oder Domain der VM (z. B. `192.0.2.10`) |
 | `VM_USER` | `binokel-deploy` |
-| `VM_SSH_KNOWN_HOSTS` | *(optional, empfohlen)* Bekannte Host-Keys der VM im `known_hosts`-Format. Erzeugen mit `ssh-keyscan -H <VM_HOST>`. Wenn nicht gesetzt, führt der Workflow `ssh-keyscan` automatisch aus – das ist praktisch, bietet aber keinen Schutz vor einem Man-in-the-Middle beim ersten Verbindungsaufbau. |
+| `VM_SSH_KNOWN_HOSTS` | **(Pflicht)** Bekannte Host-Keys der VM im `known_hosts`-Format. Erzeugen mit `ssh-keyscan -H <VM_HOST>`. Ohne dieses Secret bricht der CD-Workflow bewusst ab – es gibt **keinen** Laufzeit-`ssh-keyscan`-Fallback mehr (MITM-Schutz, siehe ADR-009). |
 
 ---
 
@@ -162,6 +168,8 @@ cd /opt/binokel/app
 git pull origin main
 cd backend
 uv sync --no-dev
+# Produktionskonfiguration laden (gleiche Pfade wie der Dienst):
+set -a; . /etc/binokel/env; set +a
 uv run python manage.py migrate --noinput
 uv run python manage.py collectstatic --noinput
 sudo systemctl restart binokel-tracker.service
@@ -193,11 +201,20 @@ tail -f /var/log/nginx/error.log
 ## Backup
 
 Die SQLite-Datenbank liegt unter `/opt/binokel/data/db.sqlite3`.
-Tägliches Backup empfohlen:
+
+`setup-server.sh` richtet automatisch ein **tägliches Backup** ein
+(`/etc/cron.d/binokel-backup`, läuft als `binokel-app` um 03:00 Uhr, Aufbewahrung 30 Tage):
 
 ```bash
-# /etc/cron.d/binokel-backup
-0 3 * * * binokel-app cp /opt/binokel/data/db.sqlite3 /opt/binokel/data/db.sqlite3.bak.$(date +\%Y\%m\%d)
-# Backups älter als 30 Tage löschen
+# /etc/cron.d/binokel-backup (vom Setup-Skript angelegt)
+0 3 * * * binokel-app cp /opt/binokel/data/db.sqlite3 /opt/binokel/data/db.sqlite3.bak.$(date +\%Y\%m\%d) 2>/dev/null || true
 5 3 * * * binokel-app find /opt/binokel/data/ -name "db.sqlite3.bak.*" -mtime +30 -delete
+```
+
+**Restore** (Dienst vorher stoppen, danach starten):
+
+```bash
+sudo systemctl stop binokel-tracker.service
+sudo -u binokel-app cp /opt/binokel/data/db.sqlite3.bak.YYYYMMDD /opt/binokel/data/db.sqlite3
+sudo systemctl start binokel-tracker.service
 ```

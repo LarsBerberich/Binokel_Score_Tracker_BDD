@@ -21,6 +21,16 @@ server {
         root /var/www/certbot;
     }
 
+    # Healthcheck über HTTP zulassen (kein HTTPS-Redirect): Der Deployment-Check
+    # ruft lokal http://localhost/health/ auf. Django ist per SECURE_REDIRECT_EXEMPT
+    # für diesen Pfad vom SSL-Redirect ausgenommen.
+    location = /health/ {
+        proxy_pass         http://binokel_app;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        access_log off;
+    }
+
     location / {
         return 301 https://$host$request_uri;
     }

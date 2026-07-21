@@ -46,6 +46,11 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes', '
 
 _allowed_hosts_raw = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
+# localhost/127.0.0.1 immer erlauben: Der Deployment-Healthcheck ruft den
+# Endpunkt lokal auf der VM als http://localhost/health/ auf.
+for _local_host in ('localhost', '127.0.0.1'):
+    if _local_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_local_host)
 
 
 # Application definition
@@ -155,7 +160,15 @@ _csrf_trusted_origins_raw = os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_trusted_origins_raw.split(',') if o.strip()]
 
 if not DEBUG:
+    # Gunicorn spricht per UNIX-Socket HTTP mit Nginx; ohne diesen Header wäre
+    # request.is_secure() immer False und SECURE_SSL_REDIRECT würde jede – auch
+    # bereits über HTTPS eingelieferte – Anfrage erneut umleiten (Redirect-Loop).
+    # Nginx setzt X-Forwarded-Proto im Proxy-Block.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
+    # Der lokale Healthcheck (http://localhost/health/) wird über HTTP aufgerufen
+    # und darf nicht auf HTTPS umgeleitet werden, sonst schlägt der Deploy-Check fehl.
+    SECURE_REDIRECT_EXEMPT = [r'^health/$']
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000

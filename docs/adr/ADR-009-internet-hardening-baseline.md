@@ -91,3 +91,41 @@ Es wird eine **Internet-Hardening-Baseline** für die Produktions-VM festgelegt:
 - `deploy/setup-server.sh` — fail2ban, unattended-upgrades, chrony (idempotent).
 - `deploy/nginx.conf.template` — TLS-Erzwingung + Security-Header (bestehend).
 - `deploy/binokel-tracker.service` — systemd-Prozesshärtung (bestehend).
+
+## Nachtrag (21.07.2026) — Rubber-Duck-Review
+
+Der Rubber-Duck-Review vor der ersten realen Ausführung bestätigte die Baseline als
+**solide** (keine Änderung an der Hardening-Entscheidung selbst nötig), deckte aber
+Blocker im *ausführbaren* Pfad auf. Daraus resultieren folgende Präzisierungen mit
+Sicherheitsbezug:
+
+1. **`known_hosts` ist Pflicht (MITM-Schutz).** Der bisherige Laufzeit-`ssh-keyscan`-
+   Fallback im CD-Workflow war blindes Trust-on-first-use bei *jedem* Deploy. Das
+   Secret `VM_SSH_KNOWN_HOSTS` ist nun verpflichtend; fehlt es, bricht der Workflow
+   bewusst ab (`.github/workflows/cd.yml`).
+2. **Gemeinsamer Schreibzugriff per POSIX-ACL statt root.** Der Dienst (`binokel-app`)
+   und der Deploy-User (`binokel-deploy`) teilen sich `data`/`static` über Default-ACLs.
+   Das erhält Least Privilege (keine root-Ausführung von migrate/collectstatic) und
+   löst zugleich die SQLite-Schreibrechte. Neue Abhängigkeit: Paket `acl`.
+3. **sudoers-Pfad `/usr/bin/systemctl`** (Ubuntu-24.04-usrmerge, kanonischer Pfad),
+   damit die eng begrenzte NOPASSWD-Regel zuverlässig greift.
+4. **App-seitige HTTPS-Erzwingung hinter Proxy:** `SECURE_PROXY_SSL_HEADER` +
+   `SECURE_REDIRECT_EXEMPT` für `/health/` verhindern Redirect-Loop und halten den
+   lokalen HTTP-Healthcheck funktionsfähig (`backend/binokel_tracker/settings.py`).
+
+Vollständige Ursachen-/Lösungsanalyse: `docs/engineering-notes/ENG-004-deployment-hardening-fallstricke.md`.
+
+## Nachtrag (21.07.2026) — Trockenlauf-Vorbereitung
+
+Bei der Vorbereitung des Trockenlaufs wurde ein weiterer Blocker im Deploy-Pfad
+gefunden und behoben:
+
+5. **Deploy lädt die Produktionskonfiguration.** `migrate`/`collectstatic` liefen als
+   `binokel-deploy` ohne `/etc/binokel/env` und verwendeten daher die Repo-Default-
+   Pfade statt `DJANGO_DB_PATH`/`DJANGO_STATIC_ROOT` — der Dienst wäre gegen eine
+   leere DB gestartet. Die Deploy-Schritte (`cd.yml`, manueller Not-Deploy) laden nun
+   die Env (`set -a; . /etc/binokel/env; set +a`). Dazu erhält `binokel-deploy` per
+   gezielter ACL (`setfacl -m u:binokel-deploy:r /etc/binokel/env`) **Lesezugriff**.
+   Dies schwächt Least Privilege nicht: `binokel-deploy` rsynct ohnehin den App-Code
+   und startet den Dienst, könnte den `SECRET_KEY` also ohnehin erlangen — der
+   Lesezugriff macht die bestehende Vertrauensgrenze nur explizit.

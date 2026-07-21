@@ -11,10 +11,14 @@
 
 **TASK-CI-001–005 — CI/CD-Pipeline + Betriebsfundament fertig.**
 
-**TASK-CI-006 — Runbook `deploy/runbook-task-ci-006.md` erstellt (19.07.2026).**
+**TASK-CI-006 — Runbook `deploy/runbook-task-ci-006.md` erstellt (19.07.2026),
+Rubber-Duck-Review erfolgt + Blocker behoben (21.07.2026).**
 Der Erst-Deploy ist vollständig geplant und dokumentiert (inkl. Internet-Hardening,
-ADR-009), aber **noch nicht auf einer realen VM ausgeführt**. Vor der Ausführung:
-Rubber-Duck-Review der Härtungsentscheidungen (siehe Runbook-Ende).
+ADR-009). Der Rubber-Duck-Review fand 5 Blocker (Redirect-Loop, Certbot-Reihenfolge,
+uv-Pfad, Deploy-Schreibrechte, Healthcheck) — alle behoben (siehe
+`docs/engineering-notes/ENG-004-deployment-hardening-fallstricke.md`). Betriebssystem-
+Basis: **Ubuntu 24.04 LTS**. Nächster Schritt: Trockenlauf gegen eine Wegwerf-VM
+(Certbot `--staging`), dann realer Deploy. **Noch nicht auf realer VM ausgeführt.**
 
 ---
 
@@ -95,7 +99,9 @@ Rubber-Duck-Review der Härtungsentscheidungen (siehe Runbook-Ende).
   - Phase 4: Deploy-SSH-Key + GitHub-Secrets `VM_SSH_KEY`, `VM_HOST`, `VM_USER`, `VM_SSH_KNOWN_HOSTS`
   - Phase 5: Branch Protection für `main` aktivieren (ADR-007)
   - Phase 6: Ersten Deploy manuell auslösen (CD → workflow_dispatch, confirm=yes) und verifizieren
-  - **Offen:** Ausführung auf realer VM (benötigt Zugangsdaten, Domain); Rubber-Duck-Review der Härtung (Punkte am Ende des Runbooks)
+  - Rubber-Duck-Review erfolgt (21.07.2026): 5 Blocker behoben — `settings.py` (Redirect-Loop), `setup-server.sh` (Certbot-Reihenfolge + uv-Pfad + POSIX-ACL-Schreibrechte + Backup-Cron), `nginx.conf.template` (Healthcheck); `known_hosts` jetzt Pflicht, sudoers `/usr/bin/systemctl`. Fallstricke: `docs/engineering-notes/ENG-004-deployment-hardening-fallstricke.md`
+  - Betriebssystem-Basis: **Ubuntu 24.04 LTS** (ADR-008)
+  - **Offen:** Trockenlauf gegen Wegwerf-VM (Certbot `--staging`), dann Ausführung auf realer VM (benötigt Zugangsdaten, Domain)
   - V1 nutzt SQLite; Docker + PostgreSQL als späterer Meilenstein (ADR-008)
 
 ### Phase 2 – Frontend (Vue) — noch nicht gestartet

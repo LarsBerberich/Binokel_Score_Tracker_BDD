@@ -85,6 +85,36 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
+## Stand 21.07.2026 (TASK-CI-006 — Rubber-Duck-Review + Blocker-Fixes, Dev/Ops)
+
+Der Rubber-Duck-Review der Hardening-/Deploy-Planung ist erfolgt. Ergebnis-Votum war
+zunächst **NO-GO**: Die Hardening-Baseline (ADR-009) ist solide, aber der ausführbare
+Pfad enthielt 5 Blocker. Diese wurden behoben (Code + Doku), Tests bleiben GREEN
+(28 Behave + 19 Django).
+
+**Behobene Blocker:**
+- `backend/binokel_tracker/settings.py` — `SECURE_PROXY_SSL_HEADER` + `SECURE_REDIRECT_EXEMPT`
+  für `/health/`; `localhost`/`127.0.0.1` immer in `ALLOWED_HOSTS` (Redirect-Loop + Healthcheck).
+- `deploy/setup-server.sh` — Nginx/Certbot Henne-Ei gelöst (HTTP-only-Bootstrap → Certbot →
+  volles Template); `uv`-Pfad-Fallback (`~/.local/bin`); POSIX-ACLs für gemeinsamen
+  Schreibzugriff (`binokel-app` + `binokel-deploy`) auf `data`/`static`; sudoers auf
+  `/usr/bin/systemctl`; tägliches SQLite-Backup via `cron.d`; `acl`-Paket ergänzt.
+- `deploy/nginx.conf.template` — `location = /health/` im Port-80-Block (HTTP-Healthcheck
+  ohne Redirect).
+- `.github/workflows/cd.yml` — `VM_SSH_KNOWN_HOSTS` jetzt **Pflicht** (kein
+  Laufzeit-`ssh-keyscan`-Fallback mehr; MITM-Schutz).
+
+**Entscheidung:** Betriebssystem-Basis bleibt **Ubuntu 24.04 LTS** (ADR-008 erweitert).
+
+**Neu/aktualisiert:** `docs/engineering-notes/ENG-004-deployment-hardening-fallstricke.md`;
+ADR-008 (OS-Basis), ADR-009 (Nachtrag Review); Runbook + `deploy/README.md` angeglichen;
+`BACKLOG.md`.
+
+**Nächste Schritte:** Trockenlauf gegen Wegwerf-VM mit Certbot `--staging`, danach realer
+Deploy nach Runbook.
+
+---
+
 ## Stand 19.07.2026 (TASK-CI-006 geplant — Dev/Ops)
 
 ### Erledigt (reine Planung/Dokumentation, KEINE Ausführung auf realer VM)

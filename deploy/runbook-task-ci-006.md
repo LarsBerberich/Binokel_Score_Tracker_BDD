@@ -1,11 +1,14 @@
 # Runbook TASK-CI-006 — VM einrichten, Secrets hinterlegen, erster Produktions-Deploy
 
-> **Status:** Geplant / noch nicht ausgeführt.
+> **Status:** Geplant / noch nicht auf realer VM ausgeführt.
+> **Rubber-Duck-Review erfolgt (21.07.2026)** — die dort gefundenen 5 Blocker wurden in
+> `settings.py`, `setup-server.sh`, `nginx.conf.template` und `cd.yml` behoben
+> (Details: `docs/engineering-notes/ENG-004-deployment-hardening-fallstricke.md`).
 > Dieses Runbook ist eine **Ausführungsanleitung** für den erstmaligen Aufbau der
 > Produktionsumgebung auf einer neuen **1&1 / IONOS-VM mit frisch installiertem
-> Ubuntu LTS (z. B. 24.04)**. Es wurde als reine Planungs- und Dokumentationsarbeit
-> erstellt — es wurden **keine** SSH-Verbindungen aufgebaut, **keine** echten Secrets
-> erzeugt und **kein** Deploy ausgelöst.
+> Ubuntu 24.04 LTS** (Referenzplattform, siehe ADR-008). Es wurde als reine Planungs-
+> und Dokumentationsarbeit erstellt — es wurden **keine** SSH-Verbindungen aufgebaut,
+> **keine** echten Secrets erzeugt und **kein** Deploy ausgelöst.
 >
 > **Normative Quellen:** `docs/adr/ADR-007-github-actions-ci-cd.md`,
 > `docs/adr/ADR-008-vm-deployment-strategie.md`,
@@ -236,12 +239,18 @@ sudo bash setup-server.sh binokel.example.com https://github.com/LarsBerberich/B
 
 Das Skript ist idempotent und richtet ein:
 - Betriebsbenutzer `binokel-app` (App) und `binokel-deploy` (CI/CD)
-- Verzeichnisstruktur unter `/opt/binokel/`
+- Verzeichnisstruktur unter `/opt/binokel/` inkl. POSIX-ACLs für gemeinsamen
+  Schreibzugriff auf `data`/`static` (App-Dienst + Deploy-User)
 - systemd-Dienst + Nginx mit TLS (Let's Encrypt via Certbot)
 - **fail2ban** (SSH-Brute-Force-Schutz)
 - **unattended-upgrades** (automatische Sicherheitsupdates)
 - **chrony** (Zeit-Sync)
-- UFW-Firewall (nur SSH/HTTP/HTTPS), Logrotation
+- UFW-Firewall (nur SSH/HTTP/HTTPS), Logrotation, tägliches SQLite-Backup (`cron.d`)
+
+> **Nginx/Certbot-Reihenfolge (Henne-Ei):** Das Skript rollt beim Erstlauf zunächst
+> einen HTTP-only-Serverblock aus, fordert dann per `certbot --nginx` das Zertifikat
+> an und aktiviert erst danach das vollständige Template mit 443/TLS. Dadurch
+> scheitert `nginx -t` nicht an noch fehlenden Zertifikatsdateien (siehe ENG-004).
 
 > **DNS-Abhängigkeit:** Certbot fordert das Zertifikat live an. `binokel.example.com`
 > **muss** bereits auf die VM zeigen (Phase 0), sonst schlägt die ACME-Challenge fehl.
@@ -396,7 +405,7 @@ ssh-keyscan -H 203.0.113.10
 | `VM_SSH_KEY` | **Privater** Key: kompletter Inhalt von `~/.ssh/binokel_deploy` |
 | `VM_HOST` | `203.0.113.10` (oder `binokel.example.com`) |
 | `VM_USER` | `binokel-deploy` |
-| `VM_SSH_KNOWN_HOSTS` | Ausgabe von `ssh-keyscan -H` aus Schritt 4.3 (empfohlen) |
+| `VM_SSH_KNOWN_HOSTS` | **(Pflicht)** Ausgabe von `ssh-keyscan -H` aus Schritt 4.3 — ohne dieses Secret bricht der CD-Workflow bewusst ab (kein Laufzeit-`ssh-keyscan`-Fallback mehr, MITM-Schutz) |
 
 ### Verifikation (Phase 4)
 
@@ -417,8 +426,9 @@ ssh -i ~/.ssh/binokel_deploy binokel-deploy@203.0.113.10 \
 
 - **Deploy-Key kompromittiert:** Zeile aus `/home/binokel-deploy/.ssh/authorized_keys`
   entfernen, neuen Key erzeugen, `VM_SSH_KEY` in GitHub rotieren.
-- **Falsche `known_hosts`:** `VM_SSH_KNOWN_HOSTS` neu setzen; Workflow fällt sonst
-  auf `ssh-keyscan` zur Laufzeit zurück (weniger sicher, siehe Risiken-Abschnitt).
+- **Falsche `known_hosts`:** `VM_SSH_KNOWN_HOSTS` neu setzen. Es gibt **keinen**
+  Laufzeit-`ssh-keyscan`-Fallback mehr — bei fehlendem/falschem Secret bricht der
+  CD-Workflow bewusst ab (MITM-Schutz, ADR-009).
 - Secrets sind jederzeit in GitHub überschreib-/löschbar → voll reversibel.
 
 ---
@@ -506,6 +516,7 @@ Ein **automatischer** Rollback auf eine frühere App-Version ist in der Pipeline
    # Als binokel-deploy:
    cd /opt/binokel/app && git pull origin main
    cd backend && uv sync --no-dev
+   set -a; . /etc/binokel/env; set +a   # Prod-Konfig laden (gleiche Pfade wie Dienst)
    uv run python manage.py migrate --noinput
    uv run python manage.py collectstatic --noinput
    sudo systemctl restart binokel-tracker.service
@@ -525,9 +536,9 @@ Ein **automatischer** Rollback auf eine frühere App-Version ist in der Pipeline
 | **Falsche Rechte auf `/etc/binokel/env`** (zu offen) | Secret (`SECRET_KEY`) lesbar für andere User | Immer `chmod 640` + `chown root:binokel-app`; Verifikation in Phase 3; bei Leak Schlüssel rotieren |
 | **SSH-Lockout durch Hardening-Fehler** | Kein Admin-Zugang mehr zur VM | Zweite Sitzung offen halten (Phase 1.3/1.4); Drop-in statt Hauptdatei; Notfall über 1&1/IONOS-Web-/VNC-Konsole |
 | **Firewall sperrt SSH aus** | Aussperrung nach `ufw enable` | `setup-server.sh` erlaubt SSH vor `ufw --force enable`; bei custom Port `ufw allow 2222/tcp` **vor** dem Aktivieren; Provider-Konsole als Fallback |
-| **Fehlende/ falsche `known_hosts`** | MITM-Risiko beim ersten CD-Connect | `VM_SSH_KNOWN_HOSTS` via `ssh-keyscan -H` setzen (Phase 4); nicht auf Laufzeit-`ssh-keyscan` verlassen |
+| **Fehlende/ falsche `known_hosts`** | MITM-Risiko beim ersten CD-Connect | `VM_SSH_KNOWN_HOSTS` ist **Pflicht** (via `ssh-keyscan -H`, Phase 4); ohne das Secret bricht der CD-Workflow ab — kein Laufzeit-Fallback |
 | **Deploy-User hat zu viele Rechte** | Kompromittierter CI-Key = Vollzugriff | sudoers auf drei `systemctl`-Kommandos begrenzt (Skript); Least-Privilege-Gegenprobe in Phase 4 |
-| **Migration beschädigt SQLite-DB** | Datenverlust / Dienst startet nicht | Tägliches Backup (Cron aus `deploy/README.md`); Restore-Schritt Phase 6; Migrationen zuerst per `check` prüfen |
+| **Migration beschädigt SQLite-DB** | Datenverlust / Dienst startet nicht | Tägliches Backup (Cron **vom `setup-server.sh` installiert**); Restore-Schritt Phase 6; Migrationen zuerst per `check` prüfen |
 | **Let's-Encrypt-Rate-Limit** (zu viele Cert-Versuche) | Temporär keine Zertifikatsausstellung | Beim Testen `--staging`; erst nach erfolgreichem Test echtes Zertifikat |
 | **Kein Auto-Rollback in der Pipeline** | Fehlerhafter Deploy bleibt live | Fix-forward oder `git revert` (Phase 6); Healthcheck lässt den Job fehlschlagen und zeigt Diagnose |
 | **`unattended-upgrades` startet Dienst/Kernel neu** | Ungeplante Kurz-Downtime | Reboot-Zeitfenster konfigurierbar (`Unattended-Upgrade::Automatic-Reboot-Time`); systemd `Restart=on-failure` fängt App-Neustart ab |
@@ -583,5 +594,35 @@ tatsächlichen Ausführung folgende Punkte prüfen:
    ein simpler Release-Symlink-Rollback (vorherige rsync-Version) ergänzt werden?
 8. **Backup vor erstem Deploy**: Backup-Cron aus `deploy/README.md` bereits VOR
    Phase 6 einrichten, damit die erste Migration abgesichert ist?
+
+### Ergebnis des Rubber-Duck-Reviews (21.07.2026)
+
+**Votum vor den Fixes: NO-GO.** Die Hardening-Baseline (ADR-009) selbst ist solide;
+die Blocker lagen im Zusammenspiel von Setup-Skript, Nginx/Django-Konfiguration und
+CD-Workflow. Alle 5 Blocker wurden behoben, Tests bleiben GREEN (28 Behave + 19 Django).
+
+| Punkt | Votum | Ergebnis / Umsetzung |
+|---|---|---|
+| 1 SSH-Hardening-Reihenfolge | OK (Restrisiko akzeptiert) | Zweitsitzung + Provider-Konsole genügen; kein `at`-Auto-Revert nötig |
+| 2 Aufgabenteilung Script↔Runbook | OK | Unverändert; ADR-009 trägt |
+| 3 SSH-Port 22 vs. 2222 | OK (Risiko akzeptiert) | Port 22 + fail2ban für V1 |
+| 4 `known_hosts`-Strategie | **Geändert** | `VM_SSH_KNOWN_HOSTS` ist jetzt **Pflicht**; Laufzeit-`ssh-keyscan`-Fallback entfernt (`cd.yml`) |
+| 5 Deploy-User-Rechte | **Geändert** | migrate/collectstatic schrieben mangels Rechten nicht → POSIX-ACLs für `binokel-app`+`binokel-deploy` (`setup-server.sh`); sudoers-Pfad `/usr/bin/systemctl` |
+| 6 Auto-Reboot unattended-upgrades | OK (Risiko akzeptiert) | Kein Auto-Reboot als Default; Reboot-Fenster bei Bedarf |
+| 7 Kein Auto-Rollback | OK (Risiko akzeptiert) | Fix-forward/`git revert` für V1 |
+| 8 Backup vor erstem Deploy | **Geändert** | Backup-Cron wird jetzt vom `setup-server.sh` automatisch installiert (Phase 2) |
+
+**Zusätzlich behobene Blocker (nicht in der ursprünglichen 8-Punkte-Liste):**
+- Redirect-Loop: `SECURE_PROXY_SSL_HEADER` fehlte (`settings.py`).
+- Certbot Henne-Ei: `nginx -t` scheiterte vor der Zertifikatsausstellung (`setup-server.sh`).
+- Falscher `uv`-Installationspfad (`setup-server.sh`).
+- Healthcheck gegen HTTPS-Erzwingung: `SECURE_REDIRECT_EXEMPT` + `localhost` in `ALLOWED_HOSTS` + `location = /health/` im Port-80-Block.
+
+Details und Präventionsregeln: `docs/engineering-notes/ENG-004-deployment-hardening-fallstricke.md`.
+
+**Nächster Schritt vor realem Deploy:** Trockenlauf gegen eine Wegwerf-VM mit
+Certbot `--staging` — vollständige Schritt-für-Schritt-Anleitung in
+`deploy/runbook-dry-run.md`. Erst nach erfolgreichem Trockenlauf die Ausführung nach
+diesem Runbook.
 ```
 
