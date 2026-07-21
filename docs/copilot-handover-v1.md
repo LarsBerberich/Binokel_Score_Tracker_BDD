@@ -85,6 +85,48 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
+## Stand 22.07.2026 (TASK-CI-006 — Trockenlauf erfolgreich + Security-Hardening, Dev/Ops)
+
+**Trockenlauf abgeschlossen (GRÜN).** Der komplette Deploy-Pfad wurde real gegen eine
+Wegwerf-VM (`staging.bebe-soft.de`, Certbot `--staging`) durchgespielt: `HTTP→HTTPS 301`,
+`health-https 200`, sauberes `error.log`, korrekte migrate-/collectstatic-Pfade. Dabei traten
+**sechs** weitere reale Blocker auf (gunicorn-Dependency fehlte, Deploy ohne Prod-env → falsche
+DB-/Static-Pfade, `/etc/binokel`-Verzeichnis-Traversal, uv-Interpreter im Deploy-Home →
+`203/EXEC`, Gunicorn-Control-Server ohne `HOME`, Nginx-Host-Header im 443-`/health/`-Block) —
+alle behoben. Commits: `5d6c5e3`, `991c493`, `f486ade`, `c37dc30`, `bbd07e3`, `ded2e13`.
+
+**Security-Review des Rechte-/Zugriffsmodells (Rubber-Duck).** Zwei prod-blockierende Punkte
+(K1, K2) + fünf Nachschärfungen (E1–E5), alle umgesetzt; Tests GREEN (28 Behave + 19 Django).
+
+- **K1** – sudoers-Regel `systemctl status` **entfernt** (Pager-Root-Escape via `!sh` aus
+  `less`). NOPASSWD nur noch `restart`/`stop`; Statusdiagnose läuft unprivilegiert.
+  (`deploy/setup-server.sh`, `.github/workflows/cd.yml`)
+- **K2** – fail-open `SECRET_KEY` behoben: bei `DEBUG=False` **harter Abbruch**
+  (`ImproperlyConfigured`), wenn der Insecure-Default-Key aktiv ist. `DEBUG`-Default bleibt
+  `True` (Test-/Behave-Läufe ohne env). (`backend/binokel_tracker/settings.py`)
+- **E1** – `STATIC_DIR` gehört `binokel-deploy`; der exponierte Dienst `binokel-app` hat nur
+  noch `rX` (kann ausgeliefertes Static nicht überschreiben). (`deploy/setup-server.sh`)
+- **E2** – Security-Header-Ownership entwirrt: Django für proxied Antworten, Nginx exklusiv im
+  `/static/`-Block; `Referrer-Policy` vereinheitlicht. (`settings.py`, `nginx.conf.template`)
+- **E3** – systemd-Härtung ausgebaut (`ProtectSystem=strict` + `ReadWritePaths`, `ProtectHome`,
+  `PrivateDevices`, `SystemCallFilter=@system-service`, `RestrictAddressFamilies` …).
+  (`deploy/binokel-tracker.service`)
+- **E4** – `server_tokens off;`. (`nginx.conf.template`)
+- **E5** – CD liest den echten `SECRET_KEY` nicht mehr: migrate/collectstatic laufen mit einem
+  Wegwerf-Schlüssel; nur nicht-geheime Pfad-Variablen werden aus der env gelesen.
+  (`.github/workflows/cd.yml`)
+
+**Doku:** ADR-009 (zwei Nachträge: Privilegienmodell „warum root nur fürs Provisioning" +
+K1–E5-Zusammenfassung); `ENG-004` (K1/K2-Fallstricke + E1–E5-Abschnitt); `BACKLOG.md`;
+`deploy/runbook-task-ci-006.md` (Phase-4-Verifikation an K1 angepasst; env-Perms `640 root:binokel-app`
+→ `600 root:root + ACL`).
+
+**Nächste Schritte:** Teardown Wegwerf-VM + Test-DNS entfernen; **realer Produktions-Deploy**
+nach Runbook (reale Domain, **ohne** `CERTBOT_STAGING`, IONOS-Ports 8000/8443/8447 schließen).
+Danach Phase 2 Frontend (Vue).
+
+---
+
 ## Stand 21.07.2026 (TASK-CI-006 — Rubber-Duck-Review + Blocker-Fixes, Dev/Ops)
 
 Der Rubber-Duck-Review der Hardening-/Deploy-Planung ist erfolgt. Ergebnis-Votum war

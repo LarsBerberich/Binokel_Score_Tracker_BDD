@@ -7,18 +7,20 @@
 
 ## ▶ Aktueller Fokus
 
-**TASK-006 ist abgeschlossen. Aktueller Dev/Ops-Fokus: TASK-CI-006 (erster Produktions-Deploy) — geplant, Runbook liegt vor.**
+**TASK-006 ist abgeschlossen. Aktueller Dev/Ops-Fokus: TASK-CI-006 (erster Produktions-Deploy) — Trockenlauf erfolgreich, Security-Review erfolgt; realer Prod-Deploy steht aus.**
 
 **TASK-CI-001–005 — CI/CD-Pipeline + Betriebsfundament fertig.**
 
-**TASK-CI-006 — Runbook `deploy/runbook-task-ci-006.md` erstellt (19.07.2026),
-Rubber-Duck-Review erfolgt + Blocker behoben (21.07.2026).**
-Der Erst-Deploy ist vollständig geplant und dokumentiert (inkl. Internet-Hardening,
-ADR-009). Der Rubber-Duck-Review fand 5 Blocker (Redirect-Loop, Certbot-Reihenfolge,
-uv-Pfad, Deploy-Schreibrechte, Healthcheck) — alle behoben (siehe
-`docs/engineering-notes/ENG-004-deployment-hardening-fallstricke.md`). Betriebssystem-
-Basis: **Ubuntu 24.04 LTS**. Nächster Schritt: Trockenlauf gegen eine Wegwerf-VM
-(Certbot `--staging`), dann realer Deploy. **Noch nicht auf realer VM ausgeführt.**
+**TASK-CI-006 — Trockenlauf gegen Wegwerf-VM erfolgreich durchgeführt (21.07.2026).**
+Der komplette Deploy-Pfad wurde real gegen eine Wegwerf-VM (`staging.bebe-soft.de`,
+Certbot `--staging`) durchgespielt und lieferte am Ende `health-https: 200`. Dabei traten
+**sechs** weitere reale Blocker auf (gunicorn-Dep, Deploy-env, `/etc/binokel`-Traversal,
+uv-Interpreter im Deploy-Home/`203/EXEC`, Gunicorn-Control-Server-`HOME`, Nginx-Host-Header)
+— alle behoben. Anschließend fand ein **Rubber-Duck-Security-Review** zwei prod-blockierende
+Punkte (K1 sudo-`status`-Root-Escape, K2 fail-open SECRET_KEY) + fünf Verschärfungen (E1–E5)
+— ebenfalls alle behoben. Details: `docs/engineering-notes/ENG-004-...` + ADR-009-Nachträge.
+Betriebssystem-Basis: **Ubuntu 24.04 LTS**. **Nächster Schritt: Teardown der Wegwerf-VM,
+dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
 
 ---
 
@@ -95,13 +97,14 @@ Basis: **Ubuntu 24.04 LTS**. Nächster Schritt: Trockenlauf gegen eine Wegwerf-V
   - Ziel-Infrastruktur: neue 1&1/IONOS-VM mit frischem Ubuntu LTS (z. B. 24.04)
   - Phase 1: Internet-Hardening (Admin-User, SSH-Key-only, sshd-Härtung) — manuell (ADR-009)
   - Phase 2: VM mit `deploy/setup-server.sh` initialisieren (inkl. fail2ban, unattended-upgrades, chrony)
-  - Phase 3: `/etc/binokel/env` mit Produktionskonfiguration befüllen (640 root:binokel-app)
+  - Phase 3: `/etc/binokel/env` mit Produktionskonfiguration befüllen (600 root:root + gezielte ACL für binokel-deploy)
   - Phase 4: Deploy-SSH-Key + GitHub-Secrets `VM_SSH_KEY`, `VM_HOST`, `VM_USER`, `VM_SSH_KNOWN_HOSTS`
   - Phase 5: Branch Protection für `main` aktivieren (ADR-007)
   - Phase 6: Ersten Deploy manuell auslösen (CD → workflow_dispatch, confirm=yes) und verifizieren
   - Rubber-Duck-Review erfolgt (21.07.2026): 5 Blocker behoben — `settings.py` (Redirect-Loop), `setup-server.sh` (Certbot-Reihenfolge + uv-Pfad + POSIX-ACL-Schreibrechte + Backup-Cron), `nginx.conf.template` (Healthcheck); `known_hosts` jetzt Pflicht, sudoers `/usr/bin/systemctl`. Fallstricke: `docs/engineering-notes/ENG-004-deployment-hardening-fallstricke.md`
   - Betriebssystem-Basis: **Ubuntu 24.04 LTS** (ADR-008)
-  - **Offen:** Trockenlauf gegen Wegwerf-VM (Certbot `--staging`), dann Ausführung auf realer VM (benötigt Zugangsdaten, Domain)
+  - **Trockenlauf (21.07.2026) erfolgreich:** kompletter Pfad gegen Wegwerf-VM durchgespielt (Certbot `--staging`), `health-https: 200`. 6 weitere Blocker gefunden+behoben (gunicorn-Dep, Deploy-env, `/etc/binokel`-x-ACL, uv-Interpreter/`UV_PYTHON_INSTALL_DIR`, Gunicorn-`HOME`, Nginx-Host-Header). Danach Security-Review: K1/K2 (blockierend) + E1–E5 behoben. Commits: 5d6c5e3, 991c493, f486ade, c37dc30, bbd07e3, ded2e13 (+Security-Commit).
+  - **Offen:** Teardown Wegwerf-VM + Test-DNS entfernen; dann realer Prod-Deploy (reale Domain/Zugangsdaten, ohne `CERTBOT_STAGING`, IONOS-Ports 8000/8443/8447 schließen)
   - V1 nutzt SQLite; Docker + PostgreSQL als späterer Meilenstein (ADR-008)
 
 ### Phase 2 – Frontend (Vue) — noch nicht gestartet

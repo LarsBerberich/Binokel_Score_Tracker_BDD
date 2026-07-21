@@ -300,6 +300,74 @@ Host-Header und Djangos `ALLOWED_HOSTS`-Prüfung schlägt fehl.
 
 ---
 
+## Fallstrick — sudo-Regel für `systemctl status` = Root-Escape via Pager (K1)
+
+**Symptom (im Security-Review gefunden):** Kein Laufzeitfehler — eine latente
+Privilege-Escalation. Die sudoers-Regel
+`binokel-deploy ALL=(ALL) NOPASSWD: /usr/bin/systemctl status binokel-tracker.service`
+erlaubt scheinbar harmlose Statusabfragen.
+
+**Ursache:** `systemctl status` leitet lange Ausgaben per Default durch einen Pager
+(`less`). `binokel-deploy` hat SSH-Login + `/bin/bash`; ruft er die Regel interaktiv über
+eine TTY auf, öffnet sich der Pager — und aus `less` heraus startet `!sh` eine **Shell als
+root**. Ein kompromittierter Deploy-SSH-Key eskaliert damit von Non-root zu **vollem Root**
+und hebelt die gesamte Nutzertrennung aus.
+
+**Lösung:** Die `status`-Regel aus `/etc/sudoers.d/binokel-deploy` **streichen**. NOPASSWD nur
+für `restart`/`stop`. Statusdiagnose läuft unprivilegiert: `systemctl status --no-pager`,
+`journalctl`, und das world-lesbare `/var/log/binokel/error.log`. Der CD-Failure-Pfad
+([.github/workflows/cd.yml](../../.github/workflows/cd.yml)) nutzt entsprechend `systemctl
+status --no-pager` (kein sudo) + `tail` des Logs.
+
+**Regel:** NOPASSWD-sudo-Regeln nur für Kommandos vergeben, die **keinen** Pager/Editor/keine
+Shell-Escape-Möglichkeit haben. `systemctl status`, `less`, `more`, `man`, `vi`, `git`
+(via `!`, `PAGER`, `-o core.pager`) sind klassische Pager-/Shell-Escape-Vektoren. Im Zweifel
+`--no-pager`/`SYSTEMD_PAGER=cat` erzwingen oder das Kommando ganz aus sudoers weglassen.
+
+---
+
+## Fallstrick — fail-open SECRET_KEY/DEBUG (K2)
+
+**Symptom (im Security-Review gefunden):** Fehlt in Production `DJANGO_SECRET_KEY` (env nicht
+gesourct, Tippfehler, leere Variable), läuft Django **still** mit dem öffentlich im Repo
+stehenden Insecure-Default-Key weiter — Session-/CSRF-/Signing-Tokens sind kompromittierbar.
+Analog aktiviert ein fehlendes `DJANGO_DEBUG` bei falschem Default `DEBUG=True` (Stacktrace-/
+Settings-Leak).
+
+**Ursache:** `os.environ.get('DJANGO_SECRET_KEY', '<insecure-default>')` ist **fail-open** —
+der unsichere Fallback greift lautlos.
+
+**Lösung:** Bei `DEBUG=False` **hart abbrechen**, wenn der Key dem Insecure-Default entspricht:
+```python
+if not DEBUG and SECRET_KEY == _INSECURE_SECRET_KEY:
+    raise ImproperlyConfigured('DJANGO_SECRET_KEY … in Production setzen')
+```
+Der `DEBUG`-Default bleibt `'True'` (dev/test-freundlich); Production erzwingt `DJANGO_DEBUG=False`
+über das env-Template, wodurch der Riegel scharf wird.
+
+**Regel:** Sicherheitskritische Defaults müssen **fail-safe** sein. Ein fehlender Secret darf in
+Production nicht durch einen im Repo sichtbaren Platzhalter ersetzt werden — lieber laut abbrechen
+als still unsicher laufen.
+
+---
+
+## Weitere Review-Nachschärfungen (E1–E5)
+
+Nicht-blockierend, aber umgesetzt (Details in [ADR-009](../adr/ADR-009-internet-hardening-baseline.md),
+Nachtrag „Security-Review-Nachschärfungen"):
+- **E1** `binokel-app` nur `rX` auf `STATIC_DIR` (Eigentümer `binokel-deploy`) — der exponierte
+  Dienst kann nicht ins ausgelieferte Static-Verzeichnis schreiben (Phishing-/JS-Injection-Schutz).
+- **E2** Security-Header-Ownership: Django für proxied Antworten, Nginx exklusiv im `/static/`-Block;
+  Referrer-Policy angeglichen (vorher zwei widersprüchliche Werte). Wichtig: Nginx vererbt
+  `add_header` **nicht** in `location`-Blöcke mit eigenem `add_header` — Header dort wiederholen.
+- **E3** systemd-Härtung: `ProtectSystem=strict` + `ReadWritePaths`, `ProtectHome`, `PrivateDevices`,
+  `SystemCallFilter=@system-service`, `RestrictAddressFamilies` u. a.
+- **E4** `server_tokens off;`.
+- **E5** CD liest den echten `SECRET_KEY` nicht mehr — migrate/collectstatic laufen mit einem
+  Wegwerf-Schlüssel (schlüssel-unabhängig); nur nicht-geheime Pfad-Variablen werden aus der env gelesen.
+
+---
+
 ## Präventionsregel (übergreifend)
 
 > Vor einem Erst-Deploy den gesamten Pfad **einmal gegen eine Wegwerf-VM** durchspielen

@@ -38,9 +38,30 @@ RuntimeDirectory=binokel
 RuntimeDirectoryMode=0755
 
 # Sicherheitshärtung
-PrivateTmp=true
 NoNewPrivileges=true
-ProtectSystem=full
+PrivateTmp=true
+PrivateDevices=true
+# Dateisystem read-only bis auf explizit freigegebene Schreibpfade. binokel-app
+# schreibt nur die SQLite-DB (data) und Logs; /run/binokel (RuntimeDirectory) ist
+# automatisch schreibbar. STATIC_DIR ist bewusst NICHT dabei (nur binokel-deploy
+# schreibt Static via collectstatic — siehe setup-server.sh, Least Privilege).
+ProtectSystem=strict
+ReadWritePaths=/var/log/binokel /opt/binokel/data
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
 
 KillMode=mixed
 TimeoutStopSec=5

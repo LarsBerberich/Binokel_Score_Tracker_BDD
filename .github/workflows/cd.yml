@@ -89,12 +89,22 @@ jobs:
         run: |
           ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" << 'REMOTE'
             set -e
-            # Produktionskonfiguration laden, damit migrate/collectstatic exakt
-            # dieselben Pfade (DJANGO_DB_PATH, DJANGO_STATIC_ROOT) verwenden wie der
-            # systemd-Dienst. Ohne dies fielen die Werte auf die Repo-Defaults zurück
-            # (backend/db.sqlite3, backend/staticfiles) und der Dienst startete gegen
-            # eine leere DB. binokel-deploy hat dafür Lesezugriff per ACL (setup-server.sh).
-            set -a; . /etc/binokel/env; set +a
+            # migrate/collectstatic müssen exakt dieselben Pfade (DJANGO_DB_PATH,
+            # DJANGO_STATIC_ROOT) verwenden wie der systemd-Dienst — sonst fielen die
+            # Werte auf die Repo-Defaults zurück (backend/db.sqlite3, backend/staticfiles)
+            # und der Dienst startete gegen eine leere DB. Ebenso muss UV_PYTHON_INSTALL_DIR
+            # gesetzt sein, damit uv den Interpreter ins geteilte /opt/binokel/python legt.
+            #
+            # SICHERHEIT (E5): NICHT die gesamte env (inkl. DJANGO_SECRET_KEY) sourcen,
+            # sondern nur die nicht-geheimen Pfad-Variablen lesen. migrate/collectstatic sind
+            # schlüssel-unabhängig; für den settings.py-Import unter DEBUG=False genügt ein
+            # EINMALIGER Wegwerf-Schlüssel — der echte Produktions-Key wird hier nie gelesen.
+            # NIEMALS `set -x` in diesem Block (würde Variablen ins Actions-Log schreiben).
+            export DJANGO_DEBUG=False
+            export DJANGO_SECRET_KEY="deploy-only-$(openssl rand -hex 32)"
+            export DJANGO_DB_PATH="$(sed -n 's/^DJANGO_DB_PATH=//p' /etc/binokel/env)"
+            export DJANGO_STATIC_ROOT="$(sed -n 's/^DJANGO_STATIC_ROOT=//p' /etc/binokel/env)"
+            export UV_PYTHON_INSTALL_DIR="$(sed -n 's/^UV_PYTHON_INSTALL_DIR=//p' /etc/binokel/env)"
             cd /opt/binokel/app/backend
             uv sync --no-dev
             uv run python manage.py migrate --noinput
@@ -120,9 +130,9 @@ jobs:
           done
           echo "❌ Healthcheck fehlgeschlagen — Diagnoseinformationen:"
           ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
-            "sudo systemctl status binokel-tracker.service --no-pager || true"
+            "systemctl status binokel-tracker.service --no-pager || true"
           ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
-            "journalctl -u binokel-tracker.service --no-pager -n 50 || true"
+            "tail -n 50 /var/log/binokel/error.log || true"
           exit 1
 
 # ── Benötigte GitHub-Secrets ──────────────────────────────────────────────────

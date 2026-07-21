@@ -16,6 +16,7 @@ server {
     listen 80;
     listen [::]:80;
     server_name REPLACE_WITH_YOUR_DOMAIN;
+    server_tokens off;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -41,6 +42,7 @@ server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     server_name REPLACE_WITH_YOUR_DOMAIN;
+    server_tokens off;
 
     # Zertifikatspfade (von Certbot automatisch gesetzt):
     ssl_certificate     /etc/letsencrypt/live/REPLACE_WITH_YOUR_DOMAIN/fullchain.pem;
@@ -48,17 +50,25 @@ server {
     include             /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
-    # Sicherheits-Header
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header X-Frame-Options DENY always;
-    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    # Sicherheits-Header: OWNERSHIP-TRENNUNG (siehe ENG-004, E2)
+    # Von Django proxied Antworten (/, /health/) erhalten ihre Security-Header von
+    # Djangos SecurityMiddleware/XFrameOptionsMiddleware (HSTS, nosniff, X-Frame-Options,
+    # Referrer-Policy) — die Werte sind mit dem /static/-Block unten abgestimmt. Deshalb
+    # hier auf Server-Ebene BEWUSST KEINE add_header-Duplikate (widersprüchliche
+    # Doppelwerte, z. B. Referrer-Policy, können sonst von Browsern verworfen werden).
+    # Statische Dateien umgehen Django und bekommen ihre Header direkt im /static/-Block.
 
     # Statische Dateien direkt aus dem Dateisystem
     location /static/ {
         alias /opt/binokel/static/;
         expires 1y;
         add_header Cache-Control "public, immutable";
+        # Security-Header hier explizit, da /static/ nicht durch Django läuft und nginx
+        # Server-Level-add_header nicht in Blöcke mit eigenem add_header vererbt.
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy strict-origin-when-cross-origin always;
         access_log off;
     }
 

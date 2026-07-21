@@ -410,10 +410,16 @@ ssh-keyscan -H 203.0.113.10
 ### Verifikation (Phase 4)
 
 ```bash
-# Lokal: Deploy-Key funktioniert und darf NUR die erlaubten sudo-Kommandos:
+# Lokal: Deploy-Key funktioniert:
 ssh -i ~/.ssh/binokel_deploy binokel-deploy@203.0.113.10 'echo DEPLOY_LOGIN_OK'
+
+# Status läuft UNPRIVILEGIERT (kein sudo — die sudo-status-Regel wurde wegen
+# Pager-Root-Escape entfernt, siehe ENG-004 K1):
 ssh -i ~/.ssh/binokel_deploy binokel-deploy@203.0.113.10 \
-    'sudo -n systemctl status binokel-tracker.service >/dev/null && echo SYSTEMCTL_OK'
+    'systemctl status binokel-tracker.service --no-pager >/dev/null && echo STATUS_OK'
+
+# Erlaubte sudo-Kommandos anzeigen — es dürfen NUR restart/stop erscheinen:
+ssh -i ~/.ssh/binokel_deploy binokel-deploy@203.0.113.10 'sudo -n -l'
 
 # Least-Privilege-Gegenprobe: darf KEIN beliebiges sudo:
 ssh -i ~/.ssh/binokel_deploy binokel-deploy@203.0.113.10 \
@@ -557,7 +563,7 @@ Bei einer späteren Umstellung ändern sich insbesondere:
 |---|---|---|
 | **Laufzeit** | Gunicorn als systemd-Dienst | Container (Compose) für App; Nginx als Proxy bleibt oder wird Container |
 | **Datenbank** | SQLite-Datei `/opt/binokel/data/db.sqlite3` | PostgreSQL-Dienst/-Container; neue Env-Vars `DJANGO_DB_*` (Host, Port, Name, User, Passwort) |
-| **Config/Secrets** | `/etc/binokel/env` (640 root:binokel-app) | zusätzliche DB-Credentials als Secrets; ggf. Docker-Secrets / `env_file` |
+| **Config/Secrets** | `/etc/binokel/env` (600 root:root + ACL für binokel-deploy) | zusätzliche DB-Credentials als Secrets; ggf. Docker-Secrets / `env_file` |
 | **CD-Pipeline** | rsync + `uv sync` + systemd-Restart | `docker build`/Registry-Push + `docker compose pull && up -d`; Migrationen im Container |
 | **Backup** | `cp` der SQLite-Datei (Cron) | `pg_dump` / WAL-Archivierung, getestete Restores |
 | **Rollback** | Fix-forward / `git revert` | Image-Tag zurückrollen (`docker compose` auf vorheriges Tag) |

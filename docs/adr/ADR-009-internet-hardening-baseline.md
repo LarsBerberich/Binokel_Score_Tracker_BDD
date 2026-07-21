@@ -150,3 +150,49 @@ Sie sind in ENG-004 im Detail dokumentiert; die Baseline-relevante Konsequenz:
    `setup-server.sh` mit `setfacl -R (-d) -m u:binokel-app:rX` absichert. Least Privilege
    bleibt gewahrt: `binokel-app` erhält nur Lese-/Ausführungsrecht (`rX`), kein
    Schreibrecht — es schreibt zur Laufzeit ausschließlich in `data`/`static`.
+
+## Nachtrag (21.07.2026) — Privilegienmodell: warum root nur fürs Provisioning
+
+Wiederkehrende Frage: „Wir machen im Deployment vieles als root — ist das nicht gegen Best
+Practice?" Antwort: Best Practice ist **nicht** „niemals root", sondern **„root nur zum
+Einrichten, niemals für den laufenden, internet-exponierten Dienst"**. Genau so ist es hier
+gebaut. Es gibt drei klar getrennte Phasen mit je minimalem Rechteumfang:
+
+| Phase | Wer | Rechte | Warum |
+|-------|-----|--------|-------|
+| **Provisioning** (einmalig) — `setup-server.sh` | `root` | voll | Nutzer/Verzeichnisse anlegen, systemd-Unit installieren, Nginx/TLS/UFW/apt — inhärent Root-Operationen. Wird **einmal** ausgeführt, danach nicht mehr. |
+| **Laufzeit** (dauerhaft) — Gunicorn/Django | `binokel-app` | System-User, **kein** Login, **kein** Home, **kein** sudo, nur `rX` auf Code | Das ist der dem Internet ausgesetzte Prozess — er ist bewusst **entprivilegiert** und kann nicht einmal seinen eigenen Code überschreiben. |
+| **Deployment** (wiederkehrend) — CI/CD | `binokel-deploy` | **kein** root; `sudo` NUR für `systemctl restart/stop` des einen Dienstes | Deployt Code und startet den Dienst neu, mehr nicht. |
+
+**Kernpunkt:** Root wird ausschließlich für die einmalige Systemadministration benutzt — um
+die Nicht-root-Trennung überhaupt korrekt **einzurichten**. Der laufende Dienst und die
+CI/CD-Pipeline sind entprivilegiert. Auch die manuellen Debug-Kommandos im Trockenlauf
+(`setfacl` auf root-eigene Pfade, `systemctl`, Schreiben nach `/etc`) waren Systemadministration
+und damit legitime Root-Operationen — nicht der Betrieb des Dienstes als root.
+
+**Merksatz:** *root provisioniert, `binokel-app` bedient das Internet, `binokel-deploy` deployt* —
+jeweils mit dem kleinstmöglichen Rechteumfang.
+
+## Nachtrag (21.07.2026) — Security-Review-Nachschärfungen (K1, K2, E1–E5)
+
+Ein Rubber-Duck-Security-Review der im Trockenlauf geänderten Zugriffsrechte fand zwei
+prod-blockierende Punkte und fünf Verschärfungen. Alle behoben (Details in ENG-004):
+
+- **K1 (Root-Escape):** Die sudoers-Regel `systemctl status` wurde entfernt. `status` läuft
+  per Default durch einen Pager (`less`), aus dem sich via `!sh` eine Root-Shell öffnen ließe —
+  ein kompromittierter Deploy-Key hätte zu vollem Root eskaliert. Statusdiagnose erfolgt jetzt
+  unprivilegiert (`systemctl status --no-pager`, world-lesbares `/var/log/binokel`).
+- **K2 (fail-open Secret):** `settings.py` bricht bei `DEBUG=False` hart ab
+  (`ImproperlyConfigured`), wenn `DJANGO_SECRET_KEY` fehlt bzw. dem Insecure-Default entspricht.
+- **E1 (Least Privilege Static):** `binokel-app` erhält auf `STATIC_DIR` nur noch `rX` (Eigentümer
+  ist `binokel-deploy`); der exponierte Dienst kann keine Dateien mehr ins ausgelieferte
+  Static-Verzeichnis schreiben. `DATA_DIR` bleibt `rwX` (SQLite zur Laufzeit).
+- **E2 (Header-Ownership):** Security-Header werden nicht mehr doppelt/widersprüchlich gesetzt.
+  Django liefert sie für proxied Antworten, Nginx exklusiv im `/static/`-Block; die Werte
+  (u. a. Referrer-Policy) sind angeglichen.
+- **E3 (systemd-Härtung):** `ProtectSystem=strict` + `ReadWritePaths`, `ProtectHome`,
+  `PrivateDevices`, `SystemCallFilter=@system-service`, `RestrictAddressFamilies` u. a.
+- **E4:** `server_tokens off;` (Versions-Disclosure).
+- **E5:** Der CD-Deploy liest den echten `DJANGO_SECRET_KEY` nicht mehr — migrate/collectstatic
+  laufen mit einem Wegwerf-Schlüssel (schlüssel-unabhängig); nur die nicht-geheimen Pfad-Variablen
+  werden aus der env gelesen.

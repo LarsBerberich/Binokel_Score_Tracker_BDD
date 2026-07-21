@@ -108,10 +108,15 @@ chmod 700 "/home/$DEPLOY_USER/.ssh"
 # Deploy-Benutzer darf systemctl für den App-Dienst ausführen (passwordlos).
 # Kanonischer Pfad ist /usr/bin/systemctl (Ubuntu 24.04 / Debian usrmerge);
 # sudo löst über secure_path genau diesen Pfad auf und vergleicht ihn literal.
+#
+# SICHERHEIT: BEWUSST nur restart/stop — KEINE `systemctl status`-Regel! `status`
+# leitet die Ausgabe per Default durch einen Pager (less); aus einer interaktiven
+# TTY (binokel-deploy hat SSH-Login + /bin/bash) ließe sich daraus mit `!sh` eine
+# Root-Shell öffnen → Privilege-Escalation. Statusdiagnose erfolgt unprivilegiert
+# (`systemctl status --no-pager`, `journalctl`, world-lesbares /var/log/binokel).
 cat > "/etc/sudoers.d/binokel-deploy" << EOF
 $DEPLOY_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart binokel-tracker.service
 $DEPLOY_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop binokel-tracker.service
-$DEPLOY_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl status binokel-tracker.service
 EOF
 chmod 440 "/etc/sudoers.d/binokel-deploy"
 
@@ -126,8 +131,8 @@ mkdir -p /etc/binokel
 # löst das; die ACL sichert es umask-unabhängig ab.
 mkdir -p "$PYTHON_DIR"
 
-chown "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR" "$PYTHON_DIR"
-chown "$APP_USER:$APP_USER" "$DATA_DIR" "$STATIC_DIR" "$LOG_DIR"
+chown "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR" "$PYTHON_DIR" "$STATIC_DIR"
+chown "$APP_USER:$APP_USER" "$DATA_DIR" "$LOG_DIR"
 chmod 750 /etc/binokel
 
 # Such-/Traversal-Recht (nur x, kein Lesen/Listen) auf /etc/binokel für App- und
@@ -155,13 +160,20 @@ setfacl -R -d -m u:"$APP_USER":rX "$APP_DIR"
 setfacl -R -m u:"$APP_USER":rX "$PYTHON_DIR"
 setfacl -R -d -m u:"$APP_USER":rX "$PYTHON_DIR"
 
-# Gemeinsamer Schreibzugriff auf Daten- und Static-Verzeichnis:
-# Der Dienst läuft als binokel-app, der CD-Deploy (migrate/collectstatic) als
-# binokel-deploy. Beide müssen dieselben Dateien schreiben (SQLite-DB zur Laufzeit
-# durch binokel-app, Migrationen/Static durch binokel-deploy). POSIX-ACLs inkl.
-# Default-ACLs stellen das umask-unabhängig auch für neu erzeugte Dateien sicher.
-setfacl -R -m u:"$APP_USER":rwX -m u:"$DEPLOY_USER":rwX "$DATA_DIR" "$STATIC_DIR"
-setfacl -R -d -m u:"$APP_USER":rwX -m u:"$DEPLOY_USER":rwX "$DATA_DIR" "$STATIC_DIR"
+# Gemeinsamer Zugriff auf Daten- und Static-Verzeichnis, aber mit Least Privilege:
+#   DATA_DIR:   binokel-app rwX (SQLite-DB + Backup zur Laufzeit) UND binokel-deploy rwX
+#               (migrate). Beide müssen dieselben Dateien schreiben.
+#   STATIC_DIR: NUR binokel-deploy rwX (collectstatic). binokel-app bekommt lediglich
+#               rX — der internet-exponierte Dienst darf NICHT in das von Nginx unter
+#               der Domain ausgelieferte Static-Verzeichnis schreiben (sonst könnte eine
+#               App-Lücke dort Phishing-/JS-Dateien ablegen). Nginx liefert /static/
+#               ohnehin nur lesend per alias aus.
+# POSIX-ACLs inkl. Default-ACLs stellen das umask-unabhängig auch für neu erzeugte
+# Dateien sicher.
+setfacl -R -m u:"$APP_USER":rwX -m u:"$DEPLOY_USER":rwX "$DATA_DIR"
+setfacl -R -d -m u:"$APP_USER":rwX -m u:"$DEPLOY_USER":rwX "$DATA_DIR"
+setfacl -R -m u:"$APP_USER":rX -m u:"$DEPLOY_USER":rwX "$STATIC_DIR"
+setfacl -R -d -m u:"$APP_USER":rX -m u:"$DEPLOY_USER":rwX "$STATIC_DIR"
 
 echo "=== [6/10] Repository klonen ==="
 sudo -u "$DEPLOY_USER" git clone "$REPO_URL" "$APP_DIR" || echo "Repo existiert bereits"
@@ -170,9 +182,10 @@ echo "=== [7/10] Umgebungsdatei anlegen (manuell befüllen!) ==="
 if [ ! -f /etc/binokel/env ]; then
     cat > /etc/binokel/env << 'ENV_TEMPLATE'
 # /etc/binokel/env — Production-Konfiguration
-# ACHTUNG: Diese Datei enthält Secrets. Berechtigungen: 640 root:binokel-app
-#
-# Nach dem Befüllen: chmod 640 /etc/binokel/env && chown root:binokel-app /etc/binokel/env
+# ACHTUNG: Diese Datei enthält Secrets (DJANGO_SECRET_KEY).
+# Berechtigungen: 600 root:root. Der systemd-Dienst liest sie als root (EnvironmentFile);
+# binokel-deploy erhält gezielten Lesezugriff per ACL (setfacl weiter unten), binokel-app
+# braucht KEINEN Datei-Lesezugriff (systemd injiziert die Variablen in den Prozess).
 
 DJANGO_SECRET_KEY=REPLACE_WITH_SECURE_RANDOM_KEY_MIN_50_CHARS
 DJANGO_DEBUG=False
@@ -183,8 +196,8 @@ DJANGO_CSRF_TRUSTED_ORIGINS=https://REPLACE_WITH_YOUR_DOMAIN
 
 # uv installiert den verwalteten Python-Interpreter in dieses geteilte Verzeichnis
 # (statt ~binokel-deploy/.local/share/uv/python, wo der Dienst-User binokel-app nicht
-# hinkommt). Der CD-Deploy und der manuelle Deploy sourcen diese Datei vor `uv sync`,
-# sodass Interpreter-Installation und venv-Symlink hierhin zeigen.
+# hinkommt). Der Deploy exportiert diese Variable vor `uv sync`, sodass
+# Interpreter-Installation und venv-Symlink hierhin zeigen.
 UV_PYTHON_INSTALL_DIR=/opt/binokel/python
 ENV_TEMPLATE
     chmod 600 /etc/binokel/env

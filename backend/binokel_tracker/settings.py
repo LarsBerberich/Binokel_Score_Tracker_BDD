@@ -26,6 +26,8 @@ https://docs.djangoproject.com/en/6.0/topics/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -34,14 +36,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # In Production muss DJANGO_SECRET_KEY auf einen sicheren Wert gesetzt sein.
-SECRET_KEY = os.environ.get(
-    'DJANGO_SECRET_KEY',
-    'django-insecure-9d5i)$qvzb(=7ur!%^n&s1s=25+^q+6y!c75q^0x-@)2xj7f)6',
-)
+# Der Insecure-Default erlaubt nur die lokale Entwicklung (DEBUG=True); bei DEBUG=False
+# wird sein Einsatz weiter unten hart unterbunden (fail-safe statt fail-open).
+_INSECURE_SECRET_KEY = 'django-insecure-9d5i)$qvzb(=7ur!%^n&s1s=25+^q+6y!c75q^0x-@)2xj7f)6'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', _INSECURE_SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # Akzeptierte Wahrheitswerte (Groß-/Kleinschreibung egal): true, 1, yes, on
 # Alle anderen Werte (z. B. false, 0, no, off) setzen DEBUG=False.
+# Default 'True' hält lokale Entwicklung/Tests bequem; Production MUSS DJANGO_DEBUG=False
+# setzen (im env-Template verankert). Bei DEBUG=False greift zusätzlich der SECRET_KEY-
+# Riegel unten, sodass ein vergessenes/falsches Setup nicht still fail-open läuft.
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes', 'on')
 
 _allowed_hosts_raw = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
@@ -160,6 +165,18 @@ _csrf_trusted_origins_raw = os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_trusted_origins_raw.split(',') if o.strip()]
 
 if not DEBUG:
+    # SICHERHEITSRIEGEL (fail-safe): In Production darf niemals der öffentlich im Repo
+    # stehende Insecure-Default-Key verwendet werden. Fehlt DJANGO_SECRET_KEY (env nicht
+    # gesourct, Tippfehler, leere Variable), bräche Django sonst still mit kompromittierbaren
+    # Session-/CSRF-/Signing-Tokens hoch. Deshalb hart abbrechen.
+    if SECRET_KEY == _INSECURE_SECRET_KEY:
+        raise ImproperlyConfigured(
+            'DJANGO_SECRET_KEY ist nicht gesetzt oder verwendet den Insecure-Default, '
+            'obwohl DEBUG=False ist. In Production einen sicheren, zufälligen Schlüssel setzen '
+            '(z. B. `python -c "from django.core.management.utils import get_random_secret_key; '
+            'print(get_random_secret_key())"`).'
+        )
+
     # Gunicorn spricht per UNIX-Socket HTTP mit Nginx; ohne diesen Header wäre
     # request.is_secure() immer False und SECURE_SSL_REDIRECT würde jede – auch
     # bereits über HTTPS eingelieferte – Anfrage erneut umleiten (Redirect-Loop).
@@ -174,3 +191,8 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+    # Referrer-Policy explizit setzen, damit App-Antworten (von Django) und statische
+    # Dateien (Header von Nginx im /static/-Block) denselben Wert liefern. Ohne dies
+    # sendete Django den Default 'same-origin', Nginx 'strict-origin-when-cross-origin'
+    # – zwei widersprüchliche Werte über dieselbe Domain (siehe ENG-004, E2).
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
