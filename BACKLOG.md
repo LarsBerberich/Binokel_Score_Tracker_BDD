@@ -7,7 +7,7 @@
 
 ## ▶ Aktueller Fokus
 
-**TASK-006 ist abgeschlossen. Aktueller Dev/Ops-Fokus: TASK-CI-006 (erster Produktions-Deploy) — Trockenlauf erfolgreich, Security-Review erfolgt; realer Prod-Deploy steht aus.**
+**TASK-006 ist abgeschlossen. TASK-CI-006 (erster Produktions-Deploy) ist erfolgreich: App läuft prod auf `api.bebe-soft.de` (CD #30/#31 GREEN, Post-Deploy-Smoke-Test automatisiert). Offene Go-Live-Governance-/Ops-Nacharbeiten → `FUTURE-006`.**
 
 **TASK-CI-001–005 — CI/CD-Pipeline + Betriebsfundament fertig.**
 
@@ -162,6 +162,14 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
   - Ziel: kein dauerhaft gültiges `VM_SSH_KEY`-Secret mehr; Zugang wird pro Deploy kurzlebig ausgestellt
   - Begründung: Der passwortlose Long-lived-Key ist für V1 pragmatisch vertretbar (kein natives OIDC für selbstverwaltete VMs), aber ein statisches Secret bleibt Restrisiko (OWASP CICD-SEC-6 Credential Hygiene)
   - Post-V1, niedrige Priorität; setzt eine erreichbare CA-Infrastruktur voraus
+
+- [ ] **FUTURE-006** Go-Live-Governance + Betriebs-Nacharbeiten aus TASK-CI-006 (offen nach erfolgreichem Prod-Deploy, 22.07.2026)
+  - Der reale Prod-Deploy auf `api.bebe-soft.de` ist erfolgreich (CD-Läufe #30/#31 GREEN, Smoke-Test automatisiert). Folgende Punkte bleiben offen:
+  - **Reviewer-Gate erzwingen** (USER-Aktion, GitHub-UI): Settings → Environments → `production` → Required reviewers (sich selbst eintragen). Aktuell NICHT aktiv — Deploy lief ohne Approval-Dialog durch (Deploy-Start ~6 s nach CI-Ende). Offene MITTEL-Auflage aus Rubber-Duck-CD-Review.
+  - **Branch Protection für `main`** (Phase 5, USER-Aktion): beide Checks als Required setzen — „BDD Akzeptanztests" + „Deploy-Skripte prüfen (shellcheck + bash -n)" (nach 1. erfolgreichem Lauf im BP-UI wählbar). Fork-PR-Approval-Setting mitprüfen.
+  - **IONOS-Cloud-Panel-Ports schließen** (Blocker #9, USER-/Betreiber-Aktion): 8000/8443/8447 dicht, nur 22/80/443 offen.
+  - **Backup-/Restore-Probe automatisieren** (Runbook 6.2 → siehe FUTURE-004 Offenpunkt): SSH-Step in `cd.yml` mit `sqlite3 integrity_check` auf einer zerstörungsfreien Kopie.
+  - Normative Quellen: `deploy/runbook-task-ci-006.md` (Phase 5/6.2), `deploy/secrets-setup.md` §6, ADR-007/009
 
 ---
 

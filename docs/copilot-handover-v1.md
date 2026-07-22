@@ -85,6 +85,43 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
+## Stand 22.07.2026 (TASK-CI-006 ABGESCHLOSSEN — Prod-Deploy live + Smoke-Test automatisiert, Dev/Ops)
+
+**Der erste reale Produktions-Deploy ist erfolgreich.** Die App läuft prod auf
+**`https://api.bebe-soft.de`** (echtes Let's-Encrypt-Cert). CD-Läufe **#30/#31 GREEN**
+(letzter Commit `e8cd217`, CI-Run 29944409695 + CD-Run 29944433636 alle Checks grün).
+Live-Smoke-Test verifiziert: `/health/`=200, `/admin/`=404 (RD-6), HTTP→HTTPS-Redirect=301,
+HSTS-Header vorhanden.
+
+**Neu automatisiert (FUTURE-004-Teil):** Post-Deploy-**Smoke-Test-Step in `cd.yml`**
+(„Smoke-Test (öffentliches HTTPS-Deployment)", nach dem Healthcheck). Prüft vom Runner via
+`curl` end-to-end über öffentliches HTTPS die vier o. g. Zusicherungen; schlägt eine fehl →
+Deploy rot. Redirect-Check läuft gegen `/` (nicht `/health/`, da dieses redirect-exempt ist).
+
+**CD-Host-Key-Fallstrick (behoben):** `VM_SSH_KNOWN_HOSTS` muss gegen den **exakten
+`VM_HOST`-String** (`api.bebe-soft.de`, nicht die IP) gescannt werden:
+`ssh-keyscan -t rsa,ecdsa,ed25519 api.bebe-soft.de` **lokal** ausführen. Der
+`ssh-keygen -lf`-Fingerprint dient nur der menschlichen Verifikation, ist **nie** der
+Variablen-Inhalt. Falscher Inhalt → `exit 255 / Host key verification failed`.
+
+**Klassifikation Secrets vs. Variables (best-practice, Rubber-Duck-CD-Review GO):**
+`VM_SSH_KEY` = Environment **Secret**; `VM_HOST`, `VM_USER`, `VM_SSH_KNOWN_HOSTS` =
+Environment **Variables** (Integritäts-, kein Vertraulichkeitsziel). Third-Party- + checkout-
+Actions auf Full-Commit-SHA gepinnt (`cd.yml` + `ci.yml`).
+
+**Offen → jetzt als `FUTURE-006` gesichert (Go-Live-Governance/Ops-Nacharbeiten):**
+- **Reviewer-Gate erzwingen** (USER, GitHub-UI): Settings → Environments → `production` →
+  Required reviewers. Aktuell **nicht** aktiv (Deploy lief ohne Approval-Dialog).
+- **Branch Protection `main`** (Phase 5, USER): beide Checks „BDD Akzeptanztests" +
+  „Deploy-Skripte prüfen (shellcheck + bash -n)" als Required.
+- **IONOS-Ports 8000/8443/8447 schließen** (Blocker #9, USER/Betreiber).
+- **Backup-/Restore-Probe automatisieren** (Runbook 6.2 → FUTURE-004-Offenpunkt): SSH-Step +
+  `sqlite3 integrity_check` auf zerstörungsfreier Kopie.
+
+Detaillierte Deploy-Historie (Phasen 0–6, alle Blocker) siehe folgende Abschnitte.
+
+---
+
 ## Stand 22.07.2026 (TASK-CI-006 — realer Prod-Deploy Phase 0/1 + IONOS-Security-Review, Dev/Ops)
 
 **Realer Produktions-Deploy gestartet** (Agent ohne SSH-Zugang → User führt VM-Kommandos,
