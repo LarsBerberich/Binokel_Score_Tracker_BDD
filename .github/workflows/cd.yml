@@ -29,28 +29,31 @@ jobs:
 
     environment:
       name: production
-      url: https://${{ secrets.VM_HOST }}
+      url: https://${{ vars.VM_HOST }}
 
     steps:
       - name: Repository auschecken
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: SSH-Schlüssel einrichten
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           ssh-private-key: ${{ secrets.VM_SSH_KEY }}
 
       - name: VM-Host zu known_hosts hinzufügen
         env:
-          KNOWN_HOSTS: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
+          KNOWN_HOSTS: ${{ vars.VM_SSH_KNOWN_HOSTS }}
         run: |
           # VM_SSH_KNOWN_HOSTS ist verpflichtend. Ein ssh-keyscan-Fallback zur
           # Laufzeit wäre blindes Trust-on-first-use bei JEDEM Deploy und böte
           # keinen MITM-Schutz — daher bewusst kein Fallback (siehe ADR-009).
+          # Es ist eine (nicht-geheime) Repository-Variable: der Inhalt sind
+          # öffentliche Host-Keys; der Schutz kommt aus dem Pinning, nicht aus
+          # Vertraulichkeit.
           if [ -z "$KNOWN_HOSTS" ]; then
-            echo "❌ Secret VM_SSH_KNOWN_HOSTS ist nicht gesetzt." >&2
+            echo "❌ Variable VM_SSH_KNOWN_HOSTS ist nicht gesetzt." >&2
             echo "   Aus Sicherheitsgründen wird kein ssh-keyscan-Fallback verwendet." >&2
-            echo "   Host-Keys einmalig mit 'ssh-keyscan -H <VM_HOST>' erzeugen und als Secret hinterlegen." >&2
+            echo "   Host-Keys einmalig mit 'ssh-keyscan -H <VM_HOST>' erzeugen und als Variable hinterlegen." >&2
             exit 1
           fi
           mkdir -p ~/.ssh
@@ -60,7 +63,7 @@ jobs:
 
       - name: Deploy-Preflight prüfen
         run: |
-          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" << 'REMOTE'
+          ssh "${{ vars.VM_USER }}@${{ vars.VM_HOST }}" << 'REMOTE'
             set -e
             echo "--- uv verfügbar?"
             command -v uv
@@ -83,11 +86,11 @@ jobs:
             --exclude='backend/staticfiles/' \
             --exclude='backend/.venv/' \
             ./ \
-            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/opt/binokel/app/"
+            "${{ vars.VM_USER }}@${{ vars.VM_HOST }}:/opt/binokel/app/"
 
       - name: Abhängigkeiten installieren, Migrationen anwenden, Static Files sammeln
         run: |
-          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" << 'REMOTE'
+          ssh "${{ vars.VM_USER }}@${{ vars.VM_HOST }}" << 'REMOTE'
             set -e
             # migrate/collectstatic müssen exakt dieselben Pfade (DJANGO_DB_PATH,
             # DJANGO_STATIC_ROOT) verwenden wie der systemd-Dienst — sonst fielen die
@@ -113,13 +116,13 @@ jobs:
 
       - name: Dienst neu starten
         run: |
-          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+          ssh "${{ vars.VM_USER }}@${{ vars.VM_HOST }}" \
             "sudo systemctl restart binokel-tracker.service"
 
       - name: Healthcheck (max. 30 Sekunden warten)
         run: |
           for i in $(seq 1 10); do
-            STATUS=$(ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+            STATUS=$(ssh "${{ vars.VM_USER }}@${{ vars.VM_HOST }}" \
               "curl -s -o /dev/null -w '%{http_code}' http://localhost/health/")
             if [ "$STATUS" = "200" ]; then
               echo "✅ Healthcheck erfolgreich (HTTP $STATUS)"
@@ -129,22 +132,28 @@ jobs:
             sleep 3
           done
           echo "❌ Healthcheck fehlgeschlagen — Diagnoseinformationen:"
-          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+          ssh "${{ vars.VM_USER }}@${{ vars.VM_HOST }}" \
             "systemctl status binokel-tracker.service --no-pager || true"
-          ssh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+          ssh "${{ vars.VM_USER }}@${{ vars.VM_HOST }}" \
             "tail -n 50 /var/log/binokel/error.log || true"
           exit 1
 
-# ── Benötigte GitHub-Secrets ──────────────────────────────────────────────────
-# Repository Settings → Secrets and Variables → Actions:
+# ── Benötigte GitHub-Konfiguration ────────────────────────────────────────────
+# Klassifikation nach Vertraulichkeit (Referenz-Best-Practice):
 #
-#   VM_SSH_KEY            — SSH-Private-Key des Deploy-Benutzers (ohne Passphrase)
+# SECRET  (Settings → Secrets and variables → Actions → Secrets, bzw. Environment):
+#   VM_SSH_KEY            — SSH-Private-Key des Deploy-Benutzers (ohne Passphrase).
+#                           EINZIGES echtes Geheimnis hier.
+#
+# VARIABLE (Settings → Secrets and variables → Actions → Variables, bzw. Environment):
 #   VM_HOST               — Hostname oder IP der 1&1 VM (z. B. 192.0.2.10)
 #   VM_USER               — Deploy-Benutzername auf der VM (z. B. binokel-deploy)
 #   VM_SSH_KNOWN_HOSTS    — (PFLICHT) Bekannte Host-Keys der VM (MITM-Schutz).
 #                           Inhalt: Zeile(n) im known_hosts-Format, z. B. aus
-#                           `ssh-keyscan -H <VM_HOST>`. Ohne dieses Secret bricht
-#                           der Deploy bewusst ab (kein ssh-keyscan-Fallback).
+#                           `ssh-keyscan -H <VM_HOST>`. Nicht vertraulich (öffentliche
+#                           Host-Keys) → als Variable; der Schutz kommt aus dem Pinning.
+#                           Ohne diese Variable bricht der Deploy bewusst ab
+#                           (kein ssh-keyscan-Fallback).
 #
 # Auf der VM als Umgebungsvariablen in /etc/binokel/env:
 #   DJANGO_SECRET_KEY          — sicherer, zufälliger Schlüssel (min. 50 Zeichen)

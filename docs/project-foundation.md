@@ -373,6 +373,10 @@ Die Teststrategie soll ein Gleichgewicht zwischen Vertrauen, Geschwindigkeit und
 - **BDD- bzw. Akzeptanztests** für fachliches Ende-zu-Ende-Verhalten
 - **Integrationstests** für das Zusammenspiel von Komponenten
 - **Unit-Tests** für isolierte Fachregeln und Berechnungen
+- **Infrastruktur-/Deploy-Skripte**: statische Prüfung (`shellcheck`, `bash -n`) im CI
+  plus Trockenlauf gegen eine Wegwerf-VM als Integrationsnachweis (siehe
+  `deploy/runbook-dry-run.md`). Bash-Skripte werden nicht unit-getestet, sondern
+  statisch + empirisch am realen System abgesichert.
 
 ### Prinzipien der Teststrategie
 
@@ -388,12 +392,29 @@ Die Teststrategie soll ein Gleichgewicht zwischen Vertrauen, Geschwindigkeit und
 
 Automatisierung soll früh eingeführt werden.
 
+### Leitgrundsatz: „Automate everything, test everything“
+
+Alles, was wiederholbar ist, soll automatisiert werden; alles, was ausgeliefert
+wird, soll geprüft werden — **App-Code wie Infrastruktur/Deployment**.
+
+- **Automate everything:** Setup, Build, Migrationen, Static-Collect, Deploy,
+  Backup und Verifikation laufen über versionierte, idempotente Skripte/Pipelines,
+  nicht über manuelle Ad-hoc-Schritte. Manuelle Schritte sind die begründete
+  Ausnahme (z. B. sshd-Hardening wegen Lockout-Risiko, ADR-009) und werden im
+  Runbook explizit als solche markiert.
+- **Test everything:** Jede versionierte Artefaktklasse hat ein passendes,
+  automatisiertes Gate — Fachlogik über BDD/Unit-Tests, Shell-Skripte über
+  `shellcheck` + `bash -n`, Deploy über Preflight- und Healthcheck-Gates. Wo ein
+  vollautomatischer Test unverhältnismäßig ist (z. B. root-/VM-gebundene Abläufe),
+  tritt ein dokumentierter Trockenlauf + Review an seine Stelle — nie „gar keine
+  Prüfung“.
+
 ### Mindestanforderungen an CI
 
 Jede sinnvolle Änderung soll perspektivisch automatisierte Prüfungen auslösen, zum Beispiel:
 
 - Installation der Abhängigkeiten,
-- Linting- bzw. Formatprüfungen,
+- Linting- bzw. Formatprüfungen (inkl. `shellcheck` + `bash -n` für alle `*.sh`),
 - Unit-Tests,
 - Integrations- und/oder Akzeptanztests, wo sinnvoll,
 - Build-Verifikation.

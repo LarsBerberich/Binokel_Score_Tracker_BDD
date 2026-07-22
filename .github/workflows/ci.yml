@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - name: Repository auschecken
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: uv einrichten
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
 
       - name: Python 3.14 installieren
         working-directory: backend
@@ -40,3 +40,35 @@ jobs:
         env:
           PYTHONPATH: backend
         run: backend/.venv/bin/python -m behave
+
+  skript-lint:
+    name: Deploy-Skripte prüfen (shellcheck + bash -n)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Shell-Skripte statisch prüfen
+        # shellcheck ist auf ubuntu-latest-Runnern vorinstalliert — kein Ad-hoc-Download.
+        # Grundsatz "automate everything, test everything": jede versionierte .sh wird
+        # bei jedem Push/PR statisch geprüft; Fehler blockieren via CD-Gating den Deploy.
+        run: |
+          set -euo pipefail
+          mapfile -t scripts < <(git ls-files '*.sh')
+          if [ "${#scripts[@]}" -eq 0 ]; then
+            echo "Keine .sh-Dateien im Repo gefunden — nichts zu prüfen."
+            exit 0
+          fi
+          printf 'Geprüfte Skripte:\n'
+          printf '  %s\n' "${scripts[@]}"
+          echo "--- bash -n (Syntaxprüfung) ---"
+          for f in "${scripts[@]}"; do
+            echo "bash -n $f"
+            bash -n "$f"
+          done
+          echo "--- shellcheck ---"
+          shellcheck --version
+          shellcheck "${scripts[@]}"

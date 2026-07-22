@@ -2,6 +2,14 @@
 
 Dieses Dokument beschreibt, wie die drei Copilot-Agenten zusammenarbeiten.
 
+> **Status dieses Dokuments:** Prozess-„Verfassung“, **kein** Zustandsdokument.
+> Es wird **beim Aufgaben-Routing** (welcher Agent? parallel?), **bei Unsicherheit/
+> Eskalation** und **vor Merge/Deploy** explizit herangezogen — nicht bei jedem
+> Mikroschritt. Anders als `BACKLOG.md` (per-Session-Zustand) steht es bewusst
+> **nicht** in der Session-Ende-Sync-Tabelle. Es wird nur aktualisiert, wenn sich
+> der **Prozess selbst** ändert (neuer Agent, neues Gating, geänderte Eskalation,
+> neues wiederkehrendes Ablaufmuster).
+
 ---
 
 ## Die drei Agenten im Überblick
@@ -167,6 +175,42 @@ Wenn ein Agent auf eine Entscheidung stößt, die außerhalb seines Verantwortun
 2. Rubber-Duck-Agent um Einschätzung bitten
 3. Wenn nötig: ADR anlegen (`docs/adr/ADR-NNN-*.md`)
 4. Erst danach implementieren
+
+---
+
+## Security-Review-Schleife (Vendor-/Best-Practice-Vorgaben)
+
+Wiederkehrendes Muster, um externe Sicherheits-Vorgaben (z. B. Hoster-/Provider-
+Best-Practice-PDFs, Härtungs-Guides) systematisch gegen die reale Konfiguration zu
+prüfen — ohne urheberrechtlich geschütztes Material ins Repo zu committen.
+
+```
+Externe Vorgabe (PDF/Guide, lokal)
+        │  pdftotext / manuelle Extraktion  → bleibt lokal/uncommitted (Copyright)
+        ▼
+Paraphrasierte Compliance-Matrix   (docs/security/*.md, committbar)
+  je Empfehlung → Ist-Zustand → Status ✅/🟡/🔴/⚪
+        ▼
+Rubber-Duck-Audit der Matrix   → GO / NO-GO + Findings (HOCH/MITTEL/NIEDRIG)
+        ▼
+Dev/Ops-Remediationsplan   → konkrete, umsetzbare Fixes (Go-Live-Gate vs. Fast-Follow)
+        ▼
+Coding/Dev/Ops implementiert  → Rubber-Duck-Re-Review der Umsetzung → GO
+        ▼
+Go-Live-Gate erfüllt? → Release; Fast-Follow-Punkte → BACKLOG.md (FUTURE-*)
+```
+
+**Regeln:**
+- **Kein Vendor-Copyright im Repo:** nur paraphrasierte Matrix committen; Original-
+  PDFs und Extrakte bleiben lokal (z. B. `~/Downloads`, `/tmp/*-review/`).
+- **Matrix ist committbares Zwischenartefakt:** macht die Prüfung nachvollziehbar und
+  auditierbar; Status-Spalte zeigt Umsetzungsstand.
+- **Zwei Rubber-Duck-Durchläufe:** erst Audit der Matrix (findet Blocker), dann
+  Re-Review der tatsächlichen Umsetzung (bestätigt GO).
+- **Blocker vs. Fast-Follow trennen:** nur echte Go-Live-Blocker halten den Release
+  auf; bewusst akzeptierte Restrisiken (ADR-Bezug) wandern als `FUTURE-*` ins BACKLOG.
+
+> Referenz-Durchlauf: IONOS-Baseline-Check (22.07.2026), `docs/security/ionos-baseline-check.md`.
 
 ---
 

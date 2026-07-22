@@ -14,6 +14,7 @@ Dieses Verzeichnis enthält alle Artefakte für das Production-Deployment auf ei
 | Datei | Zweck |
 |---|---|
 | `runbook-task-ci-006.md` | Schritt-für-Schritt-Runbook für den erstmaligen Aufbau + Erst-Deploy |
+| `secrets-setup.md` | **GitHub-Secrets für den CD-Deploy** — lückenlose Anleitung (Deploy-Key, `known_hosts`, die vier Secrets, Rotation) |
 | `setup-server.sh` | Einmaliges Server-Initialsetup (als root ausführen) |
 | `binokel-tracker.service` | systemd-Unit: startet die Django-App via Gunicorn |
 | `nginx.conf.template` | Nginx Reverse-Proxy-Konfiguration mit TLS (Platzhalter ersetzen) |
@@ -74,16 +75,20 @@ Das Skript richtet folgendes ein:
 
 ---
 
-## GitHub-Secrets einrichten
+## GitHub-Secret + -Variables einrichten
 
-In **GitHub → Repository → Settings → Secrets and Variables → Actions** folgende Secrets anlegen:
+Klassifikation nach Vertraulichkeit: **nur `VM_SSH_KEY` ist ein Secret**, der Rest sind
+nicht-geheime **Variables**. Empfohlen unter Environment `production`
+(Schritt-für-Schritt: [`secrets-setup.md`](secrets-setup.md)).
 
-| Secret-Name | Inhalt |
-|---|---|
-| `VM_SSH_KEY` | Privater SSH-Schlüssel des `binokel-deploy`-Benutzers |
-| `VM_HOST` | IP-Adresse oder Domain der VM (z. B. `192.0.2.10`) |
-| `VM_USER` | `binokel-deploy` |
-| `VM_SSH_KNOWN_HOSTS` | **(Pflicht)** Bekannte Host-Keys der VM im `known_hosts`-Format. Erzeugen mit `ssh-keyscan -H <VM_HOST>`. Ohne dieses Secret bricht der CD-Workflow bewusst ab – es gibt **keinen** Laufzeit-`ssh-keyscan`-Fallback mehr (MITM-Schutz, siehe ADR-009). |
+In **GitHub → Repository → Settings → Environments → `production`** anlegen:
+
+| Name | Typ | Inhalt |
+|---|---|---|
+| `VM_SSH_KEY` | **Secret** | Privater SSH-Schlüssel des `binokel-deploy`-Benutzers |
+| `VM_HOST` | **Variable** | IP-Adresse oder Domain der VM (z. B. `192.0.2.10`) |
+| `VM_USER` | **Variable** | `binokel-deploy` |
+| `VM_SSH_KNOWN_HOSTS` | **Variable** | **(Pflicht)** Bekannte Host-Keys der VM im `known_hosts`-Format. Erzeugen mit `ssh-keyscan -H <VM_HOST>`. Ohne diesen Wert bricht der CD-Workflow bewusst ab – es gibt **keinen** Laufzeit-`ssh-keyscan`-Fallback mehr (MITM-Schutz, siehe ADR-009). Öffentliche Host-Keys → **Variable**, kein Secret. |
 
 ---
 
@@ -203,11 +208,16 @@ tail -f /var/log/nginx/error.log
 Die SQLite-Datenbank liegt unter `/opt/binokel/data/db.sqlite3`.
 
 `setup-server.sh` richtet automatisch ein **tägliches Backup** ein
-(`/etc/cron.d/binokel-backup`, läuft als `binokel-app` um 03:00 Uhr, Aufbewahrung 30 Tage):
+(`/etc/cron.d/binokel-backup`, läuft als `binokel-app` um 03:00 Uhr, Aufbewahrung 30 Tage).
+Die Logik liegt im Skript `/usr/local/bin/binokel-backup.sh`, das die
+**SQLite-Online-Backup-API** (`.backup`) nutzt — das ergibt einen konsistenten
+Snapshot (auch WAL-sicher), im Gegensatz zu einem `cp` auf die Live-DB (torn pages).
+Jeder Snapshot wird per `PRAGMA integrity_check` verifiziert, atomar aktiviert und
+nach journald geloggt (`journalctl -t binokel-backup`):
 
 ```bash
 # /etc/cron.d/binokel-backup (vom Setup-Skript angelegt)
-0 3 * * * binokel-app cp /opt/binokel/data/db.sqlite3 /opt/binokel/data/db.sqlite3.bak.$(date +\%Y\%m\%d) 2>/dev/null || true
+0 3 * * * binokel-app /usr/local/bin/binokel-backup.sh
 5 3 * * * binokel-app find /opt/binokel/data/ -name "db.sqlite3.bak.*" -mtime +30 -delete
 ```
 
@@ -218,3 +228,9 @@ sudo systemctl stop binokel-tracker.service
 sudo -u binokel-app cp /opt/binokel/data/db.sqlite3.bak.YYYYMMDD /opt/binokel/data/db.sqlite3
 sudo systemctl start binokel-tracker.service
 ```
+
+> **Offsite/DR (Fast-Follow, nicht Teil von V1-Go-Live):** Die Backups liegen auf
+> derselben VM/Platte und schützen nicht gegen Total-VM-Verlust — ein in ADR-008/009
+> bewusst akzeptiertes V1-Restrisiko. Sofortige Null-Code-Absicherung: IONOS-VM-Snapshot
+> aktivieren. Geplant: pull-basiertes Offsite (externer Host zieht per `scp`) +
+> periodische Restore-Übung (siehe `BACKLOG.md`).

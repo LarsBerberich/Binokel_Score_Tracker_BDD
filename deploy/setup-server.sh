@@ -78,7 +78,8 @@ echo "=== [2/10] Benötigte Pakete installieren ==="
 apt-get install -y -qq \
     git curl nginx certbot python3-certbot-nginx \
     ufw logrotate acl \
-    fail2ban unattended-upgrades apt-listchanges chrony
+    fail2ban unattended-upgrades apt-listchanges chrony \
+    sqlite3
 
 echo "=== [3/10] uv installieren (Python-Paketmanager) ==="
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -322,14 +323,62 @@ systemctl restart unattended-upgrades
 # chrony: Zeit-Synchronisation (wichtig für TLS-Gültigkeit und Log-Korrelation)
 systemctl enable chrony
 systemctl restart chrony
-# Tägliches SQLite-Backup per cron.d (idempotent überschrieben). Läuft als
-# binokel-app (Eigentümer der DB). Das '|| true' unterdrückt Fehler-Mails, solange
-# die DB (vor dem ersten Deploy) noch nicht existiert. Backups > 30 Tage werden gelöscht.
+# Tägliches SQLite-Backup. Die eigentliche Logik liegt in einem Skript, nicht
+# im cron.d-One-Liner: ein `cp` auf die Live-DB kann torn pages / eine offene
+# Transaktion erwischen (inkonsistente Kopie), und Fehler wurden zuvor per
+# `2>/dev/null || true` still verschluckt. Das Skript nutzt stattdessen die
+# SQLite-Online-Backup-API (konsistenter Snapshot, auch WAL-sicher), verifiziert
+# ihn per integrity_check, schaltet ihn atomar aktiv und loggt nach journald.
+# Idempotent: bei jedem Lauf überschrieben (wie der cron.d-Heredoc).
+cat > /usr/local/bin/binokel-backup.sh << 'BACKUPSCRIPT'
+#!/usr/bin/env bash
+# /usr/local/bin/binokel-backup.sh — konsistentes tägliches SQLite-Backup.
+# Angelegt von deploy/setup-server.sh; nicht manuell editieren.
+set -euo pipefail
+
+DB="/opt/binokel/data/db.sqlite3"
+DEST_DIR="/opt/binokel/data"
+TARGET="$DEST_DIR/db.sqlite3.bak.$(date +%Y%m%d)"
+TMP="$TARGET.tmp"
+
+log()  { logger -t binokel-backup -- "$*"; }
+fail() { logger -t binokel-backup -p user.err -- "FEHLER: $*"; exit 1; }
+
+# Vor dem ersten Deploy existiert die DB noch nicht — das ist KEIN Fehler
+# (ersetzt das frühere stille '|| true').
+if [ ! -f "$DB" ]; then
+    log "DB $DB noch nicht vorhanden — Backup übersprungen."
+    exit 0
+fi
+
+# Reste abgebrochener Läufe (SIGKILL/OOM) aufräumen, damit kein stale .tmp
+# bis zur Retention liegen bleibt. Läufe überlappen nicht (täglich, 03:00).
+rm -f "$DEST_DIR"/db.sqlite3.bak.*.tmp
+
+# Konsistenter Online-Snapshot (SQLite-Online-Backup-API).
+sqlite3 "$DB" ".backup '$TMP'" || { rm -f "$TMP"; fail ".backup fehlgeschlagen (DB=$DB)."; }
+
+# Restore-Fähigkeit des Snapshots sofort verifizieren.
+if [ "$(sqlite3 "$TMP" 'PRAGMA integrity_check;')" != "ok" ]; then
+    rm -f "$TMP"
+    fail "integrity_check fehlgeschlagen — Backup verworfen."
+fi
+
+# Atomar aktiv schalten: eine Teildatei kann nie als gültiges Backup erscheinen.
+mv -f "$TMP" "$TARGET"
+date -u +%FT%TZ > "$DEST_DIR/.last-backup-ok"
+log "Backup OK: $TARGET ($(stat -c%s "$TARGET") Bytes)."
+BACKUPSCRIPT
+chmod 0755 /usr/local/bin/binokel-backup.sh
+
+# cron.d ruft nur noch das Skript auf; die Retention läuft als separater Job.
+# Vorteil: das '%'-Escaping des Datums (cron.d-Fallstrick) entfällt, weil `date`
+# jetzt im Skript und nicht im crontab läuft.
 cat > /etc/cron.d/binokel-backup << 'BACKUP'
 # Binokel Score Tracker — tägliches SQLite-Backup
 SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-0 3 * * * binokel-app cp /opt/binokel/data/db.sqlite3 /opt/binokel/data/db.sqlite3.bak.$(date +\%Y\%m\%d) 2>/dev/null || true
+0 3 * * * binokel-app /usr/local/bin/binokel-backup.sh
 5 3 * * * binokel-app find /opt/binokel/data/ -name "db.sqlite3.bak.*" -mtime +30 -delete
 BACKUP
 chmod 644 /etc/cron.d/binokel-backup

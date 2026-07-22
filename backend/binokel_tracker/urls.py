@@ -14,7 +14,6 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path
 
@@ -33,7 +32,11 @@ def healthcheck(request):
 
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    # /admin/ ist in V1 bewusst NICHT geroutet (Sicherheits-Audit RD-6): kein
+    # Superuser-Workflow nötig, und eine internet-exponierte Admin-Oberfläche ohne
+    # Web-Rate-Limiting (fail2ban schützt nur sshd) wäre unnötige Angriffsfläche.
+    # Reaktivieren: django.contrib.admin importieren + path("admin/", ...) hinzufügen,
+    # dann zwingend per Nginx-IP-Allowlist absichern.
     path("health/", healthcheck, name="healthcheck"),
     # Slice 1: Spiel anlegen / laden
     path("api/spiele/", spiele_view, name="spiele"),

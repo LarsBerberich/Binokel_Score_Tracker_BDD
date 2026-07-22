@@ -189,8 +189,13 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    # preload + includeSubDomains sind auf einer Subdomain praktisch irreversibel
+    # (Sicherheits-Audit RD-8): includeSubDomains bindet alle Geschwister-Subdomains,
+    # preload zementiert das über die Browser-Preload-Liste für ~1 Jahr. Erst nach
+    # nachweislich stabilem TLS (mehrere erfolgreiche Renewals) scharf schalten und
+    # ggf. bewusst an die HSTS-Preload-Liste submitten.
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
     # Referrer-Policy explizit setzen, damit App-Antworten (von Django) und statische
     # Dateien (Header von Nginx im /static/-Block) denselben Wert liefern. Ohne dies
     # sendete Django den Default 'same-origin', Nginx 'strict-origin-when-cross-origin'

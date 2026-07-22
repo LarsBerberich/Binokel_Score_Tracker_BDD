@@ -85,6 +85,49 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
+## Stand 22.07.2026 (TASK-CI-006 — realer Prod-Deploy Phase 0/1 + IONOS-Security-Review, Dev/Ops)
+
+**Realer Produktions-Deploy gestartet** (Agent ohne SSH-Zugang → User führt VM-Kommandos,
+paste-sichere Blöcke). Zieldomain **`api.bebe-soft.de`** → `212.132.119.150`, Ubuntu 24.04.
+
+- **Phase 0 (DNS + Admin-Key) ✅** — A-Record verifiziert (beide Resolver, kein AAAA);
+  Admin-Key `~/.ssh/binokel_admin` erzeugt.
+- **Phase 1 (Erst-Login + sshd-Hardening) ✅ + lockout-sicher verifiziert** — `binokel-admin`
+  angelegt (sudo-Gruppe), Key-Login OK, Passwort- + Root-Login abgewiesen.
+  **Fallstrick (neu, ENG-004):** cloud-init legt `/etc/ssh/sshd_config.d/50-cloud-init.conf`
+  mit `PasswordAuthentication yes` an → überstimmt eine `99-`-Drop-in (sshd „first match wins").
+  **Fix:** Hardening als **`00-binokel-hardening.conf`** + Effektivwert-Prüfung via `sshd -T`.
+  Runbook Phase 1.3/1.4 korrigiert (realer Login/sudo-Check statt `sudo -n`).
+
+**IONOS-Security-Review (Best-Practice-PDFs → Compliance-Matrix → Rubber-Duck-Audit).**
+Matrix: `docs/security/ionos-baseline-check.md` (paraphrasiert; PDFs bleiben lokal/uncommitted).
+Ablauf als wiederverwendbares Muster: `pdftotext` → paraphrasierte Matrix (committbar) →
+Rubber-Duck-Audit → Dev/Ops-Remediationsplan. Audit-Votum initial **NO-GO** bis Blocker behoben.
+
+**Umgesetztes Go-Live-Gate (Rubber-Duck: GO, nur NIEDRIG-Restpunkte):**
+- **#4/#20** SQLite-Backup: `cp` → **`sqlite3 .backup`** + `PRAGMA integrity_check` + atomarer
+  `mv` + journald-Logging in neuem `/usr/local/bin/binokel-backup.sh`; cron.d ruft nur noch das
+  Skript + separate Retention. Stale-`.tmp`-Cleanup ergänzt. (`deploy/setup-server.sh`)
+- **RD-6** `/admin/`-Route in V1 **deaktiviert** (kein Superuser nötig; Reaktivierung nur mit
+  Nginx-IP-Allowlist). (`backend/binokel_tracker/urls.py`)
+- **RD-8** HSTS `preload` + `includeSubDomains` = **`False`** (host-scoped, reversibel; erst
+  nach stabilem TLS scharf schalten). (`backend/binokel_tracker/settings.py`)
+- **Restore-Probe** als Runbook-Schritt **6.2** (zerstörungsfrei, Go-Live-Gate).
+- Tests GREEN (28 Behave + 19 Django); `bash -n setup-server.sh` OK.
+
+**RD-7** (`@csrf_exempt` auf POST-Views) bewusst akzeptiert/dokumentiert (token-lose JSON-API,
+V1 ohne Auth). **Fast-Follow → FUTURE-003:** Offsite-DR (scp-Pull) + IONOS-VM-Snapshot +
+periodische Restore-Übung (Backups liegen auf gleicher Platte — in ADR-008/009 akzeptiert).
+
+**Offener Go-Live-Blocker (Betreiber-Aktion):** IONOS-Cloud-Panel-Ports **8000/8443/8447
+schließen** (nur 22/80/443).
+
+**Nächste Schritte:** Doc-Änderungen committen (Push-Timing wg. CD beachten — „lokal patchen":
+VM erhält gepatchtes `setup-server.sh` per scp, nicht via `curl` aus main) → **Phase 2**
+(`setup-server.sh api.bebe-soft.de <repo>`, ohne `CERTBOT_STAGING`) → Phasen 3–6.
+
+---
+
 ## Stand 22.07.2026 (TASK-CI-006 — Trockenlauf erfolgreich + Security-Hardening, Dev/Ops)
 
 **Trockenlauf abgeschlossen (GRÜN).** Der komplette Deploy-Pfad wurde real gegen eine

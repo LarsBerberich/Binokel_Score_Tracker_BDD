@@ -158,16 +158,32 @@ chown binokel-admin:binokel-admin /home/binokel-admin/.ssh/authorized_keys
 
 ```bash
 # Lokal, in einem ZWEITEN Terminal — die root-Sitzung offen lassen!
-ssh -i ~/.ssh/binokel_admin binokel-admin@203.0.113.10 'sudo -n true && echo SUDO_OK'
+# Key-Login muss funktionieren UND binokel-admin muss in der sudo-Gruppe sein.
+# (Kein `sudo -n`-Check: ein Admin-User braucht bewusst ein Passwort für sudo —
+#  passwortloses sudo ist hier NICHT gewollt.)
+ssh -i ~/.ssh/binokel_admin binokel-admin@203.0.113.10 \
+  'echo LOGIN_OK; id | grep -qw "(sudo)" && echo SUDO_GROUP_OK || echo SUDO_GROUP_MISSING'
 ```
 
-**Erst weitermachen, wenn `SUDO_OK` erscheint.** Ansonsten Key/Rechte korrigieren.
+**Erst weitermachen, wenn `LOGIN_OK` und `SUDO_GROUP_OK` erscheinen.** Ansonsten
+Key/Rechte bzw. `usermod -aG sudo binokel-admin` korrigieren. Das sudo-Passwort des
+Admins wird beim späteren `sudo` interaktiv abgefragt (gewollt).
+
+> **Host-Key-Wechsel nach VM-Neuinstallation:** Wird eine bereits genutzte IP neu
+> aufgesetzt (z. B. Wegwerf-VM → Prod auf derselben IP), meldet SSH beim ersten
+> Connect `REMOTE HOST IDENTIFICATION HAS CHANGED`. Das ist hier erwartet (kein MITM).
+> Alten Eintrag entfernen: `ssh-keygen -R 203.0.113.10`, dann neu verbinden und den
+> neuen Host-Key bestätigen.
 
 ### Schritt 1.4 — sshd härten (Drop-in, kein Überschreiben der Hauptdatei)
 
 ```bash
 # Auf der VM (als binokel-admin via sudo, root-Sitzung weiterhin offen halten):
-sudo tee /etc/ssh/sshd_config.d/99-binokel-hardening.conf > /dev/null << 'EOF'
+# WICHTIG: Präfix 00- (nicht 99-)! sshd nimmt bei jedem Keyword den ERSTEN
+# gefundenen Wert. Ubuntu-Cloud-Images liefern 50-cloud-init.conf mit
+# `PasswordAuthentication yes`; eine 99-Datei würde ZU SPÄT gelesen und NICHT
+# greifen. 00- wird vor allen Cloud-Dateien gelesen und gewinnt (siehe ENG-004).
+sudo tee /etc/ssh/sshd_config.d/00-binokel-hardening.conf > /dev/null << 'EOF'
 # Binokel Internet-Hardening-Baseline (ADR-009)
 PermitRootLogin no
 PasswordAuthentication no
@@ -186,6 +202,9 @@ sudo sshd -t
 
 # Erst nach fehlerfreiem Test neu laden:
 sudo systemctl reload ssh
+
+# EFFEKTIVE Werte gegenprüfen (nicht nur die Datei!) — muss `no` für Passwort/Root zeigen:
+sudo sshd -T | grep -Ei 'permitrootlogin|passwordauthentication|kbdinteractive|pubkeyauthentication'
 ```
 
 > **Wenn `Port 2222` aktiviert wird:** In Phase 2 die UFW-Regel anpassen
@@ -214,7 +233,7 @@ ssh root@203.0.113.10 || echo "Root-Login korrekt deaktiviert"
 - **SSH-Lockout-Absicherung:** Die root-Sitzung aus Schritt 1.1 bleibt offen, bis
   der Key-Login verifiziert ist. Bei Problemen dort das Drop-in entfernen:
   ```bash
-  rm /etc/ssh/sshd_config.d/99-binokel-hardening.conf
+  rm /etc/ssh/sshd_config.d/00-binokel-hardening.conf
   systemctl reload ssh
   ```
 - **Totaler Lockout (alle Sitzungen zu):** Über die **Web-/VNC-Konsole im
@@ -366,6 +385,13 @@ sudo -u binokel-app bash -c '
 **Ziel:** Der CD-Pipeline einen dedizierten, minimal berechtigten SSH-Zugang geben
 und die zugehörigen GitHub-Secrets hinterlegen.
 
+> **Eigenständige Detailanleitung:** [`secrets-setup.md`](secrets-setup.md) —
+> lückenlose Schritt-für-Schritt-Prozedur mit den realen Werten dieses Deployments
+> (Keypair erzeugen, Public-Key auf VM, `known_hosts`, GitHub-Environment `production`,
+> die vier Secrets, Verifikation, Rotation, Troubleshooting). Die folgenden Schritte
+> sind die Kurzfassung.
+
+
 ### Schritt 4.1 — Deploy-Key erzeugen (ohne Passphrase, da nicht-interaktiv)
 
 ```bash
@@ -396,16 +422,20 @@ ssh-keyscan -H 203.0.113.10
 # Bei custom Port: ssh-keyscan -H -p 2222 203.0.113.10
 ```
 
-### Schritt 4.4 — GitHub-Secrets hinterlegen
+### Schritt 4.4 — GitHub-Secret + -Variables hinterlegen
 
-**GitHub → Repository → Settings → Secrets and Variables → Actions → New repository secret:**
+Klassifikation nach Vertraulichkeit: **nur der private Key ist ein Secret**, der Rest
+ist nicht-geheime Konfiguration (**Variables**). Empfohlen unter Environment
+`production` (Detailanleitung: [`secrets-setup.md`](secrets-setup.md)).
 
-| Secret | Inhalt |
-|---|---|
-| `VM_SSH_KEY` | **Privater** Key: kompletter Inhalt von `~/.ssh/binokel_deploy` |
-| `VM_HOST` | `203.0.113.10` (oder `binokel.example.com`) |
-| `VM_USER` | `binokel-deploy` |
-| `VM_SSH_KNOWN_HOSTS` | **(Pflicht)** Ausgabe von `ssh-keyscan -H` aus Schritt 4.3 — ohne dieses Secret bricht der CD-Workflow bewusst ab (kein Laufzeit-`ssh-keyscan`-Fallback mehr, MITM-Schutz) |
+**Settings → Environments → `production`:**
+
+| Name | Typ | Inhalt |
+|---|---|---|
+| `VM_SSH_KEY` | **Secret** | **Privater** Key: kompletter Inhalt von `~/.ssh/binokel_deploy` |
+| `VM_HOST` | **Variable** | `203.0.113.10` (oder `binokel.example.com`) |
+| `VM_USER` | **Variable** | `binokel-deploy` |
+| `VM_SSH_KNOWN_HOSTS` | **Variable** | **(Pflicht)** Ausgabe von `ssh-keyscan -H` aus Schritt 4.3 — ohne diesen Wert bricht der CD-Workflow bewusst ab (kein Laufzeit-`ssh-keyscan`-Fallback, MITM-Schutz). Öffentliche Host-Keys → kein Secret nötig. |
 
 ### Verifikation (Phase 4)
 
@@ -447,7 +477,8 @@ ssh -i ~/.ssh/binokel_deploy binokel-deploy@203.0.113.10 \
 
 **GitHub → Settings → Branches → Add branch protection rule** für `main`:
 
-- [x] **Require status checks to pass before merging** → Check `BDD Akzeptanztests`
+- [x] **Require status checks to pass before merging** → Checks `BDD Akzeptanztests`
+      **und** `Deploy-Skripte prüfen (shellcheck + bash -n)`
 - [x] **Require branches to be up to date before merging**
 - [x] **Require a pull request before merging** (empfohlen)
 - [x] **Do not allow bypassing the above settings** (empfohlen)
@@ -455,7 +486,8 @@ ssh -i ~/.ssh/binokel_deploy binokel-deploy@203.0.113.10 \
 ### Verifikation (Phase 5)
 
 - Testweise ein PR mit absichtlich rotem CI-Lauf lässt sich **nicht** mergen.
-- Der Status-Check `BDD Akzeptanztests` erscheint als „Required".
+- Beide Status-Checks (`BDD Akzeptanztests`, `Deploy-Skripte prüfen (shellcheck + bash -n)`)
+  erscheinen als „Required".
 
 ### Rollback / Recovery (Phase 5)
 
@@ -503,9 +535,31 @@ journalctl -u binokel-tracker.service -n 50 --no-pager
 tail -n 20 /var/log/binokel/error.log
 ```
 
+### Schritt 6.2 — Backup- und Restore-Probe (Pflicht vor Go-Live-Freigabe)
+
+Beweist einmalig, dass der Backup-Pfad einen **konsistenten, wiederherstellbaren**
+Snapshot erzeugt (Sicherheits-Audit #4/#20). Zerstörungsfrei — fasst die Live-DB
+nicht an.
+
+```bash
+# Als binokel-admin, nach dem ersten Deploy (DB existiert):
+which sqlite3                                              # Paket vorhanden
+sudo -u binokel-app /usr/local/bin/binokel-backup.sh       # Backup sofort erzwingen
+journalctl -t binokel-backup -n 5 --no-pager               # -> "Backup OK: …"
+
+LATEST=$(ls -1t /opt/binokel/data/db.sqlite3.bak.* | head -n1)
+cp "$LATEST" /tmp/restore-probe.sqlite3
+sqlite3 /tmp/restore-probe.sqlite3 'PRAGMA integrity_check;' # -> ok
+sqlite3 /tmp/restore-probe.sqlite3 '.tables'                # Tabellen lesbar
+rm -f /tmp/restore-probe.sqlite3
+```
+
+**Erfolgskriterium:** `sqlite3` vorhanden, journald meldet `Backup OK: …`,
+`integrity_check` liefert `ok`, Tabellen sind lesbar.
+
 **Deploy gilt als erfolgreich, wenn:** GitHub-Actions-Job grün, externer
 `/health/` liefert HTTP 200 über HTTPS, TLS gültig, Security-Header gesetzt,
-keine Fehler im `error.log`/Journal.
+keine Fehler im `error.log`/Journal, **und die Backup-/Restore-Probe (6.2) grün**.
 
 ### Rollback / Recovery (Phase 6)
 
@@ -544,7 +598,7 @@ Ein **automatischer** Rollback auf eine frühere App-Version ist in der Pipeline
 | **Firewall sperrt SSH aus** | Aussperrung nach `ufw enable` | `setup-server.sh` erlaubt SSH vor `ufw --force enable`; bei custom Port `ufw allow 2222/tcp` **vor** dem Aktivieren; Provider-Konsole als Fallback |
 | **Fehlende/ falsche `known_hosts`** | MITM-Risiko beim ersten CD-Connect | `VM_SSH_KNOWN_HOSTS` ist **Pflicht** (via `ssh-keyscan -H`, Phase 4); ohne das Secret bricht der CD-Workflow ab — kein Laufzeit-Fallback |
 | **Deploy-User hat zu viele Rechte** | Kompromittierter CI-Key = Vollzugriff | sudoers auf drei `systemctl`-Kommandos begrenzt (Skript); Least-Privilege-Gegenprobe in Phase 4 |
-| **Migration beschädigt SQLite-DB** | Datenverlust / Dienst startet nicht | Tägliches Backup (Cron **vom `setup-server.sh` installiert**); Restore-Schritt Phase 6; Migrationen zuerst per `check` prüfen |
+| **Migration beschädigt SQLite-DB** | Datenverlust / Dienst startet nicht | Konsistentes tägliches Backup via `sqlite3 .backup` + `integrity_check` (`binokel-backup.sh`, vom `setup-server.sh` installiert); Restore-Probe Phase 6.2; Migrationen zuerst per `check` prüfen |
 | **Let's-Encrypt-Rate-Limit** (zu viele Cert-Versuche) | Temporär keine Zertifikatsausstellung | Beim Testen `--staging`; erst nach erfolgreichem Test echtes Zertifikat |
 | **Kein Auto-Rollback in der Pipeline** | Fehlerhafter Deploy bleibt live | Fix-forward oder `git revert` (Phase 6); Healthcheck lässt den Job fehlschlagen und zeigt Diagnose |
 | **`unattended-upgrades` startet Dienst/Kernel neu** | Ungeplante Kurz-Downtime | Reboot-Zeitfenster konfigurierbar (`Unattended-Upgrade::Automatic-Reboot-Time`); systemd `Restart=on-failure` fängt App-Neustart ab |
@@ -565,7 +619,7 @@ Bei einer späteren Umstellung ändern sich insbesondere:
 | **Datenbank** | SQLite-Datei `/opt/binokel/data/db.sqlite3` | PostgreSQL-Dienst/-Container; neue Env-Vars `DJANGO_DB_*` (Host, Port, Name, User, Passwort) |
 | **Config/Secrets** | `/etc/binokel/env` (600 root:root + ACL für binokel-deploy) | zusätzliche DB-Credentials als Secrets; ggf. Docker-Secrets / `env_file` |
 | **CD-Pipeline** | rsync + `uv sync` + systemd-Restart | `docker build`/Registry-Push + `docker compose pull && up -d`; Migrationen im Container |
-| **Backup** | `cp` der SQLite-Datei (Cron) | `pg_dump` / WAL-Archivierung, getestete Restores |
+| **Backup** | `sqlite3 .backup` + `integrity_check` (Cron, `binokel-backup.sh`) | `pg_dump` / WAL-Archivierung, getestete Restores |
 | **Rollback** | Fix-forward / `git revert` | Image-Tag zurückrollen (`docker compose` auf vorheriges Tag) |
 | **Settings** | `DATABASES` auf `sqlite3` | `DATABASES` auf `postgresql`; App muss neue Env-Vars lesen |
 

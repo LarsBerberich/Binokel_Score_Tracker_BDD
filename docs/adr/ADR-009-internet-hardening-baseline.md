@@ -100,8 +100,9 @@ Blocker im *ausführbaren* Pfad auf. Daraus resultieren folgende Präzisierungen
 Sicherheitsbezug:
 
 1. **`known_hosts` ist Pflicht (MITM-Schutz).** Der bisherige Laufzeit-`ssh-keyscan`-
-   Fallback im CD-Workflow war blindes Trust-on-first-use bei *jedem* Deploy. Das
-   Secret `VM_SSH_KNOWN_HOSTS` ist nun verpflichtend; fehlt es, bricht der Workflow
+   Fallback im CD-Workflow war blindes Trust-on-first-use bei *jedem* Deploy. Der
+   Wert `VM_SSH_KNOWN_HOSTS` (GitHub-**Variable** — öffentliche Host-Keys, nicht
+   vertraulich) ist nun verpflichtend; fehlt er, bricht der Workflow
    bewusst ab (`.github/workflows/cd.yml`).
 2. **Gemeinsamer Schreibzugriff per POSIX-ACL statt root.** Der Dienst (`binokel-app`)
    und der Deploy-User (`binokel-deploy`) teilen sich `data`/`static` über Default-ACLs.

@@ -104,6 +104,7 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
   - Rubber-Duck-Review erfolgt (21.07.2026): 5 Blocker behoben — `settings.py` (Redirect-Loop), `setup-server.sh` (Certbot-Reihenfolge + uv-Pfad + POSIX-ACL-Schreibrechte + Backup-Cron), `nginx.conf.template` (Healthcheck); `known_hosts` jetzt Pflicht, sudoers `/usr/bin/systemctl`. Fallstricke: `docs/engineering-notes/ENG-004-deployment-hardening-fallstricke.md`
   - Betriebssystem-Basis: **Ubuntu 24.04 LTS** (ADR-008)
   - **Trockenlauf (21.07.2026) erfolgreich:** kompletter Pfad gegen Wegwerf-VM durchgespielt (Certbot `--staging`), `health-https: 200`. 6 weitere Blocker gefunden+behoben (gunicorn-Dep, Deploy-env, `/etc/binokel`-x-ACL, uv-Interpreter/`UV_PYTHON_INSTALL_DIR`, Gunicorn-`HOME`, Nginx-Host-Header). Danach Security-Review: K1/K2 (blockierend) + E1–E5 behoben. Commits: 5d6c5e3, 991c493, f486ade, c37dc30, bbd07e3, ded2e13 (+Security-Commit).
+  - **IONOS-Security-Review (22.07.2026):** Best-Practice-PDFs → Compliance-Matrix `docs/security/ionos-baseline-check.md`; Rubber-Duck-Audit. Umgesetztes **Go-Live-Gate**: (a) konsistentes SQLite-Backup `sqlite3 .backup` + `integrity_check` + atomarer `mv` + journald-Logging (`/usr/local/bin/binokel-backup.sh`, `setup-server.sh`) statt `cp`; (b) `/admin/`-Route in V1 deaktiviert (RD-6); (c) HSTS `preload`/`includeSubDomains` vorerst zurückgenommen (RD-8); (d) Restore-Probe als Runbook-Schritt 6.2. Offener Blocker: **IONOS-Cloud-Panel-Ports 8000/8443/8447 schließen** (Betreiber-Aktion, #9).
   - **Offen:** Teardown Wegwerf-VM + Test-DNS entfernen; dann realer Prod-Deploy (reale Domain/Zugangsdaten, ohne `CERTBOT_STAGING`, IONOS-Ports 8000/8443/8447 schließen)
   - V1 nutzt SQLite; Docker + PostgreSQL als späterer Meilenstein (ADR-008)
 
@@ -139,6 +140,26 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
 - [ ] **FUTURE-002** DRF (Django REST Framework) als Upgrade
   - Kandidat wenn: Auth, Throttling, Pagination oder OpenAPI-Schema benötigt werden
   - Normative Quelle: ADR-005 (JsonResponse für V1)
+
+- [ ] **FUTURE-003** Backup-DR / Offsite (Fast-Follow aus IONOS-Security-Review 22.07.2026)
+  - Pull-basiertes Offsite-Backup: externer/vertrauenswürdiger Host zieht `db.sqlite3.bak.*` per `scp` (kein Cloud-SDK auf der VM)
+  - Sofort-Maßnahme (Null-Code): IONOS-VM-Snapshot aktivieren (Volume-DR)
+  - Periodische Restore-Übung als wiederkehrender Ops-Schritt dokumentieren
+  - Optional: `.last-backup-ok`-Staleness in `/health/` einhängen (Coding-Agent) für „Backup veraltet"-Alarm
+  - Begründung: DR gegen Total-VM-Verlust ist ein in ADR-008/009 bewusst akzeptiertes V1-Restrisiko
+
+- [ ] **FUTURE-004** Deploy-Artefakt-Tests vertiefen (Grundsatz „automate everything, test everything", 22.07.2026)
+  - ERLEDIGT als Basis: `shellcheck` + `bash -n` für alle `*.sh` als CI-Job (`ci.yml`, Job `skript-lint`)
+  - Offen: `nginx -t` gegen das gerenderte `nginx.conf.template` (mit Platzhalter-Substitution) in CI
+  - Offen: `systemd-analyze verify` für `binokel-tracker.service`
+  - Optional/abwägen: `bats`-Tests für `binokel-backup.sh` (root-/sqlite3-/cron-Abhängigkeiten → ggf. unverhältnismäßig, Trockenlauf bevorzugt)
+  - Normative Quelle: `docs/project-foundation.md` §16/§17
+
+- [ ] **FUTURE-005** Deploy-Zugang auf kurzlebige SSH-Zertifikate umstellen (Rubber-Duck-Review CD, 20.10.2026)
+  - Statt statischem Long-lived-Deploy-Key eine **SSH-CA / kurzlebige Certs** (z. B. HashiCorp Vault SSH, Teleport) einsetzen
+  - Ziel: kein dauerhaft gültiges `VM_SSH_KEY`-Secret mehr; Zugang wird pro Deploy kurzlebig ausgestellt
+  - Begründung: Der passwortlose Long-lived-Key ist für V1 pragmatisch vertretbar (kein natives OIDC für selbstverwaltete VMs), aber ein statisches Secret bleibt Restrisiko (OWASP CICD-SEC-6 Credential Hygiene)
+  - Post-V1, niedrige Priorität; setzt eine erreichbare CA-Infrastruktur voraus
 
 ---
 

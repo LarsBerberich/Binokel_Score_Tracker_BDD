@@ -368,6 +368,42 @@ Nachtrag „Security-Review-Nachschärfungen"):
 
 ---
 
+## Fallstrick: cloud-init übersteuert das sshd-Hardening (Erst-Deploy 22.07.2026)
+
+**Symptom:** Nach dem Ausrollen des Hardening-Drop-ins `99-binokel-hardening.conf`
+(`PasswordAuthentication no`) und `systemctl reload ssh` zeigte
+`sshd -T | grep passwordauthentication` weiterhin **`passwordauthentication yes`** —
+Passwort-Login blieb also offen, obwohl die Datei korrekt geschrieben war.
+
+**Ursache:** Ubuntu-Cloud-Images legen unter `/etc/ssh/sshd_config.d/` eigene
+Drop-ins an, u. a. `50-cloud-init.conf` mit `PasswordAuthentication yes`. sshd liest
+die Drop-ins über `Include …/*.conf` in **lexikografischer** Reihenfolge und nimmt für
+jedes Keyword den **ersten** gefundenen Wert (man `sshd_config`: „the first obtained
+value will be used"). `50-cloud-init.conf` wird also **vor** `99-binokel-hardening.conf`
+gelesen und gewinnt. `PermitRootLogin no` griff nur deshalb, weil cloud-init dieses
+Keyword nicht setzt.
+
+**Lösung:** Das Hardening-Drop-in so benennen, dass es **zuerst** gelesen wird:
+`00-binokel-hardening.conf`. Damit gewinnen die sicherheitskritischen Werte
+unabhängig von cloud-init-/Cloud-Image-Dateien (`50-cloud-init.conf`,
+`60-cloudimg-settings.conf`).
+
+**Verifikation (Pflicht):** Nach `reload` **nicht** nur die Datei prüfen, sondern die
+**effektive** Konfiguration:
+```bash
+sudo sshd -T | grep -Ei 'permitrootlogin|passwordauthentication|kbdinteractive'
+```
+Zusätzlich lockout-sicher gegenprüfen (zweites Terminal): Key-Login muss gehen,
+`-o PreferredAuthentications=password -o PubkeyAuthentication=no` muss
+`Permission denied (publickey)` liefern.
+
+**Regel:** Bei Drop-in-Konfigurationsverzeichnissen mit First-Match-Semantik
+(`sshd_config.d`, ähnlich `sysctl.d`) zählt die **Lese-Reihenfolge**, nicht die
+Absicht. Sicherheits-Overrides mit niedrigem Präfix (`00-`) nach vorne ziehen und
+immer den **effektiven** Zustand verifizieren, nie nur die geschriebene Datei.
+
+---
+
 ## Präventionsregel (übergreifend)
 
 > Vor einem Erst-Deploy den gesamten Pfad **einmal gegen eine Wegwerf-VM** durchspielen
