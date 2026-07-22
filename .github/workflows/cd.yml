@@ -138,6 +138,51 @@ jobs:
             "tail -n 50 /var/log/binokel/error.log || true"
           exit 1
 
+      - name: Smoke-Test (öffentliches HTTPS-Deployment)
+        # End-to-End-Abnahme vom Runner aus über das öffentliche Internet: prüft die
+        # gesamte Kette TLS → Nginx → Gunicorn → Django. Ergänzt den vorherigen
+        # (VM-internen) Readiness-Healthcheck um fachliche Sicherheits-Erwartungen.
+        env:
+          BASE: https://${{ vars.VM_HOST }}
+        run: |
+          set -uo pipefail
+          fail=0
+
+          check() {  # $1=Beschreibung  $2=erwarteter Code  $3=URL
+            local code
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$3" || echo "000")
+            if [ "$code" = "$2" ]; then
+              echo "  ✅ $1 (HTTP $code)"
+            else
+              echo "  ❌ $1 — erwartet $2, erhalten $code"
+              fail=1
+            fi
+          }
+
+          echo "→ /health/ liefert 200 (End-to-End über TLS)"
+          check "/health/" 200 "$BASE/health/"
+
+          echo "→ /admin/ liefert 404 (Django-Admin bewusst entfernt, RD-6)"
+          check "/admin/" 404 "$BASE/admin/"
+
+          echo "→ HTTP wird auf HTTPS umgeleitet"
+          check "HTTP→HTTPS-Redirect" 301 "http://${{ vars.VM_HOST }}/"
+
+          echo "→ HSTS-Header ist gesetzt"
+          if curl -sSI --max-time 15 "$BASE/health/" | tr -d '\r' | grep -iq '^strict-transport-security:'; then
+            echo "  ✅ Strict-Transport-Security vorhanden"
+          else
+            echo "  ❌ Strict-Transport-Security fehlt"
+            fail=1
+          fi
+
+          if [ "$fail" -eq 0 ]; then
+            echo "✅ Smoke-Test bestanden"
+          else
+            echo "❌ Smoke-Test fehlgeschlagen"
+            exit 1
+          fi
+
 # ── Benötigte GitHub-Konfiguration ────────────────────────────────────────────
 # Klassifikation nach Vertraulichkeit (Referenz-Best-Practice):
 #

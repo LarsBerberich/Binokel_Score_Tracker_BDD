@@ -150,6 +150,8 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
 
 - [ ] **FUTURE-004** Deploy-Artefakt-Tests vertiefen (Grundsatz „automate everything, test everything", 22.07.2026)
   - ERLEDIGT als Basis: `shellcheck` + `bash -n` für alle `*.sh` als CI-Job (`ci.yml`, Job `skript-lint`)
+  - ERLEDIGT: **Post-Deploy-Smoke-Test** in `cd.yml` (End-to-End über öffentliches HTTPS): `/health/`=200, `/admin/`=404 (RD-6), HTTP→HTTPS-Redirect, HSTS-Header. Schlägt einer fehl → Deploy rot.
+  - Offen: Smoke-Test um **Backup-/Restore-Probe** erweitern (Runbook 6.2 automatisieren — braucht SSH-Step + `sqlite3 integrity_check` auf einer Kopie; noch manuell)
   - Offen: `nginx -t` gegen das gerenderte `nginx.conf.template` (mit Platzhalter-Substitution) in CI
   - Offen: `systemd-analyze verify` für `binokel-tracker.service`
   - Optional/abwägen: `bats`-Tests für `binokel-backup.sh` (root-/sqlite3-/cron-Abhängigkeiten → ggf. unverhältnismäßig, Trockenlauf bevorzugt)

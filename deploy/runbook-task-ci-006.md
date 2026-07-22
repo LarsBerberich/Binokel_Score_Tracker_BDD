@@ -508,7 +508,14 @@ ssh -i ~/.ssh/binokel_deploy binokel-deploy@203.0.113.10 \
 - Input `confirm`: **`yes`**
 
 Der Workflow führt aus: Preflight → rsync → `uv sync` → `migrate` →
-`collectstatic` → `systemctl restart` → Healthcheck auf `/health/`.
+`collectstatic` → `systemctl restart` → Readiness-Healthcheck auf `/health/` →
+**Post-Deploy-Smoke-Test** (End-to-End über öffentliches HTTPS).
+
+> **Automatisiert seit CI/CD-Ausbau:** Der Smoke-Test-Step in `cd.yml` prüft nach
+> jedem Deploy selbsttätig: `/health/` = 200 über TLS, `/admin/` = 404 (RD-6),
+> HTTP→HTTPS-Redirect und den HSTS-Header. Schlägt einer fehl, wird der Deploy
+> **rot**. Die folgenden `curl`-Kommandos sind damit nur noch optionale
+> Nachkontrolle bzw. für Dinge, die die Pipeline nicht abdeckt (TLS-Zertifikatsdaten).
 
 ### Verifikation (Phase 6)
 
