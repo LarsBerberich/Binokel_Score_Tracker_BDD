@@ -7,7 +7,7 @@
 
 ## ▶ Aktueller Fokus
 
-**TASK-006 ist abgeschlossen. TASK-CI-006 (erster Produktions-Deploy) ist erfolgreich: App läuft prod auf `api.bebe-soft.de` (CD #30/#31 GREEN, Post-Deploy-Smoke-Test automatisiert). Offene Go-Live-Governance-/Ops-Nacharbeiten → `FUTURE-006`.**
+**TASK-006 ist abgeschlossen. TASK-CI-006 (erster Produktions-Deploy) ist erfolgreich: App läuft prod auf `api.bebe-soft.de` (CD #30/#31 GREEN, Post-Deploy-Smoke-Test automatisiert). Verbleibende Go-Live-Governance-/Ops-Nacharbeiten sind hinter Phase 2 eingeordnet → `TASK-CI-007`…`TASK-CI-010`.**
 
 **TASK-CI-001–005 — CI/CD-Pipeline + Betriebsfundament fertig.**
 
@@ -92,7 +92,7 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
   - `docs/agents/orchestration.md` — Workflow für alle 3 Agenten (Coding, Rubber-Duck, Dev/Ops)
   - ADR-007 (GitHub Actions CI/CD), ADR-008 (VM-Deployment-Strategie)
 
-- [ ] **TASK-CI-006** VM einrichten + erster Produktions-Deploy — **geplant** (Runbook liegt vor, noch nicht ausgeführt)
+- [x] **TASK-CI-006** VM einrichten + erster Produktions-Deploy — **erfolgreich (22.07.2026)**: App live auf `https://api.bebe-soft.de` (echtes Let's-Encrypt-Cert), CD-Läufe #30/#31 GREEN, Post-Deploy-Smoke-Test automatisiert (letzter Commit `e8cd217`)
   - **Ausführungsanleitung:** `deploy/runbook-task-ci-006.md` (Phasen 0–6 mit Verifikation + Rollback)
   - Ziel-Infrastruktur: neue 1&1/IONOS-VM mit frischem Ubuntu LTS (z. B. 24.04)
   - Phase 1: Internet-Hardening (Admin-User, SSH-Key-only, sshd-Härtung) — manuell (ADR-009)
@@ -105,7 +105,8 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
   - Betriebssystem-Basis: **Ubuntu 24.04 LTS** (ADR-008)
   - **Trockenlauf (21.07.2026) erfolgreich:** kompletter Pfad gegen Wegwerf-VM durchgespielt (Certbot `--staging`), `health-https: 200`. 6 weitere Blocker gefunden+behoben (gunicorn-Dep, Deploy-env, `/etc/binokel`-x-ACL, uv-Interpreter/`UV_PYTHON_INSTALL_DIR`, Gunicorn-`HOME`, Nginx-Host-Header). Danach Security-Review: K1/K2 (blockierend) + E1–E5 behoben. Commits: 5d6c5e3, 991c493, f486ade, c37dc30, bbd07e3, ded2e13 (+Security-Commit).
   - **IONOS-Security-Review (22.07.2026):** Best-Practice-PDFs → Compliance-Matrix `docs/security/ionos-baseline-check.md`; Rubber-Duck-Audit. Umgesetztes **Go-Live-Gate**: (a) konsistentes SQLite-Backup `sqlite3 .backup` + `integrity_check` + atomarer `mv` + journald-Logging (`/usr/local/bin/binokel-backup.sh`, `setup-server.sh`) statt `cp`; (b) `/admin/`-Route in V1 deaktiviert (RD-6); (c) HSTS `preload`/`includeSubDomains` vorerst zurückgenommen (RD-8); (d) Restore-Probe als Runbook-Schritt 6.2. Offener Blocker: **IONOS-Cloud-Panel-Ports 8000/8443/8447 schließen** (Betreiber-Aktion, #9).
-  - **Offen:** Teardown Wegwerf-VM + Test-DNS entfernen; dann realer Prod-Deploy (reale Domain/Zugangsdaten, ohne `CERTBOT_STAGING`, IONOS-Ports 8000/8443/8447 schließen)
+  - **Erledigt:** Teardown Wegwerf-VM + Test-DNS entfernt; realer Prod-Deploy gegen reale Domain ohne `CERTBOT_STAGING` durchgeführt und via Smoke-Test verifiziert.
+  - **Restaufgaben (Go-Live-Governance/Ops)** bewusst hinter Phase 2 gezogen → `TASK-CI-007`…`TASK-CI-010`.
   - V1 nutzt SQLite; Docker + PostgreSQL als späterer Meilenstein (ADR-008)
 
 ### Phase 2 – Frontend (Vue) — noch nicht gestartet
@@ -115,6 +116,27 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
 - [ ] **TASK-009** Runde eingeben und auswerten (UI)
 - [ ] **TASK-010** Spielstand anzeigen (UI)
 - [ ] **TASK-011** Spiel abschließen / Sieger anzeigen (UI)
+
+### Nach Phase 2 – Go-Live-Nacharbeiten (Restaufgaben aus TASK-CI-006)
+
+> Der Prod-Deploy selbst ist abgeschlossen (TASK-CI-006 ✅). Diese betrieblichen Nacharbeiten
+> sind bewusst hinter Phase 2 (Frontend) eingeordnet und größtenteils USER-/Betreiber-Aktionen
+> in der GitHub- bzw. IONOS-Oberfläche.
+
+- [ ] **TASK-CI-007** Reviewer-Gate für Environment `production` erzwingen (USER, GitHub-UI)
+  - Settings → Environments → `production` → Required reviewers (sich selbst eintragen)
+  - Aktuell NICHT aktiv — Deploy lief ohne Approval-Dialog durch (Deploy-Start ~6 s nach CI-Ende). Offene MITTEL-Auflage aus Rubber-Duck-CD-Review.
+
+- [ ] **TASK-CI-008** Branch Protection für `main` aktivieren (frühere Phase 5, USER, GitHub-UI)
+  - Beide Checks als Required setzen: „BDD Akzeptanztests" + „Deploy-Skripte prüfen (shellcheck + bash -n)" (nach 1. erfolgreichem Lauf im BP-UI wählbar)
+  - Fork-PR-Approval-Setting mitprüfen. Normative Quellen: ADR-007, `deploy/secrets-setup.md` §6
+
+- [ ] **TASK-CI-009** IONOS-Cloud-Panel-Ports schließen (Blocker #9, USER-/Betreiber-Aktion)
+  - 8000/8443/8447 dicht, nur 22/80/443 offen
+
+- [ ] **TASK-CI-010** Backup-/Restore-Probe automatisieren (Runbook 6.2 → vgl. FUTURE-004)
+  - SSH-Step in `cd.yml` mit `sqlite3 integrity_check` auf einer zerstörungsfreien Kopie
+  - Normative Quelle: `deploy/runbook-task-ci-006.md` Phase 6.2
 
 ---
 
@@ -162,14 +184,6 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
   - Ziel: kein dauerhaft gültiges `VM_SSH_KEY`-Secret mehr; Zugang wird pro Deploy kurzlebig ausgestellt
   - Begründung: Der passwortlose Long-lived-Key ist für V1 pragmatisch vertretbar (kein natives OIDC für selbstverwaltete VMs), aber ein statisches Secret bleibt Restrisiko (OWASP CICD-SEC-6 Credential Hygiene)
   - Post-V1, niedrige Priorität; setzt eine erreichbare CA-Infrastruktur voraus
-
-- [ ] **FUTURE-006** Go-Live-Governance + Betriebs-Nacharbeiten aus TASK-CI-006 (offen nach erfolgreichem Prod-Deploy, 22.07.2026)
-  - Der reale Prod-Deploy auf `api.bebe-soft.de` ist erfolgreich (CD-Läufe #30/#31 GREEN, Smoke-Test automatisiert). Folgende Punkte bleiben offen:
-  - **Reviewer-Gate erzwingen** (USER-Aktion, GitHub-UI): Settings → Environments → `production` → Required reviewers (sich selbst eintragen). Aktuell NICHT aktiv — Deploy lief ohne Approval-Dialog durch (Deploy-Start ~6 s nach CI-Ende). Offene MITTEL-Auflage aus Rubber-Duck-CD-Review.
-  - **Branch Protection für `main`** (Phase 5, USER-Aktion): beide Checks als Required setzen — „BDD Akzeptanztests" + „Deploy-Skripte prüfen (shellcheck + bash -n)" (nach 1. erfolgreichem Lauf im BP-UI wählbar). Fork-PR-Approval-Setting mitprüfen.
-  - **IONOS-Cloud-Panel-Ports schließen** (Blocker #9, USER-/Betreiber-Aktion): 8000/8443/8447 dicht, nur 22/80/443 offen.
-  - **Backup-/Restore-Probe automatisieren** (Runbook 6.2 → siehe FUTURE-004 Offenpunkt): SSH-Step in `cd.yml` mit `sqlite3 integrity_check` auf einer zerstörungsfreien Kopie.
-  - Normative Quellen: `deploy/runbook-task-ci-006.md` (Phase 5/6.2), `deploy/secrets-setup.md` §6, ADR-007/009
 
 ---
 
