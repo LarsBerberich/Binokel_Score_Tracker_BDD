@@ -96,9 +96,9 @@ Jedes Spiel belegt zwei Zeilen: Die Rundenzeile zur getrennten Erfassung von M |
 Rechenformel für die STAND-Zeile:
 
 * Gewonnenes Spiel & alle Gegner:
-$$\text{Neuer STAND} = \text{Vorheriger STAND} + M + S + \text{Mit}$$ 
+	`Neuer STAND = Vorheriger STAND + M + S + Mit`
 * Verlierender Spielmacher (Szenario B & C):
-$$\text{Neuer STAND} = \text{Vorheriger STAND} + \text{negativer Verlustwert in Klammern}$$ 
+	`Neuer STAND = Vorheriger STAND + negativer Verlustwert in Klammern`
 
 
 

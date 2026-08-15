@@ -1,21 +1,35 @@
-# Nginx-Konfiguration für den Binokel Score Tracker
+# Nginx-Konfiguration für den Binokel Score Tracker (Frontend-Ära, Same-Origin)
+#
+# ARCHITEKTUR (ADR-010): Eine Domain serviert sowohl die Vue-SPA (statische Dateien
+# aus /opt/binokel/frontend) ALS AUCH die JSON-API (/api/ → Django per Unix-Socket).
+# Same-Origin: die SPA ruft /api/... auf DERSELBEN Herkunft auf → kein CORS, keine
+# Preflights, CSRF/SameSite-Cookies funktionieren ohne Sonderfälle.
+#
+# Die frühere reine API-Domain (REPLACE_WITH_API_DOMAIN, z. B. api.bebe-soft.de) wird
+# per 301 dauerhaft auf die Frontend-Domain umgeleitet — Altbestand/Bookmarks bleiben
+# erreichbar, aber es gibt genau eine kanonische Herkunft.
 #
 # Vor dem Einsatz alle REPLACE_WITH_... Platzhalter ersetzen:
-#   REPLACE_WITH_YOUR_DOMAIN  — z. B. binokel.example.com
+#   REPLACE_WITH_YOUR_DOMAIN  — Frontend-/Primärdomain, z. B. binokel.example.com
+#   REPLACE_WITH_API_DOMAIN   — bisherige API-Domain (301 → Primärdomain), z. B. api.example.com
+# (setup-server.sh ersetzt beide automatisch; der Block für die API-Domain wird
+#  weggelassen, wenn keine API_DOMAIN übergeben wurde — siehe Sentinel-Marker unten.)
 #
-# TLS-Zertifikat mit Certbot einrichten:
-#   certbot --nginx -d REPLACE_WITH_YOUR_DOMAIN
-# (Certbot schreibt die ssl_certificate-Pfade automatisch ein)
+# TLS-Zertifikat mit Certbot einrichten (SAN-Zertifikat für BEIDE Domains):
+#   certbot --nginx -d REPLACE_WITH_YOUR_DOMAIN -d REPLACE_WITH_API_DOMAIN
+# (Certbot schreibt die ssl_certificate-Pfade automatisch ein. Das SAN-Zertifikat
+#  liegt unter der Lineage des ERSTEN -d, also live/REPLACE_WITH_YOUR_DOMAIN/ — beide
+#  Server-Blöcke referenzieren daher denselben Pfad.)
 
 upstream binokel_app {
     server unix:/run/binokel/binokel.sock fail_timeout=0;
 }
 
-# ── HTTP → HTTPS-Weiterleitung ─────────────────────────────────────────────
+# ── HTTP → HTTPS-Weiterleitung (beide Domains) ─────────────────────────────
 server {
     listen 80;
     listen [::]:80;
-    server_name REPLACE_WITH_YOUR_DOMAIN;
+    server_name REPLACE_WITH_YOUR_DOMAIN REPLACE_WITH_API_DOMAIN;
     server_tokens off;
 
     location /.well-known/acme-challenge/ {
@@ -37,35 +51,50 @@ server {
     }
 }
 
-# ── HTTPS-Server ───────────────────────────────────────────────────────────
+# ── HTTPS-Server: Frontend-SPA + API (Same-Origin) ─────────────────────────
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     server_name REPLACE_WITH_YOUR_DOMAIN;
     server_tokens off;
 
-    # Zertifikatspfade (von Certbot automatisch gesetzt):
+    # Zertifikatspfade (von Certbot automatisch gesetzt, SAN-Cert-Lineage der Primärdomain):
     ssl_certificate     /etc/letsencrypt/live/REPLACE_WITH_YOUR_DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/REPLACE_WITH_YOUR_DOMAIN/privkey.pem;
     include             /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
-    # Sicherheits-Header: OWNERSHIP-TRENNUNG (siehe ENG-004, E2)
-    # Von Django proxied Antworten (/, /health/) erhalten ihre Security-Header von
-    # Djangos SecurityMiddleware/XFrameOptionsMiddleware (HSTS, nosniff, X-Frame-Options,
-    # Referrer-Policy) — die Werte sind mit dem /static/-Block unten abgestimmt. Deshalb
-    # hier auf Server-Ebene BEWUSST KEINE add_header-Duplikate (widersprüchliche
-    # Doppelwerte, z. B. Referrer-Policy, können sonst von Browsern verworfen werden).
-    # Statische Dateien umgehen Django und bekommen ihre Header direkt im /static/-Block.
+    # Wurzelverzeichnis der gebauten Vue-SPA (Deploy legt hierhin ab, siehe ADR-010).
+    root  /opt/binokel/frontend;
+    index index.html;
 
-    # Statische Dateien direkt aus dem Dateisystem
+    client_max_body_size 10M;
+
+    # Sicherheits-Header: OWNERSHIP-TRENNUNG (siehe ENG-004, E2)
+    # Von Django proxied Antworten (/api/, /health/) erhalten ihre Security-Header von
+    # Djangos SecurityMiddleware/XFrameOptionsMiddleware. Statisch aus dem Dateisystem
+    # ausgelieferte Antworten (SPA-Shell, /assets/, /static/) laufen NICHT durch Django
+    # und bekommen ihre Header deshalb hier je Location explizit. nginx vererbt
+    # Server-Level-add_header NICHT in Blöcke mit eigenem add_header — daher pro Block.
+
+    # Von Vite gebaute Assets: content-gehasht → langlebig und unveränderlich cachebar.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy strict-origin-when-cross-origin always;
+        access_log off;
+        try_files $uri =404;
+    }
+
+    # Django-Static (z. B. DRF-/künftige Admin-Assets) direkt aus dem Dateisystem.
     location /static/ {
         alias /opt/binokel/static/;
         expires 1y;
         add_header Cache-Control "public, immutable";
-        # Security-Header hier explizit, da /static/ nicht durch Django läuft und nginx
-        # Server-Level-add_header nicht in Blöcke mit eigenem add_header vererbt.
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
         add_header X-Content-Type-Options nosniff always;
         add_header X-Frame-Options DENY always;
         add_header Referrer-Policy strict-origin-when-cross-origin always;
@@ -83,8 +112,8 @@ server {
         access_log off;
     }
 
-    # Django-Anwendung
-    location / {
+    # JSON-API → Django (Same-Origin-Aufrufe der SPA)
+    location /api/ {
         proxy_pass         http://binokel_app;
         proxy_redirect     off;
 
@@ -96,7 +125,48 @@ server {
         proxy_connect_timeout 60s;
         proxy_read_timeout    90s;
         proxy_send_timeout    90s;
+    }
 
-        client_max_body_size 10M;
+    # SPA-Fallback: unbekannte Pfade liefern index.html, damit clientseitiges
+    # Vue-Router-Routing (History-Mode) auch bei direktem Aufruf/Reload funktioniert.
+    # index.html selbst NICHT langlebig cachen, sonst sehen Clients nach einem Deploy
+    # veraltete Asset-Referenzen (die gehashten /assets/ bleiben unveränderlich cachebar).
+    location / {
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy strict-origin-when-cross-origin always;
     }
 }
+
+# >>> API_REDIRECT_BLOCK (setup-server.sh entfernt diesen Block, wenn keine API_DOMAIN gesetzt ist)
+# ── HTTPS-Server: bisherige API-Domain → 301 auf die Primärdomain ──────────
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name REPLACE_WITH_API_DOMAIN;
+    server_tokens off;
+
+    # Dasselbe SAN-Zertifikat (Lineage der Primärdomain, siehe Kopf).
+    ssl_certificate     /etc/letsencrypt/live/REPLACE_WITH_YOUR_DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/REPLACE_WITH_YOUR_DOMAIN/privkey.pem;
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Healthcheck weiterhin auf beiden Hostnamen bedienbar (Smoke-Test-Kompatibilität),
+    # bevor/nachdem der Smoke-Test auf die Primärdomain umgestellt wird.
+    location /health/ {
+        proxy_pass         http://binokel_app;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        access_log off;
+    }
+
+    # Alles Übrige dauerhaft auf die kanonische Primärdomain umleiten.
+    location / {
+        return 301 https://REPLACE_WITH_YOUR_DOMAIN$request_uri;
+    }
+}
+# <<< API_REDIRECT_BLOCK

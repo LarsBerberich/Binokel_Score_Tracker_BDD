@@ -104,7 +104,15 @@ Für Stichwerte bzw. Augen gelten die folgenden Kartenwerte:
 - Unter (Bube): 2 Punkte
 - letzter Stich: 10 Punkte zusätzlich für den Gewinner des letzten Stichs
 
-### 5.2 Gesamtsumme regulärer Stichwerte
+### 5.2 Blatt und Konsequenz für Stiche (württembergisches Blatt)
+
+V1 wird mit dem **württembergischen Blatt** gespielt: Es enthält nur **Siebener** (keine Achter oder Neuner), und die **Siebener werden vor dem Spiel aussortiert**, weil sie für das Spiel irrelevant sind. Gespielt wird also **ohne Siebener**.
+
+Daraus folgt: Es gibt **keine 0-Augen-Karte**. Die niedrigstwertige Karte im Spiel ist der Unter (2 Punkte). Jeder gewonnene Stich enthält daher zwangsläufig Augen — der **kleinstmögliche Stich beträgt 6 Punkte** (drei Unter). Ein „Nuller-Stich" (ein realer Stich mit 0 Augen) ist damit **ausgeschlossen**.
+
+Diese Eigenschaft ist die fachliche Grundlage dafür, dass „hat mindestens einen eigenen Stich" (§10) zuverlässig aus einem **Stichwert > 0** abgeleitet werden kann (siehe §10.3).
+
+### 5.3 Gesamtsumme regulärer Stichwerte
 
 In einer regulär ausgespielten Runde gilt:
 
@@ -161,9 +169,25 @@ In V1 werden insbesondere die folgenden Wertarten unterschieden:
 Dabei gilt:
 
 - **Reizwerte** sind immer volle 10er-Werte
+- **Reizwerte** starten bei einem Minimum von **150** (Hausregel; entspricht gängiger Turnierpraxis) und werden im Erfassungs-UI mit 150 vorbelegt
 - **Mitpunkte** sind immer volle 10er-Werte
 - **nur Stichwerte** können 1er-genaue Werte enthalten
 - beim Spielmacher umfassen die Stichwerte auch die gedrückten Karten
+
+### 7.1 Plausibilitätsgrenze der Meldepunkte
+
+Die **Meldepunkte eines einzelnen Spielers** können einen fachlich begründeten Höchstwert nicht überschreiten. In V1 gilt als obere Plausibilitätsgrenze:
+
+> **Meldepunkte ≤ 1800** je Spieler und Runde. Negative Meldepunkte sind ebenfalls unzulässig (Untergrenze 0).
+
+Herleitung des theoretischen Maximums (württembergisches Doppelblatt, vgl. §5.1/§5.2):
+
+- **Doppelte Familie** einer Farbe (alle zehn Karten einer Farbe außer den beiden Siebenern) = **1500 Punkte**
+- zusätzlich **doppelter Binokel** (zwei Schellen-Unter + zwei Blatt-Ober) = **300 Punkte**; die beiden Blatt-Ober sind bereits Teil der doppelten Familie in Blatt und dürfen zugleich für den Binokel gewertet werden (eine Karte darf mehrfach für Meldungen verwendet werden)
+
+Daraus ergibt sich die Summe **1500 + 300 = 1800**.
+
+Diese Grenze dient als **Eingabe-Plausibilitätsprüfung** (Schutz vor Tippfehlern, z. B. 1300 statt 130) und wird sowohl im Erfassungs-UI (Absenden gesperrt) als auch serverseitig bei der Rundenerfassung durchgesetzt. Ein höherer oder negativer Wert wird abgelehnt.
 
 ---
 
@@ -189,9 +213,9 @@ Dies soll in der UI flexibel möglich sein, unabhängig davon, von welchen zwei 
 
 Nur die Stichwerte bzw. Stichaugen können 1er-genau sein.
 
-Diese Werte werden bereits beim Eintragen auf volle 10 gerundet.
+Das Erfassungs-UI nimmt Stichwerte grundsätzlich **1er-genau** entgegen (Eingabeschritt 1), damit knappe Spiele exakt gezählt werden können. Bei knappen Spielen ist ein genaues Zählen auf Einer-Werte notwendig (siehe §9.3).
 
-Die Speicherung darf im Standardfall ebenfalls bereits in dieser gerundeten Form erfolgen.
+Eine Rundung auf volle 10 ist lediglich eine **optionale Bequemlichkeit** in klar entschiedenen Runden und wird vom UI **nicht erzwungen**. Die Speicherung erfolgt in der tatsächlich erfassten (ggf. 1er-genauen) Form.
 
 ### 9.2 Geltungsbereich der Rundung
 
@@ -221,6 +245,8 @@ Hat ein aktiver Spieler mindestens einen Stich gewonnen, zählen seine Meldepunk
 ### 10.3 Kein eigener Stich
 
 Hat ein aktiver Spieler keinen Stich gewonnen, verfallen seine Meldepunkte und werden für diese Runde mit 0 gewertet.
+
+**Ableitung im Erfassungs-UI:** „Hat einen eigenen Stich" wird nicht separat erfasst, sondern aus dem erfassten **Stichwert > 0** abgeleitet. Das ist fachlich zulässig, weil es im württembergischen Blatt ohne Siebener keinen 0-Augen-Stich gibt (§5.2): Ein Stichwert von 0 bedeutet zwingend „kein Stich", jeder reale Stich ergibt mindestens 6 Augen.
 
 ### 10.4 Geltung des Stich-Zwangs
 
@@ -419,9 +445,9 @@ Mehrere Spieler können daher gemeinsam Sieger sein.
 
 ### 17.2 Punktgenaue Entscheidung in der letzten Runde
 
-Da Stichwerte im Regelfall auf volle 10 gerundet werden, gilt für die letzte Runde:
+Da Stichwerte in klar entschiedenen Runden oft auf volle 10 gerundet erfasst werden, gilt für die letzte Runde:
 
-Wenn um den Gesamtsieg ein Gleichstand möglich ist, müssen zusätzlich die exakten 1er-Werte berücksichtigt werden, um den Sieger punktgenau zu bestimmen.
+Wenn um den Gesamtsieg ein Gleichstand möglich ist, müssen zusätzlich die exakten 1er-Werte berücksichtigt werden, um den Sieger punktgenau zu bestimmen. Das Erfassungs-UI erlaubt die 1er-genaue Eingabe der Stichwerte daher durchgängig (Eingabeschritt 1).
 
 Nur wenn danach weiterhin Gleichstand besteht, gibt es mehrere Sieger.
 

@@ -1,0 +1,419 @@
+openapi: 3.1.0
+info:
+  title: Binokel Score Tracker API
+  version: '1.0'
+  description: >-
+    Handgeschriebener API-Vertrag für den Binokel Score Tracker (V1).
+
+    Normative Quellen: backend/binokel_tracker/urls.py, backend/scoring/views.py,
+    docs/rule-set-v1.md. Kein DRF (ADR-005) – die Django-Views liefern JsonResponse.
+
+    Änderungen an den Django-Views MÜSSEN hier nachgezogen werden (PFLICHT-Sync).
+
+servers:
+  - url: /
+    description: Same-Origin (Frontend und API unter derselben Domain, ADR-010)
+
+tags:
+  - name: Spiel
+    description: Spiel anlegen und laden (Slice 1)
+  - name: Runde
+    description: Runde auswerten und speichern (Slices 2–5)
+  - name: Auswertung
+    description: Punktestände und Sieger (Slice 6)
+  - name: System
+    description: Betrieb / Healthcheck
+
+paths:
+  /health/:
+    get:
+      tags: [System]
+      operationId: healthcheck
+      summary: Healthcheck für die Deployment-Pipeline
+      responses:
+        '200':
+          description: Dienst ist erreichbar.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+
+  /api/spiele/:
+    post:
+      tags: [Spiel]
+      operationId: spielAnlegen
+      summary: Neues Spiel anlegen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpielAnlegenRequest'
+      responses:
+        '201':
+          description: Spiel angelegt.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Spiel'
+        '400':
+          $ref: '#/components/responses/Fehler'
+        '405':
+          $ref: '#/components/responses/Fehler'
+
+  /api/spiele/{spiel_id}/:
+    parameters:
+      - $ref: '#/components/parameters/SpielId'
+    get:
+      tags: [Spiel]
+      operationId: spielLaden
+      summary: Spiel laden
+      responses:
+        '200':
+          description: Spiel gefunden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Spiel'
+        '404':
+          $ref: '#/components/responses/Fehler'
+
+  /api/spiele/{spiel_id}/runden/:
+    parameters:
+      - $ref: '#/components/parameters/SpielId'
+    post:
+      tags: [Runde]
+      operationId: rundeAuswerten
+      summary: Runde auswerten und speichern
+      description: >-
+        Der Request-Body wird über das Feld `typ` diskriminiert. Je nach
+        Rundentyp gelten unterschiedliche Pflichtfelder
+        (normativ: docs/rule-set-v1.md §13–§15).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RundeRequest'
+      responses:
+        '201':
+          description: Runde ausgewertet und gespeichert.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RundeErgebnis'
+        '400':
+          $ref: '#/components/responses/Fehler'
+        '404':
+          $ref: '#/components/responses/Fehler'
+        '405':
+          $ref: '#/components/responses/Fehler'
+
+  /api/spiele/{spiel_id}/punktestaende/:
+    parameters:
+      - $ref: '#/components/parameters/SpielId'
+    get:
+      tags: [Auswertung]
+      operationId: punktestaendeLaden
+      summary: Aktuelle Punktestände aller Spieler
+      responses:
+        '200':
+          description: Punktestände berechnet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Punktestaende'
+        '404':
+          $ref: '#/components/responses/Fehler'
+
+  /api/spiele/{spiel_id}/sieger/:
+    parameters:
+      - $ref: '#/components/parameters/SpielId'
+    get:
+      tags: [Auswertung]
+      operationId: siegerErmitteln
+      summary: Sieger nach Spielende ermitteln
+      parameters:
+        - name: exakte_stichwerte
+          in: query
+          required: false
+          description: >-
+            Optionale exakte Stichwerte für das Tiebreaking mit 1er-Werten
+            (normativ: docs/rule-set-v1.md §9.3).
+            Format: kommaseparierte `Name:Wert`-Paare, z. B. `Anna:12,Bernd:7`.
+          schema:
+            type: string
+          example: 'Anna:12,Bernd:7'
+      responses:
+        '200':
+          description: Sieger ermittelt (leer, wenn kein eindeutiger Sieger).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiegerErgebnis'
+        '400':
+          $ref: '#/components/responses/Fehler'
+        '404':
+          $ref: '#/components/responses/Fehler'
+
+components:
+  parameters:
+    SpielId:
+      name: spiel_id
+      in: path
+      required: true
+      description: Datenbank-ID des Spiels.
+      schema:
+        type: integer
+        minimum: 1
+
+  responses:
+    Fehler:
+      description: Fehlerantwort mit menschenlesbarer Meldung.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fehler'
+
+  schemas:
+    Fehler:
+      type: object
+      required: [fehler]
+      properties:
+        fehler:
+          type: string
+          description: Menschenlesbare Fehlermeldung (deutsch).
+      examples:
+        - fehler: "Pflichtfeld fehlt: 'spieler'."
+
+    SpielAnlegenRequest:
+      type: object
+      required: [spieler]
+      properties:
+        spieler:
+          type: array
+          description: Spielernamen in Reihenfolge. Genau 4 Spieler (rule-set-v1.md).
+          items:
+            type: string
+          minItems: 4
+          maxItems: 4
+        rundenanzahl:
+          type: [integer, 'null']
+          description: >-
+            Gesamtzahl der Runden. Muss ein Vielfaches von 4 sein.
+            Optional; Default legt das Backend fest.
+      examples:
+        - spieler: [Anna, Bernd, Clara, David]
+          rundenanzahl: 12
+
+    Spiel:
+      type: object
+      required: [id, rundenanzahl, spieler]
+      properties:
+        id:
+          type: integer
+          description: Datenbank-ID des Spiels.
+        rundenanzahl:
+          type: integer
+        spieler:
+          type: array
+          items:
+            type: string
+
+    Gegenspieler:
+      type: object
+      description: Gegenspieler-Daten mit vollem Stich-Zwang (typ normal / doppeltes_abgehen).
+      required: [name, meldepunkte, stichwerte, hat_eigenen_stich]
+      properties:
+        name:
+          type: string
+        meldepunkte:
+          type: integer
+          minimum: 0
+          maximum: 1800
+          description: Meldepunkte des Spielers (Plausibilitätsgrenze, rule-set-v1.md §7.1).
+        stichwerte:
+          type: integer
+        hat_eigenen_stich:
+          type: boolean
+
+    GegenspielerEinfach:
+      type: object
+      description: Gegenspieler-Daten ohne Stich-Zwang (typ einfaches_abgehen).
+      required: [name, meldepunkte]
+      properties:
+        name:
+          type: string
+        meldepunkte:
+          type: integer
+          minimum: 0
+          maximum: 1800
+          description: Meldepunkte des Spielers (Plausibilitätsgrenze, rule-set-v1.md §7.1).
+        hat_eigenen_stich:
+          type: boolean
+          default: false
+
+    RundeBasis:
+      type: object
+      required: [typ, rundennummer, spielmacher, geber]
+      properties:
+        typ:
+          $ref: '#/components/schemas/Rundentyp'
+        rundennummer:
+          type: integer
+          description: 1-basierte Rundennummer.
+          minimum: 1
+        spielmacher:
+          type: string
+        geber:
+          type: string
+        spielmacher_stern:
+          type: boolean
+          default: false
+        gegenspieler_stern:
+          type: boolean
+          default: false
+
+    Rundentyp:
+      type: string
+      enum:
+        - normal
+        - einfaches_abgehen
+        - doppeltes_abgehen
+        - tausender_gewonnen
+        - tausender_verloren
+
+    RundeNormal:
+      allOf:
+        - $ref: '#/components/schemas/RundeBasis'
+        - type: object
+          required: [reizwert, meldepunkte, stichwerte, hat_eigenen_stich, gegenspieler]
+          properties:
+            reizwert:
+              type: integer
+            meldepunkte:
+              type: integer
+              minimum: 0
+              maximum: 1800
+              description: Meldepunkte des Spielmachers (Plausibilitätsgrenze, rule-set-v1.md §7.1).
+            stichwerte:
+              type: integer
+            hat_eigenen_stich:
+              type: boolean
+            gegenspieler:
+              type: array
+              items:
+                $ref: '#/components/schemas/Gegenspieler'
+
+    RundeEinfachesAbgehen:
+      allOf:
+        - $ref: '#/components/schemas/RundeBasis'
+        - type: object
+          required: [reizwert, gegenspieler]
+          properties:
+            reizwert:
+              type: integer
+            gegenspieler:
+              type: array
+              items:
+                $ref: '#/components/schemas/GegenspielerEinfach'
+
+    RundeDoppeltesAbgehen:
+      allOf:
+        - $ref: '#/components/schemas/RundeBasis'
+        - type: object
+          required: [reizwert, gegenspieler]
+          properties:
+            reizwert:
+              type: integer
+            gegenspieler:
+              type: array
+              items:
+                $ref: '#/components/schemas/Gegenspieler'
+
+    RundeTausender:
+      description: >-
+        typ tausender_gewonnen / tausender_verloren – kein numerischer Einfluss
+        auf den Punktestand (rule-set-v1.md §15). Nur die Basisfelder werden benötigt.
+      allOf:
+        - $ref: '#/components/schemas/RundeBasis'
+
+    RundeRequest:
+      oneOf:
+        - $ref: '#/components/schemas/RundeNormal'
+        - $ref: '#/components/schemas/RundeEinfachesAbgehen'
+        - $ref: '#/components/schemas/RundeDoppeltesAbgehen'
+        - $ref: '#/components/schemas/RundeTausender'
+      discriminator:
+        propertyName: typ
+        mapping:
+          normal: '#/components/schemas/RundeNormal'
+          einfaches_abgehen: '#/components/schemas/RundeEinfachesAbgehen'
+          doppeltes_abgehen: '#/components/schemas/RundeDoppeltesAbgehen'
+          tausender_gewonnen: '#/components/schemas/RundeTausender'
+          tausender_verloren: '#/components/schemas/RundeTausender'
+
+    RundeErgebnis:
+      type: object
+      required:
+        - id
+        - rundennummer
+        - rundenausgang
+        - spielmacher_punkte
+        - verlustwert
+        - mitpunkte_pro_gegenspieler
+      properties:
+        id:
+          type: integer
+        rundennummer:
+          type: integer
+        rundenausgang:
+          type: string
+          description: Interner Ausgangs-Code (z. B. gewonnenes_spiel, doppeltes_abgehen).
+        spielmacher_punkte:
+          type: integer
+        verlustwert:
+          type: integer
+          description: Negativer Verlustwert bei Abgehen; sonst 0.
+        mitpunkte_pro_gegenspieler:
+          type: integer
+
+    Punktestaende:
+      type: object
+      required: [spiel_id, punktestaende]
+      properties:
+        spiel_id:
+          type: integer
+        punktestaende:
+          type: object
+          description: Mapping Spielername → aktueller Gesamtpunktestand.
+          additionalProperties:
+            type: integer
+      examples:
+        - spiel_id: 1
+          punktestaende:
+            Anna: 340
+            Bernd: 90
+            Clara: 90
+            David: 0
+
+    SiegerErgebnis:
+      type: object
+      required: [spiel_id, punktestaende, sieger]
+      properties:
+        spiel_id:
+          type: integer
+        punktestaende:
+          type: object
+          additionalProperties:
+            type: integer
+        sieger:
+          type: array
+          description: Sieger-Namen; leer, wenn kein eindeutiger Sieger feststeht.
+          items:
+            type: string

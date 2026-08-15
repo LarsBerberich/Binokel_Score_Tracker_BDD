@@ -85,6 +85,261 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
+## Stand 15.08.2026 (Plausibilitätsregel Meldepunkte — aus Live-Test)
+
+Beim manuellen Durchspielen fiel auf, dass die Meldepunkte eines einzelnen Spielers
+unbegrenzt eingegeben werden konnten. Eingeführt wurde eine **Plausibilitätsgrenze**:
+Meldepunkte je Spieler und Runde liegen zwischen **0 und 1800**. Das Maximum von 1800
+ist das theoretische Höchstmaß im württembergischen Doppelblatt — **doppelte Familie**
+einer Farbe (1500) plus **doppelter Binokel** (300), wobei die beiden Blatt-Ober der
+Familie zugleich den Binokel bilden (Karten dürfen mehrfach gemeldet werden). Das
+allgemeine Binokel-Regelwerk wurde dazu gegengeprüft.
+
+Durchsetzung mehrschichtig: Domäne (`MELDEPUNKTE_MAXIMUM`, `UngueltigeMeldepunkte`),
+Use Case (`meldepunkte_validieren`), HTTP-View (Rundenerfassung → 400 bei Verstoß) sowie
+im `RundeForm`-UI (Absenden gesperrt + Hinweis). Nachgezogen: `rule-set-v1.md` §7.1
+(Herleitung), `ubiquitous-language.md` §4.9, OpenAPI-Vertrag (`minimum: 0`, `maximum: 1800`).
+Validierung: 22 Django + 28 Behave + 35 Vitest grün, Build grün, Live-curl (1801 → 400,
+1800 → 201).
+
+## Stand 24.07.2026 (Phase 2b — TASK-012 Häppchen B: Stichwerte 1er-genau, Auto-3.-Stichwert, Ableitungen)
+
+**TASK-012 komplett** (Häppchen A + B). Häppchen B umgesetzt + validiert; anschließend
+Rubber-Duck-Review.
+
+- **Regel-Korrektur (USER 24.07.2026): Stichwerte 1er-genau.** „Bei knappen Spielen ist ein
+  genaues Zählen auf Einer-Werte notwendig." → Stichwert-Felder `step=1` (statt 10). `rule-set-v1.md`
+  §9.1 + §17.2 aktualisiert: UI erfasst Stichwerte grundsätzlich 1er-genau; Rundung auf 10 ist nur
+  optionale Bequemlichkeit, wird nie erzwungen. **Meldepunkte + Reizwert bleiben `step=10`.** Der
+  frühere „Tiebreak-Nachzügler" (§9.3/§17.2) ist damit nativ erledigt — kein Sonderfeld nötig.
+- **`RundeForm.vue` (012.3/012.5/012.7):**
+  - **012.3** Stich-Checkboxen (`sm-stich`/`gs-stich-*`) + `hatEigenenStich` aus `SpielerDetail`
+    entfernt. Payload leitet `hat_eigenen_stich = stichwerte > 0` ab (Spielmacher + je Gegenspieler).
+  - **012.5** Dritter Stichwert automatisch = `250 − w1 − w2`, sobald zwei der drei aktiven Werte
+    erfasst sind. Tracking via `stichwertReihenfolge` (zwei zuletzt bearbeitete gewinnen);
+    `autoStichwertSpieler` ist **read-only** + Hinweis „— automatisch". Negativer Auto-Wert →
+    `stichwerte-fehler`-Hinweis + `runde-absenden` gesperrt (`stichwerteNegativ` in `normalGueltig`).
+  - **012.7** `doppeltes-abgehen-hinweis`: bei normalem Spiel live, wenn `spielmacherGesamt`
+    (M+S) < Reizwert (§16.1 nachvollziehbar).
+- **Tests (Vitest, ADR-013):** `RundeForm.spec.ts` — Normal-Test auf Auto-Berechnung umgestellt
+  (2 Stichwerte eingegeben, 3. read-only + auto), neue Tests: Ableitung `hat_eigenen_stich=false`
+  bei Auto-0-Stichwert (012.3), doppeltes-Abgehen-Hinweis (012.7), Negativ-Stichwert sperrt Runde
+  (RD-S3, Werte >250). **34 Tests grün (6 Dateien),
+  Build (vue-tsc) grün.** Per curl: Normal-Payload → 201, Punktestände Bernd 190 / Carla 80 /
+  Dirk 60 / Anna 0 (200). **Hinweis:** API-Endpunkte brauchen Trailing-Slash; Create-Response liefert
+  `id` (nicht `spiel_id`).
+- **Offen:** Live-Cut-Over unverändert; nichts committet/gepusht (User: „Commit später").
+- **Nächster Schritt:** **TASK-013** (Sterne im Wertungsbereich, Prio vor TASK-014).
+
+## Stand 24.07.2026 (Phase 2b — TASK-012 Häppchen A: Rundenerfassung regelkonform verfeinert)
+
+**Erstes Durchspielen der Rundenerfassung (nach MVP-Loop) → USER-Feedback + Rubber-Duck-Review
+→ Phase 2b (TASK-012/013/014) geplant** (siehe `BACKLOG.md`). **Häppchen A von TASK-012
+umgesetzt + validiert.**
+
+- **Hausregel verankert:** Reizwert-Minimum **150** (gängige Turnierpraxis) in `rule-set-v1.md` §7
+  und `ubiquitous-language.md` §4.14; im UI mit 150 vorbelegt. Domänenkonstanten in
+  `src/domain/regeln.ts`: `REIZWERT_MINIMUM = 150`, `ZEHNER_SCHRITT = 10`.
+- **`RundeForm.vue` (012.1/012.2/012.4/012.6):**
+  - **012.1** „Doppeltes Abgehen" aus der Rundentyp-Auswahl entfernt — wird bei normalem Spiel
+    automatisch abgeleitet (M+S < Reizwert, §16.1). `absenden()`-Zweig + `istDoppeltesAbgehen`/
+    `istAbgehen` entfernt; Abgehen-Block auf einfaches Abgehen reduziert. **API-Typ
+    `RundeDoppeltesAbgehen` bleibt** (Vertrag unberührt).
+  - **012.2** Reizwert `min=150 step=10` Default 150 (`reizwertGueltig` prüft `>= 150`);
+    Meldepunkte + Stichwerte `step=10`.
+  - **012.4** Manuelle Sterne-Checkboxen (`sm-stern`/`gs-stern`) + Refs entfernt — Sterne ergeben
+    sich nur aus dem Tausender-Ausgang und werden vom Backend gesetzt (§15.3/§15.5).
+  - **012.6 BUG-FIX** Formular-Reset nach Wertung über `watch(() => props.rundennummer)` →
+    `resetEingaben()` (typ→`normal`, reizwert→150, Melde/Stich→0). Reset kommt bewusst aus dem
+    Parent (RundeForm kennt den POST-Erfolg nicht).
+- **Tests (Vitest, ADR-013):** `RundeForm.spec.ts` — doppeltes-Abgehen-Test entfernt, neuer Test
+  „bietet Doppeltes Abgehen nicht an", Sterne aus dem Normal-Payload entfernt, neuer Reset-Test.
+  **31 Tests grün (6 Dateien), Build (vue-tsc) grün.** Per curl verifiziert: schlanker Normal-Payload
+  ohne Stern-Felder → 201, Punktestände Bernd 190 / Carla 80 / Dirk 60 / Anna 0 (200).
+- **Rubber-Duck-Entscheide für Häppchen B (offen):** 012.5 Auto-Feld **read-only** („zwei
+  bearbeitete gewinnen, drittes berechnet + gesperrt") gegen „unset vs. bewusst 0"-Ambiguität;
+  012.3 `hat_eigenen_stich = stichwerte > 0` (Edge-Case „kleiner Stich → 0" irrelevant, kleinster
+  Stich = 6). §9.3/§17.2 (1er-genaue Tiebreak-Stichwerte) bleibt bewusster V1-Nachzügler.
+- **Offen:** Live-Cut-Over (s. u.) unverändert; nichts committet/gepusht (User: „Commit später").
+- **Nächster Schritt:** TASK-012 **Häppchen B** (012.3/012.5/012.7) mit Rubber-Duck-Schleife,
+  danach **TASK-013** (Sterne im Wertungsbereich, Prio vor TASK-014).
+
+## Stand 24.07.2026 (Phase 2 Frontend — TASK-011 Sieger anzeigen, UI Slice 6 abgeschlossen — MVP-Loop komplett)
+
+**TASK-011 (Spiel abschließen / Sieger anzeigen, UI, Slice 6) ist abgeschlossen.** Damit ist
+der **Phase-2-MVP-Loop komplett**: Spiel anlegen → Runden aller fünf Typen erfassen →
+laufender Punktestand → Spielende → Sieger.
+
+- **View** `src/views/SpielendeView.vue` (vorher Platzhalter) — lädt in `onMounted`
+  `siegerErmitteln(Number(spielId))` → `SiegerErgebnis` (`{spiel_id, punktestaende, sieger}`).
+  Zeigt: Sieger-Banner (einzeln „Sieger: X" oder „Gleichstand – mehrere Sieger: X, Y" bei
+  `sieger.length > 1`), absteigenden Endstand (Sieger via `sieger.includes(name)` hervorgehoben),
+  `RouterLink` „Neues Spiel" → Route `start`. Lade-/Fehlerzustand analog `SpielView`.
+- **Erreichbar** über den „Zur Auswertung"-Link im Beendet-Bereich von `SpielView` (TASK-009.6)
+  bzw. direkt via `/spiel/:spielId/ende` (die View lädt eigenständig, kein Store nötig).
+- **Tests (Vitest, ADR-013):** `SpielendeView.spec.ts` — alleiniger Sieger + Endstand-Sortierung,
+  Gleichstand (mehrere Sieger), Fehlerfall (`vi.mock('../api')` siegerErmitteln, `RouterLinkStub`).
+  **30 Tests grün (6 Dateien), Build (vue-tsc) grün.** Per curl verifiziert: Sieger nach 1 Runde
+  `["Bernd"]` (200). **Kein neues E2E-Szenario.**
+- **Bewusst zurückgestellt (Nachzügler):** UI-Eingabe für **exakte 1er-Stichwerte** (Tiebreak
+  bei Gleichstand in der letzten Runde). Das Backend unterstützt `?exakte_stichwerte=Name:Wert,…`
+  bereits; der Client-Funktion `siegerErmitteln(spielId, exakteStichwerte?)` ist der Parameter
+  schon bekannt. Im UI noch nicht exponiert (lean; kann bei Bedarf ergänzt werden).
+- **Offen:** Live-Cut-Over (s. u.) unverändert; nichts committet/gepusht (User: „Commit später").
+- **Nächster Schritt:** Durchspielen + Frontend-Feedback (Flow/UX), danach gebündelte visuelle
+  Politur über alle Screens; optional der exakte-Stichwerte-Tiebreak.
+
+## Stand 24.07.2026 (Phase 2 Frontend — TASK-010 Spielstand anzeigen, UI Slice 6 Punktestände abgeschlossen)
+
+**TASK-010 (Spielstand anzeigen, UI, Slice 6, Punktestände) ist abgeschlossen.** `SpielView`
+zeigt jetzt den laufenden Punktestand.
+
+- **View** `src/views/SpielView.vue` — hält `punktestaende` (`PunktestandMap | null`) und
+  `punktestaendeAktualisieren()`; ruft `punktestaendeLaden(spielId)` **beim Öffnen** und
+  **nach jeder gewerteten Runde** auf. Ladefehler sind weich (Punktestand ist ergänzende
+  Info → blockiert die Rundenerfassung nicht, `punktestaende` fällt auf `null` zurück).
+- **Anzeige** — Sektion `data-testid="punktestaende"` zwischen Header und Rundenerfassung
+  (also während des Spiels **und** im Beendet-Bereich sichtbar). Computed `sortierteStaende`
+  sortiert **absteigend** (höchster Punktestand zuerst → führt zur Siegerlogik in TASK-011);
+  Führender hervorgehoben. Einträge `data-testid="punktestand-{name}"`.
+- **Tests (Vitest, ADR-013):** `SpielView.spec.ts` um `punktestaendeLaden`-Mock erweitert
+  (Default 0/0/0/0 in `beforeEach`) + neuer Test „lädt und zeigt die Punktestände absteigend
+  sortiert". **27 Tests grün, Build (vue-tsc) grün.** Per curl verifiziert: nach 1 normalen
+  Runde `{Anna:0, Bernd:190, Carla:80, Dirk:60}` (200). **Kein neues E2E-Szenario.**
+- **Offen:** Live-Cut-Over (s. u.) unverändert; nichts committet/gepusht (User: „Commit später").
+- **Nächster Schritt:** TASK-011 (Spiel abschließen / Sieger anzeigen – UI, Slice 6);
+  `siegerErmitteln()` im Client vorhanden, `SpielendeView` noch Platzhalter.
+
+## Stand 24.07.2026 (Phase 2 Frontend — TASK-009 Runde eingeben und auswerten, UI Slices 2–5 abgeschlossen)
+
+**TASK-009 (Runde eingeben und auswerten, UI, Slices 2–5) ist abgeschlossen** (Subtasks
+009.1–009.6). Alle fünf Rundentypen sind über die UI erfassbar und werden vom Backend
+gewertet; das TASK-008-Schichten-Muster (Store / präsentationsnahe Komponente / View)
+wurde konsequent fortgesetzt.
+
+- **Domänenmodule (rein, isoliert getestet):**
+  - `src/domain/rotation.ts` — `geberFuerRunde(spieler, rundennummer)` (`(rundennummer-1) %
+    n`), `aktiveSpieler(spieler, geber)` (Geber setzt aus), `gegenspielerNamen(aktive,
+    spielmacher)`. Normativ rule-set §3: bei 4 Spielern spielen 3 aktiv, der Geber setzt aus.
+  - `src/domain/regeln.ts` — `STICHWERT_KONTROLLSUMME = 250` (rule-set §5.3).
+- **Präsentationsnahe Komponente** `src/components/RundeForm.vue` — deckt **alle fünf
+  Rundentypen** ab (normal, einfaches/doppeltes Abgehen, Tausender gewonnen/verloren).
+  Detaileingaben je aktivem Spieler in einer `reactive`-Map (per `watch` an die aktiven
+  Spieler gekoppelt); Gegenspieler = aktive minus Spielmacher (computed). Typabhängige
+  Felder via `v-if`/`<template v-if>`:
+  - **normal:** Reizwert + Spielmacher- und Gegenspieler-Details (Meldepunkte/Stichwerte/
+    eigener Stich), **Live-Kontrollsumme muss genau 250 ergeben**, Sterne → `RundeNormal`.
+  - **einfaches Abgehen:** nur Gegenspieler-Meldepunkte (kein Stich-Zwang, keine 250er-Summe)
+    → `RundeEinfachesAbgehen` (`gegenspieler: [{name, meldepunkte}]`).
+  - **doppeltes Abgehen:** volle Gegenspieler-Daten inkl. Stich-Zwang → `RundeDoppeltesAbgehen`.
+  - **Tausender:** keine Zahlenfelder → `RundeTausender` (Sterne setzt das Backend).
+- **View** `src/views/SpielView.vue` — lädt das Spiel aus dem Store (oder per `spielLaden`,
+  falls direkt aufgerufen), zeigt Rundenfortschritt (`Runde X / Y`), Geber (setzt aus),
+  aktive Spieler und das letzte Ergebnis; reicht `rundeAuswerten()` durch → `letztesErgebnis`
+  + `naechsteRunde()`. Bei Spielende (`rundennummer > rundenanzahl`) erscheint der
+  Beendet-Bereich mit `RouterLink` zur Auswertung (`/spiel/:spielId/ende`).
+- **Store** `src/stores/spiel.ts` — um `aktuelleRundennummer` + `naechsteRunde()` erweitert;
+  `setzeSpiel` setzt die Rundennummer auf 1 zurück.
+- **Tests (Vitest, ADR-013):** `rotation.spec.ts`, `RundeForm.spec.ts` (Gegenspieler-
+  Ableitung, normal gesperrt/gültig bei Summe 250, einfaches/doppeltes Abgehen, Tausender,
+  Fehler), `SpielView.spec.ts` (Store-/API-Laden, Fehler, Spielende-Link via `RouterLinkStub`).
+  **26 Tests grün, Build (vue-tsc) grün.** Alle fünf Rundentypen zusätzlich per curl gegen
+  das echte Backend geprüft (201). **Kein neues E2E-Szenario** (ADR-013).
+- **Fachliche Entscheidung:** Die Backend-API-Tests verwenden teils 3 Gegenspieler inklusive
+  Geber; das Frontend folgt der **normativen** `rule-set-v1.md` (Geber setzt aus → 2
+  Gegenspieler, Stichwerte-Summe 250). Das Backend erzwingt beides im HTTP-Pfad nicht.
+- **Offen:** Live-Cut-Over (s. u.) unverändert; nichts committet/gepusht (User: „Commit später").
+- **Nächster Schritt:** TASK-010 (Spielstand anzeigen – UI, Slice 6, Punktestände);
+  `SpielendeView` ist noch Platzhalter.
+
+## Stand 24.07.2026 (Phase 2 Frontend — TASK-008 Spiel anlegen, UI Slice 1 abgeschlossen)
+
+**TASK-008 (Spiel anlegen, UI, Slice 1) ist abgeschlossen** — erste echte View auf dem
+TASK-007-Fundament; Muster für die folgenden UI-Slices (TASK-009–011) ist etabliert.
+
+- **Schichten-Muster (bewusst getrennt, wird für weitere Slices wiederverwendet):**
+  - **Pinia-Store** `src/stores/spiel.ts` — hält das aktuelle Spiel (`aktuellesSpiel`,
+    `setzeSpiel`); schlank, wird in späteren Slices um Runden-/Punktestand-State erweitert.
+  - **Präsentationsnahe Komponente** `src/components/SpielAnlegenForm.vue` — 4 Spielernamen
+    + Rundenanzahl, reine Client-Validierung (alle Namen gefüllt, eindeutig, Rundenanzahl
+    positives Vielfaches von 4), Absenden-Button gesperrt bis gültig, meldet gültige Eingabe
+    per `absenden`-Event. **Kennt keine API** → isoliert testbar.
+  - **View** `src/views/StartView.vue` orchestriert die Seiteneffekte: `spielAnlegen()` →
+    Store setzen → `router.push({ name: 'spiel', params: { spielId } })`; `ApiError`-Meldung
+    inline, Lade-/Fehlerzustand an das Formular durchgereicht.
+- **Tests (Vitest, ADR-013):** `SpielAnlegenForm.spec.ts` (Validierung, Trimmen, Emit-Payload,
+  Sperr-/Fehlerzustände) + `StartView.spec.ts` (Integration mit gemocktem API-Client via
+  `vi.mock('../api')`, Pinia, Memory-Router: Erfolg → Store+Navigation, Fehler → Meldung +
+  keine Navigation). **11 Tests grün, Build (vue-tsc) grün.** Kein neues E2E-Szenario.
+- **Offen:** Live-Cut-Over (s. u.) unverändert; nichts committet/gepusht (User: „Commit später").
+- **Nächster Schritt:** TASK-009 (Runde eingeben und auswerten – UI, Slices 2–5).
+
+## Stand 23.07.2026 (Phase 2 Frontend — TASK-007 Vue-Fundament abgeschlossen)
+
+**TASK-007 (Vue-Fundament) ist vollständig abgeschlossen** — `frontend/` steht als
+lauffähiges, getestetes Gerüst; die UI-Slices (TASK-008–011) können darauf aufsetzen.
+
+- **Gerüst:** Vite + Vue 3.5 + TypeScript; Vue Router (History-Mode) + Pinia; Tailwind
+  CSS v4 (`@tailwindcss/vite`, mobil-first). Node via `frontend/.node-version` = `22`
+  (fnm, ADR-012) + `engines.node` `>=22 <23`.
+- **Route-Struktur (leer, an Slices ausgerichtet):** `start` (Slice 1) /
+  `spiel/:spielId` (Slices 2–5) / `spielende` (Slice 6) + 404; Views lazy-geladen.
+- **API-Vertrag zuerst:** `frontend/openapi/binokel-api.v1.yaml` — handgeschriebenes
+  OpenAPI 3.1 (5 Endpunkte + `/health/`, `oneOf`+Discriminator für die 5 Rundentypen).
+  Daraus abgeleitet: TS-Typen (`src/api/types.ts`) + dünner `fetch`-Client
+  (`src/api/client.ts`, relative Basis `/api`, `ApiError`).
+- **Tests (Testpyramide, ADR-013):** Vitest-Smoke grün; **genau 1** Playwright-E2E-Smoke
+  (`e2e/features/smoke.feature`, deutsch) grün. **Verbindliche Teststrategie in ADR-013:**
+  Fachlichkeit bleibt auf API-Ebene (18 Django + 28 Behave), E2E-Budget ≤ 3–5 bis MVP,
+  kein Ausbau > 1 Szenario ohne Einzelentscheidung.
+- **Dev = Prod-Same-Origin:** Vite-Dev-Proxy reicht `/api` + `/health` an Django
+  (`127.0.0.1:8000`) weiter (verifiziert: `/health/` 200, `POST /api/spiele/` 201).
+  Lokal ansehen: Django (`.venv`) + `npm run dev` → http://localhost:5173/.
+- **CI:** neue Jobs `frontend` (npm ci → build inkl. vue-tsc → Vitest) und
+  `frontend-e2e` (Chromium + Playwright-Smoke); `actions/setup-node` SHA-gepinnt.
+  Die gesamte CI **gatet** den Deploy → Frontend muss grün sein.
+- **Doku-Sync:** ADR-013 (Teststrategie), `development-approach-v1.md` §Phase 2
+  (Frontend-Zyklus), `glossar.md` (gaten, Testpyramide, playwright-bdd, Dev-Proxy),
+  `project-foundation.md` §18/§20.
+- **Offen:** Live-Cut-Over (s. u.) unverändert; nichts committet/gepusht.
+- **Nächster Schritt:** TASK-008 (Spiel anlegen – UI, Slice 1).
+
+## Stand 23.07.2026 (Phase 2 Frontend gestartet — Same-Origin-Infrastruktur, Coding)
+
+**Phase 2 (Frontend, Vue) ist gestartet.** Erste Teilaufgabe **TASK-007a** (Phase-0-
+Infrastruktur) ist umgesetzt: Die Deploy-Konfiguration liefert jetzt SPA **und** API
+**Same-Origin** auf einer Domain aus.
+
+- **Entscheidungen (Repo-Eigentümer, aus Plan-Session):** (1) Playwright + playwright-bdd;
+  (2) Frontend `binokel.bebe-soft.de`, gleiche VM, Same-Origin (Nginx serviert SPA +
+  proxied `/api/`), `api.bebe-soft.de` → 301 auf Primärdomain; (3) Tailwind CSS;
+  (4) handgeschriebenes OpenAPI 3.1 jetzt (Auto-Schema = FUTURE-002).
+  **Stack:** Vue 3.5 + Vite + TS + Vue Router + Pinia + Vitest; PWA + Capacitor-ready; mobil-first.
+- **Umgesetzt (B1–B3):**
+  - `deploy/nginx.conf.template`: SPA-Root `/opt/binokel/frontend`, `try_files`-Fallback
+    (History-Mode), `/api/`- + `/health/`-Proxy, `/assets/`-Immutable-Cache, `index.html`
+    `no-cache`; zweiter 443-Serverblock 301 (API-Domain → Primärdomain); gemeinsames
+    SAN-Zertifikat (Lineage der Primärdomain).
+  - `deploy/setup-server.sh`: `/opt/binokel/frontend` + `www-data`-rX-ACL (+Default-ACL);
+    optionale `API_DOMAIN` (Arg 3) → SAN-Cert (`-d PRIMÄR -d API`) + Zwei-Domain-
+    Substitution; Ein-Domain-Modus entfernt Redirect-Block (Sentinel-Marker) + Rest-
+    Platzhalter. `bash -n` OK; beide Render-Modi verifiziert.
+- **Doku-Sync (PFLICHT-KONVENTION):** ADR-010 (Same-Origin-Deployment), ADR-011
+  (Vue-Stack + Playwright + Teststrategie-Leitplanke), ENG-005 (Frontend-Fallstricke),
+  `project-foundation.md` §20 (Fragen 5–8 beantwortet), BACKLOG (TASK-007a ✅ + 007–011
+  präzisiert).
+- **Teststrategie-Leitplanke (WICHTIG, Wunsch des Repo-Eigentümers):** fachliche Abdeckung
+  bleibt schwerpunktmäßig auf der API-Ebene (18 Django + 28 Behave); E2E (Playwright)
+  bewusst schlank (kritische Journeys/Smoke). **Vor** breitem Ausbau der playwright-bdd-
+  Szenarien final abstimmen.
+- **Offen (Live-Cut-Over, USER/Betreiber):** DNS `binokel.bebe-soft.de`; einmalige
+  Cert-Migration auf gemeinsame SAN-Lineage (api-Domain ist bereits eigene Lineage);
+  `cd.yml`-Smoke-Test auf Primärdomain umstellen; `DJANGO_ALLOWED_HOSTS` /
+  `DJANGO_CSRF_TRUSTED_ORIGINS` beide Domains.
+- **Git:** 2 ältere lokale Doku-Commits (`1a20e55`, `27a9dd1`) noch nicht auf `origin/main`.
+- **Nächster Schritt:** TASK-007 — Vite-Scaffold `frontend/`, API-Client + OpenAPI 3.1,
+  Tailwind/Router/Pinia, Vitest + Playwright-Grundgerüst.
+
 ## Stand 22.07.2026 (TASK-CI-006 ABGESCHLOSSEN — Prod-Deploy live + Smoke-Test automatisiert, Dev/Ops)
 
 **Der erste reale Produktions-Deploy ist erfolgreich.** Die App läuft prod auf

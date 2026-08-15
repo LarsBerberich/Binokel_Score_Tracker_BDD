@@ -26,6 +26,7 @@ from scoring.domain import (
     UngueltigeRundenanzahl,
     UngueltigeStichwerte,
     UngueltigeSpielerzahl,
+    UngueltigeMeldepunkte,
 )
 from scoring.repositories import (
     punktestaende_laden,
@@ -37,6 +38,7 @@ from scoring.use_cases import (
     doppeltes_abgehen_auswerten,
     einfaches_abgehen_auswerten,
     meldepunkte_mit_stich_zwang,
+    meldepunkte_validieren,
     normales_spiel_auswerten,
     sieger_ermitteln,
     spiel_anlegen,
@@ -64,7 +66,21 @@ def _validierungsfehler_nachricht(exc: Exception) -> str:
         return "Ungültige Rundenzahl: Die Rundenzahl muss ein Vielfaches von 4 sein."
     if isinstance(exc, UngueltigeStichwerte):
         return "Ungültige Stichwerte."
+    if isinstance(exc, UngueltigeMeldepunkte):
+        return str(exc)
     return "Ungültige Eingabedaten."
+
+
+def _meldepunkte_pruefen(body: dict) -> None:
+    """Validiert alle im Body enthaltenen Meldepunkte (Spielmacher + Gegenspieler).
+
+    Plausibilitätsgrenze (normativ: docs/rule-set-v1.md §7.1).
+    """
+    if "meldepunkte" in body:
+        meldepunkte_validieren(body["meldepunkte"])
+    for gegenspieler in body.get("gegenspieler", []):
+        if isinstance(gegenspieler, dict) and "meldepunkte" in gegenspieler:
+            meldepunkte_validieren(gegenspieler["meldepunkte"])
 
 
 def _pflichtfeld(body: dict, *felder: str) -> str | None:
@@ -171,6 +187,12 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
     geber_name: str = body["geber"]
     spielmacher_stern: bool = body.get("spielmacher_stern", False)
     gegenspieler_stern: bool = body.get("gegenspieler_stern", False)
+
+    # Plausibilitätsgrenze der Meldepunkte prüfen (normativ: rule-set-v1.md §7.1).
+    try:
+        _meldepunkte_pruefen(body)
+    except UngueltigeMeldepunkte as exc:
+        return _fehler(_validierungsfehler_nachricht(exc))
 
     # ── Dispatch nach Rundentyp ────────────────────────────────────────────────
 

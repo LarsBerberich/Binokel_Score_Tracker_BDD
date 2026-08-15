@@ -145,6 +145,33 @@ Ziel: Alle Kern-Workflows sind über eine Vue-Oberfläche bedienbar.
 
 Die Gherkin-Akzeptanztests aus Phase 1 bleiben in Phase 2 grün — das Backend ändert sich nicht.
 
+#### Frontend-Fundament und -Zyklus
+
+Das Frontend-Gerüst (TASK-007) wird einmalig aufgesetzt und dann Slice für Slice
+gefüllt. Stack und Toolchain sind in ADR-011 (Stack), ADR-012 (Node via fnm),
+ADR-010 (Same-Origin) und ADR-013 (Teststrategie) festgelegt:
+
+- **Gerüst:** Vite + Vue 3 + TypeScript; Vue Router (History-Mode) + Pinia;
+  Tailwind CSS (mobil-first). Node-Version via `frontend/.node-version` (fnm).
+- **API-Vertrag zuerst:** handgeschriebenes OpenAPI 3.1
+  (`frontend/openapi/binokel-api.v1.yaml`) als Single Source of Truth; daraus
+  abgeleitete TS-Typen und ein dünner `fetch`-Client (`src/api/`, relative Basis `/api`).
+- **Same-Origin lokal wie in Prod:** Vite-Dev-Proxy reicht `/api` + `/health` an
+  das lokale Django (`127.0.0.1:8000`) weiter — kein CORS, keine absolute Backend-URL.
+- **Teststrategie (Testpyramide, ADR-013):** Fachlichkeit bleibt auf der API-Ebene
+  (Behave HTTP). Im Frontend: Vitest für Komponenten/Stores/Client (schnell, breit),
+  Playwright + playwright-bdd nur für **wenige** kritische E2E-Journeys
+  (Budget ≤ 3–5 bis MVP, Start mit genau 1 Smoke-Szenario).
+- **Testablage (Co-Location, ADR-013):** Unit-/Komponententests liegen neben der
+  geprüften Einheit (`*.spec.ts` neben der `.vue`/`.ts`-Datei in `src/`); E2E-Tests
+  getrennt unter `frontend/e2e/`. `*.spec.ts` landen nicht im Produktions-Build.
+- **CI gatet:** eigener `frontend`-Job (Build inkl. Typecheck + Vitest) und separater
+  `frontend-e2e`-Job; die gesamte CI ist Voraussetzung für den Deploy.
+
+Pro UI-Slice gilt derselbe Outside-In-Gedanke wie im Backend: erst der sichtbare
+Nutzerworkflow, dann Komponenten/Store, abgesichert durch Vitest; E2E nur, wenn eine
+Journey ein Risiko trägt, das Unit/API **nicht** abdecken.
+
 ---
 
 ## 6. Was nicht gebaut wird

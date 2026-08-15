@@ -15,6 +15,11 @@ STANDARD_RUNDENANZAHL: int = 12
 GUELTIGE_SPIELERZAHL: int = 4
 STICHWERT_KONTROLLSUMME: int = 250
 
+# Höchstmögliche Meldung eines einzelnen Spielers (württembergisches Doppelblatt):
+# doppelte Familie einer Farbe (1500) + doppelter Binokel (300); die beiden Blatt-Ober
+# der Familie bilden zugleich den doppelten Binokel. Normativ: docs/rule-set-v1.md §7.1.
+MELDEPUNKTE_MAXIMUM: int = 1800
+
 
 # ── Fehlerklassen ──────────────────────────────────────────────────────────────
 
@@ -32,6 +37,11 @@ class UngueltigeRundenanzahl(SpielFehler):
 
 class UngueltigeStichwerte(SpielFehler):
     """Wird ausgelöst, wenn die Summe aller drei Stichwerte 250 überschreitet."""
+
+
+class UngueltigeMeldepunkte(SpielFehler):
+    """Wird ausgelöst, wenn die Meldepunkte eines Spielers unplausibel sind
+    (negativ oder größer als das theoretische Maximum von 1800)."""
 
 
 # ── Enumerationen ──────────────────────────────────────────────────────────────

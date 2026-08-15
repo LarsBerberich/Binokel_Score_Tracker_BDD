@@ -41,6 +41,65 @@ jobs:
           PYTHONPATH: backend
         run: backend/.venv/bin/python -m behave
 
+  frontend:
+    name: Frontend (Build + Vitest)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Node einrichten (Version aus .node-version)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: frontend/.node-version
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Abhängigkeiten installieren (reproduzierbar)
+        working-directory: frontend
+        run: npm ci
+
+      - name: Produktions-Build (inkl. vue-tsc Typecheck)
+        working-directory: frontend
+        run: npm run build
+
+      - name: Unit-/Komponententests (Vitest)
+        working-directory: frontend
+        run: npm test
+
+  frontend-e2e:
+    name: Frontend E2E-Smoke (Playwright)
+    # Separater Job (ADR-013): E2E bleibt schlank und von Unit/Build isoliert.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Node einrichten (Version aus .node-version)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: frontend/.node-version
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Abhängigkeiten installieren (reproduzierbar)
+        working-directory: frontend
+        run: npm ci
+
+      - name: Playwright-Browser installieren (nur Chromium)
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E-Smoke ausführen (genau 1 Szenario)
+        working-directory: frontend
+        run: npm run test:e2e
+
   skript-lint:
     name: Deploy-Skripte prüfen (shellcheck + bash -n)
     runs-on: ubuntu-latest

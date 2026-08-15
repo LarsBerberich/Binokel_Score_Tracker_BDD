@@ -12,9 +12,11 @@ from scoring.domain import (
     STANDARD_RUNDENANZAHL,
     GUELTIGE_SPIELERZAHL,
     STICHWERT_KONTROLLSUMME,
+    MELDEPUNKTE_MAXIMUM,
     UngueltigeSpielerzahl,
     UngueltigeRundenanzahl,
     UngueltigeStichwerte,
+    UngueltigeMeldepunkte,
 )
 
 
@@ -106,6 +108,26 @@ def stichwerte_validieren(werte: list[int]) -> None:
         raise UngueltigeStichwerte(
             f"Die Summe der Stichwerte ({gesamt}) überschreitet "
             f"die Kontrollsumme {STICHWERT_KONTROLLSUMME}."
+        )
+
+
+def meldepunkte_validieren(meldepunkte: int) -> None:
+    """
+    Plausibilitätsprüfung für die Meldepunkte eines einzelnen Spielers.
+
+    Die höchstmögliche Meldung im Binokel beträgt 1800 Punkte (doppelte Familie
+    einer Farbe = 1500 + doppelter Binokel = 300). Ein höherer oder negativer Wert
+    ist ein Eingabefehler.
+
+    Normativ: docs/rule-set-v1.md §7.1.
+
+    Raises:
+        UngueltigeMeldepunkte: Wenn die Meldepunkte negativ sind oder 1800 überschreiten.
+    """
+    if meldepunkte < 0 or meldepunkte > MELDEPUNKTE_MAXIMUM:
+        raise UngueltigeMeldepunkte(
+            f"Die Meldepunkte eines Spielers ({meldepunkte}) müssen zwischen 0 "
+            f"und {MELDEPUNKTE_MAXIMUM} liegen."
         )
 
 

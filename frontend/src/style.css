@@ -1,0 +1,13 @@
+@import 'tailwindcss';
+
+/* Mobile-first Basis für den Binokel Score Tracker.
+   Tailwind v4 – zusätzliche Theme-Tokens bei Bedarf via @theme direkt hier. */
+
+html,
+body {
+  @apply min-h-dvh bg-slate-50 text-slate-900 antialiased;
+}
+
+#app {
+  @apply mx-auto w-full max-w-screen-sm px-4 py-6;
+}

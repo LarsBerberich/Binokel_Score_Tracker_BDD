@@ -193,6 +193,8 @@ In den bisherigen Wertungsbeispielen entspricht dies der Spalte **M**.
 
 **Wichtig:** Ob Meldepunkte tatsächlich zählen, kann von Regeln wie dem Stich-Zwang oder besonderen Verlustfällen abhängen.
 
+**Plausibilitätsgrenze:** Die Meldepunkte eines einzelnen Spielers liegen zwischen **0 und 1800**. Das Maximum von 1800 ergibt sich aus einer doppelten Familie einer Farbe (1500) zuzüglich eines doppelten Binokels (300). Höhere oder negative Werte werden als Eingabefehler abgelehnt (siehe `rule-set-v1.md` §7.1).
+
 ---
 
 ### 4.10 Stichpunkte
@@ -262,6 +264,9 @@ In Quellen und Tabellen kann auch von:
 gesprochen werden.
 
 Im Projekt wird fachlich **Reizwert** bevorzugt.
+
+Reizwerte sind immer volle 10er-Werte und starten bei einem **Minimum von 150** (Hausregel,
+entspricht gängiger Turnierpraxis; im Erfassungs-UI mit 150 vorbelegt).
 
 **Bevorzugte Verwendung im Code:** `reizwert`
 
@@ -340,6 +345,8 @@ Der **Stich-Zwang** ist die Regel, dass ein Spieler mindestens einen Stich gewin
 In den dokumentierten Regeln gilt:
 - normalerweise verfallen Meldepunkte bei 0 Stichen,
 - bei Verlustfällen des Spielmachers können Gegner ihre Meldepunkte auch ohne eigenen Stich behalten.
+
+Im Erfassungs-UI wird „hat einen eigenen Stich" aus dem **Stichwert > 0** abgeleitet (keine separate Eingabe). Das ist zulässig, weil im württembergischen Blatt ohne Siebener kein 0-Augen-Stich möglich ist (kleinster Stich = 6 Augen; siehe `rule-set-v1.md` §5.2/§10.3).
 
 **Bevorzugte Verwendung im Code:** `StichZwang`
 

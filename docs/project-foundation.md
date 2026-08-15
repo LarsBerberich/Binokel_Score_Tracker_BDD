@@ -449,6 +449,7 @@ Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 - `docs/rule-set-v1.md` – normatives V1-Regelwerk; primäre Quelle für alle Domänenlogik-Implementierungen
 - `docs/ubiquitous-language.md` – gemeinsame Fachsprache des Projekts
 - `docs/language-conventions.md` – Konventionen für Benennung in Dokumentation, Gherkin und Code
+- `docs/glossar.md` – Abkürzungen und technische Fachbegriffe (Nachschlagewerk)
 - `docs/Anschreibetabelle_4_Spieler.md` – tabellarische Herleitung der Wertungslogik mit Beispielen
 
 #### BDD und Testspezifikation
@@ -473,6 +474,13 @@ Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 - `ADR-004-repository-pattern.md` – Repository Pattern zur Trennung von Domäne und Persistenz
 - `ADR-005-jsonresponse-statt-drf.md` – JsonResponse statt Django REST Framework für V1
 - `ADR-006-behave-http-blackbox-tests.md` – Behave-Akzeptanztests via HTTP (Blackbox) statt direkter Use-Case-Aufrufe
+- `ADR-007-github-actions-ci-cd.md` – GitHub Actions als CI/CD-Toolchain
+- `ADR-008-vm-deployment-strategie.md` – Direktes systemd-Deployment auf der VM (ohne Container)
+- `ADR-009-internet-hardening-baseline.md` – Härtungs-Baseline für die internet-exponierte VM
+- `ADR-010-frontend-deployment-same-origin.md` – Frontend Same-Origin auf einer Domain
+- `ADR-011-frontend-stack-und-bdd-toolchain.md` – Vue-Stack + Playwright/playwright-bdd
+- `ADR-012-node-toolchain-fnm.md` – fnm (verifizierte Binary) als Node-Toolchain
+- `ADR-013-teststrategie-testpyramide.md` – Testpyramide; Fachlichkeit auf API-Ebene, schlankes E2E-Budget
 
 ### Dokumentationsregel
 
@@ -489,6 +497,7 @@ Jede Änderung am Code, an der Architektur oder an Konventionen zieht eine synch
 | Neuer Implementierungsfallstrick | `docs/engineering-notes/ENG-NNN-*.md` anlegen |
 | Neue Gherkin-Schritte oder Konventionen | `docs/gherkin-step-phrase-reference-v1.md` |
 | Neue Sprachkonventionen oder Begriffe | `docs/ubiquitous-language.md`, `docs/language-conventions.md` |
+| Neue Abkürzung oder technischer Fachbegriff | `docs/glossar.md` |
 | Regeländerung im Fachmodell | `docs/rule-set-v1.md` |
 | Neues Werkzeug oder neue Abhängigkeit | `docs/development-approach-v1.md` oder neuer ADR |
 | Projektstand geändert | `BACKLOG.md` + `docs/copilot-handover-v1.md` + `/memories/repo/handover-status.md` synchron aktualisieren |
@@ -517,10 +526,10 @@ Die folgenden Fragen sollten früh geklärt werden:
 2. Ist die Anwendung zunächst für lokale/private Nutzung gedacht oder für breiteren öffentlichen Mehrbenutzerzugang?
 3. Werden Spieler zunächst nur innerhalb eines Spiels erfasst oder sollen früh persistente Spielerprofile existieren?
 4. Nutzt das MVP Teams, Einzelwertung oder beides?
-5. Soll Authentifizierung Teil des MVP sein oder ausdrücklich zurückgestellt werden?
-6. Welches Deployment-Ziel ist zuerst vorgesehen?
-7. Welche BDD-Toolchain soll für die Integration von Django und Vue gewählt werden?
-8. Wie stark soll die UI von Anfang an für mobile Nutzung während des Live-Spiels optimiert werden?
+5. Soll Authentifizierung Teil des MVP sein oder ausdrücklich zurückgestellt werden? — **Zurückgestellt (V1 ohne Auth,** token-lose JSON-API, siehe Sicherheits-Audit RD-7).
+6. Welches Deployment-Ziel ist zuerst vorgesehen? — **Beantwortet:** 1&1/IONOS-VM, systemd + Nginx (ADR-008); Frontend Same-Origin auf einer Domain (ADR-010).
+7. Welche BDD-Toolchain soll für die Integration von Django und Vue gewählt werden? — **Beantwortet:** Backend Behave (ADR-003), Frontend Playwright + playwright-bdd (ADR-011). Zuständigkeit der Testebenen und E2E-Budget: **ADR-013** (Fachlichkeit auf API-Ebene, genau 1 E2E-Smoke jetzt, ≤ 3–5 bis MVP).
+8. Wie stark soll die UI von Anfang an für mobile Nutzung während des Live-Spiels optimiert werden? — **Beantwortet:** mobil-first von Beginn an, Tailwind CSS, PWA/Capacitor-ready (ADR-011).
 
 ---
 

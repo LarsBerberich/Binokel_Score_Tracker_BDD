@@ -1,0 +1,224 @@
+import { describe, expect, it } from 'vitest'
+import { mount } from '@vue/test-utils'
+import RundeForm from './RundeForm.vue'
+
+const aktive = ['Bernd', 'Carla', 'Dirk']
+
+function mountForm() {
+  return mount(RundeForm, {
+    props: { rundennummer: 1, geber: 'Anna', aktive },
+  })
+}
+
+describe('RundeForm', () => {
+  it('leitet die Gegenspieler aus aktiven Spielern minus Spielmacher ab', async () => {
+    const wrapper = mountForm()
+    // Default-Spielmacher = erster aktiver Spieler (Bernd)
+    expect(wrapper.find('[data-testid="gegenspieler"]').text()).toBe('Carla, Dirk')
+
+    await wrapper.find('[data-testid="spielmacher"]').setValue('Carla')
+    expect(wrapper.find('[data-testid="gegenspieler"]').text()).toBe('Bernd, Dirk')
+  })
+
+  it('emittiert einfaches Abgehen mit Meldepunkten je Gegenspieler und ohne Stich-Zwang', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="typ"]').setValue('einfaches_abgehen')
+    await wrapper.find('[data-testid="reizwert"]').setValue(150)
+    await wrapper.find('[data-testid="gs-meldepunkte-Carla"]').setValue(40)
+    await wrapper.find('[data-testid="gs-meldepunkte-Dirk"]').setValue(20)
+
+    // Kein Stichwerte-Feld, keine 250er-Kontrollsumme
+    expect(wrapper.find('[data-testid="gs-stichwerte-Carla"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="runde-absenden"]').attributes('disabled')).toBeUndefined()
+
+    await wrapper.find('form').trigger('submit')
+    const events = wrapper.emitted('absenden')
+    expect(events).toHaveLength(1)
+    expect(events?.[0][0]).toEqual({
+      typ: 'einfaches_abgehen',
+      rundennummer: 1,
+      spielmacher: 'Bernd',
+      geber: 'Anna',
+      reizwert: 150,
+      gegenspieler: [
+        { name: 'Carla', meldepunkte: 40 },
+        { name: 'Dirk', meldepunkte: 20 },
+      ],
+    })
+  })
+
+  it('sperrt das Absenden, wenn Meldepunkte das Maximum (1800) überschreiten', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="typ"]').setValue('einfaches_abgehen')
+    await wrapper.find('[data-testid="reizwert"]').setValue(150)
+    await wrapper.find('[data-testid="gs-meldepunkte-Carla"]').setValue(1900)
+
+    expect(wrapper.find('[data-testid="meldepunkte-fehler"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="runde-absenden"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.find('form').trigger('submit')
+    expect(wrapper.emitted('absenden')).toBeUndefined()
+  })
+
+  it('bietet „Doppeltes Abgehen" nicht als Rundentyp an (wird automatisch abgeleitet)', () => {
+    const wrapper = mountForm()
+    const werte = wrapper
+      .find('[data-testid="typ"]')
+      .findAll('option')
+      .map((o) => o.element.value)
+    expect(werte).toEqual([
+      'normal',
+      'einfaches_abgehen',
+      'tausender_gewonnen',
+      'tausender_verloren',
+    ])
+  })
+
+  it('emittiert einen vollständigen Tausender-Request ohne Zahlenfelder', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="typ"]').setValue('tausender_gewonnen')
+
+    // Reizwert-Feld entfällt bei Tausender
+    expect(wrapper.find('[data-testid="reizwert"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="runde-absenden"]').attributes('disabled')).toBeUndefined()
+
+    await wrapper.find('form').trigger('submit')
+    const events = wrapper.emitted('absenden')
+    expect(events).toHaveLength(1)
+    expect(events?.[0][0]).toEqual({
+      typ: 'tausender_gewonnen',
+      rundennummer: 1,
+      spielmacher: 'Bernd',
+      geber: 'Anna',
+    })
+  })
+
+  it('sperrt die normale Runde, solange die Stichwerte-Summe nicht 250 ergibt', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="sm-stichwerte"]').setValue(100)
+
+    expect(wrapper.find('[data-testid="stichwerte-summe"]').text()).toContain('100 / 250')
+    expect(wrapper.find('[data-testid="runde-absenden"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.find('form').trigger('submit')
+    expect(wrapper.emitted('absenden')).toBeUndefined()
+  })
+
+  it('berechnet den dritten Stichwert automatisch und emittiert die normale Runde', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="reizwert"]').setValue(180)
+    await wrapper.find('[data-testid="sm-meldepunkte"]').setValue(60)
+    await wrapper.find('[data-testid="gs-meldepunkte-Carla"]').setValue(20)
+    // Zwei Stichwerte genügen (§8.2) – der dritte (Dirk) wird automatisch = 250 − 130 − 60.
+    await wrapper.find('[data-testid="sm-stichwerte"]').setValue(130)
+    await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(60)
+
+    const dirkFeld = wrapper.find('[data-testid="gs-stichwerte-Dirk"]')
+    expect((dirkFeld.element as HTMLInputElement).value).toBe('60')
+    expect(dirkFeld.attributes('readonly')).toBeDefined()
+    expect(wrapper.find('[data-testid="stichwerte-summe"]').text()).toContain('250 / 250')
+    expect(wrapper.find('[data-testid="runde-absenden"]').attributes('disabled')).toBeUndefined()
+
+    await wrapper.find('form').trigger('submit')
+    const events = wrapper.emitted('absenden')
+    expect(events).toHaveLength(1)
+    expect(events?.[0][0]).toEqual({
+      typ: 'normal',
+      rundennummer: 1,
+      spielmacher: 'Bernd',
+      geber: 'Anna',
+      reizwert: 180,
+      meldepunkte: 60,
+      stichwerte: 130,
+      hat_eigenen_stich: true,
+      gegenspieler: [
+        { name: 'Carla', meldepunkte: 20, stichwerte: 60, hat_eigenen_stich: true },
+        { name: 'Dirk', meldepunkte: 0, stichwerte: 60, hat_eigenen_stich: true },
+      ],
+    })
+  })
+
+  it('leitet „kein eigener Stich" aus einem Stichwert von 0 ab (012.3)', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="reizwert"]').setValue(150)
+    await wrapper.find('[data-testid="sm-meldepunkte"]').setValue(60)
+    await wrapper.find('[data-testid="gs-meldepunkte-Carla"]').setValue(20)
+    await wrapper.find('[data-testid="gs-meldepunkte-Dirk"]').setValue(40)
+    // sm 130 + Carla 120 → Dirk automatisch 0 → Dirk hat keinen eigenen Stich.
+    await wrapper.find('[data-testid="sm-stichwerte"]').setValue(130)
+    await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(120)
+
+    expect(
+      (wrapper.find('[data-testid="gs-stichwerte-Dirk"]').element as HTMLInputElement).value,
+    ).toBe('0')
+
+    await wrapper.find('form').trigger('submit')
+    expect(wrapper.emitted('absenden')?.[0][0]).toEqual({
+      typ: 'normal',
+      rundennummer: 1,
+      spielmacher: 'Bernd',
+      geber: 'Anna',
+      reizwert: 150,
+      meldepunkte: 60,
+      stichwerte: 130,
+      hat_eigenen_stich: true,
+      gegenspieler: [
+        { name: 'Carla', meldepunkte: 20, stichwerte: 120, hat_eigenen_stich: true },
+        { name: 'Dirk', meldepunkte: 40, stichwerte: 0, hat_eigenen_stich: false },
+      ],
+    })
+  })
+
+  it('weist auf doppeltes Abgehen hin, wenn der Spielmacher den Reizwert nicht erreicht (012.7)', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="reizwert"]').setValue(200)
+    await wrapper.find('[data-testid="sm-meldepunkte"]').setValue(20)
+    // M+S Spielmacher = 20 + 130 = 150 < 200; Summe 250 gültig (Dirk automatisch 60).
+    await wrapper.find('[data-testid="sm-stichwerte"]').setValue(130)
+    await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(60)
+
+    expect(wrapper.find('[data-testid="doppeltes-abgehen-hinweis"]').exists()).toBe(true)
+  })
+
+  it('sperrt die Runde und zeigt einen Fehler, wenn zwei Stichwerte 250 übersteigen (012.5)', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="reizwert"]').setValue(180)
+    // sm 200 + Carla 100 → Dirk automatisch 250 − 300 = −50 (ungültig).
+    await wrapper.find('[data-testid="sm-stichwerte"]').setValue(200)
+    await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(100)
+
+    expect(
+      (wrapper.find('[data-testid="gs-stichwerte-Dirk"]').element as HTMLInputElement).value,
+    ).toBe('-50')
+    expect(wrapper.find('[data-testid="stichwerte-fehler"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="runde-absenden"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.find('form').trigger('submit')
+    expect(wrapper.emitted('absenden')).toBeUndefined()
+  })
+
+  it('setzt das Formular nach einem Rundenwechsel zurück (Bugfix 012.6)', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="typ"]').setValue('einfaches_abgehen')
+    await wrapper.find('[data-testid="reizwert"]').setValue(220)
+    await wrapper.find('[data-testid="gs-meldepunkte-Carla"]').setValue(40)
+
+    // Nächste Runde: Parent erhöht die Rundennummer und rotiert Geber/aktive Spieler.
+    await wrapper.setProps({ rundennummer: 2, geber: 'Bernd', aktive: ['Anna', 'Carla', 'Dirk'] })
+
+    // Rundentyp zurück auf „Normales Spiel", Reizwert auf Minimum, Detailwerte genullt.
+    const typEl = wrapper.find('[data-testid="typ"]').element as HTMLSelectElement
+    expect(typEl.value).toBe('normal')
+    const reizwertEl = wrapper.find('[data-testid="reizwert"]').element as HTMLInputElement
+    expect(reizwertEl.value).toBe('150')
+    const meldeEl = wrapper.find('[data-testid="gs-meldepunkte-Carla"]').element as HTMLInputElement
+    expect(meldeEl.value).toBe('0')
+  })
+
+  it('zeigt eine übergebene Fehlermeldung an', () => {
+    const wrapper = mount(RundeForm, {
+      props: { rundennummer: 1, geber: 'Anna', aktive, fehler: 'Pflichtfeld fehlt.' },
+    })
+    expect(wrapper.find('[data-testid="runde-fehler"]').text()).toBe('Pflichtfeld fehlt.')
+  })
+})

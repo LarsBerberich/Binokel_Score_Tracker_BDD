@@ -232,6 +232,62 @@ class RundeAuswertenApiTest(TestCase):
         })
         self.assertEqual(antwort.status_code, 400)
 
+    def test_meldepunkte_maximum_akzeptiert(self):
+        """Spielmacher-Meldepunkte genau am Maximum (1800) → 201 (Plausibilitätsgrenze §7.1)."""
+        antwort = _post_json(self.client, self.url, {
+            "typ": "normal",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+            "reizwert": 200,
+            "meldepunkte": 1800,
+            "stichwerte": 100,
+            "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20, "stichwerte": 50, "hat_eigenen_stich": True},
+                {"name": "Clara", "meldepunkte": 0,  "stichwerte": 60, "hat_eigenen_stich": True},
+                {"name": "Dieter","meldepunkte": 40, "stichwerte": 40, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 201)
+
+    def test_spielmacher_meldepunkte_zu_hoch(self):
+        """Spielmacher-Meldepunkte über 1800 → 400 (Plausibilitätsgrenze §7.1)."""
+        antwort = _post_json(self.client, self.url, {
+            "typ": "normal",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+            "reizwert": 200,
+            "meldepunkte": 1801,
+            "stichwerte": 100,
+            "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20, "stichwerte": 50, "hat_eigenen_stich": True},
+                {"name": "Clara", "meldepunkte": 0,  "stichwerte": 60, "hat_eigenen_stich": True},
+                {"name": "Dieter","meldepunkte": 40, "stichwerte": 40, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 400)
+        self.assertIn("fehler", antwort.json())
+
+    def test_gegenspieler_meldepunkte_zu_hoch(self):
+        """Gegenspieler-Meldepunkte über 1800 → 400 (Plausibilitätsgrenze §7.1)."""
+        antwort = _post_json(self.client, self.url, {
+            "typ": "einfaches_abgehen",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+            "reizwert": 200,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 5000},
+                {"name": "Clara", "meldepunkte": 0},
+                {"name": "Dieter","meldepunkte": 40},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 400)
+        self.assertIn("fehler", antwort.json())
+
 
 # ── Slice 6: Punktestände und Sieger ──────────────────────────────────────────
 

@@ -9,3 +9,8 @@ Die fachliche Dokumentation des Projekts wird bewusst auf Deutsch geführt, da d
 Die gemeinsame Fachsprache ist in `docs/ubiquitous-language.md` dokumentiert.  
 Die Regeln zur Verwendung dieser Fachsprache in Code, Dokumentation und technischen Artefakten sind in `docs/language-conventions.md` beschrieben.  
 Das verbindliche V1-Regelwerk ist in `docs/rule-set-v1.md` festgelegt.
+
+## Lokale Entwicklung
+
+Start-Anleitung für die lokale Dev-Umgebung (Django-Backend + Vite-Dev-Server, inkl.
+Fallstricke): siehe `frontend/README.md`.

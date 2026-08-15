@@ -12,10 +12,16 @@
 #     BEREITS eingerichtet.
 #
 # Aufruf (als root):
-#   bash setup-server.sh YOUR_DOMAIN your-github-repo-url
+#   bash setup-server.sh FRONTEND_DOMAIN REPO_URL [API_DOMAIN]
 #
-# Beispiel:
-#   bash setup-server.sh binokel.example.com https://github.com/LarsBerberich/Binokel_Score_Tracker_BDD.git
+# Beispiel (Frontend-Ära, Same-Origin — ADR-010):
+#   bash setup-server.sh binokel.example.com https://github.com/LarsBerberich/Binokel_Score_Tracker_BDD.git api.example.com
+#
+# FRONTEND_DOMAIN (Arg 1) ist die Primärdomain: nginx serviert die Vue-SPA UND
+# proxied /api/ nach Django (Same-Origin). API_DOMAIN (Arg 3, optional) ist die
+# bisherige reine API-Domain; sie wird per 301 dauerhaft auf FRONTEND_DOMAIN
+# umgeleitet und ins SAN-Zertifikat aufgenommen. Ohne Arg 3 entfällt der
+# Redirect-Serverblock (reiner Ein-Domain-Betrieb).
 #
 # TROCKENLAUF (Wegwerf-VM): Certbot im Staging-Modus ausführen, um die strengen
 # Let's-Encrypt-Produktions-Rate-Limits zu schonen. Das erzeugte Zertifikat ist
@@ -48,9 +54,13 @@ fi
 
 DOMAIN="${1:?Fehler: Domain als erstes Argument angeben, z. B. binokel.example.com}"
 REPO_URL="${2:?Fehler: GitHub-Repo-URL als zweites Argument angeben}"
+# Optionale bisherige API-Domain (301 → DOMAIN, SAN-Zertifikat). Leer = Ein-Domain-Betrieb.
+API_DOMAIN="${3:-}"
 APP_DIR="/opt/binokel/app"
 DATA_DIR="/opt/binokel/data"
 STATIC_DIR="/opt/binokel/static"
+# Wurzelverzeichnis der gebauten Vue-SPA; nginx liefert es aus (Same-Origin, ADR-010).
+FRONTEND_DIR="/opt/binokel/frontend"
 LOG_DIR="/var/log/binokel"
 # Geteiltes Zielverzeichnis für den von uv verwalteten Python-Interpreter, damit der
 # Dienst-User binokel-app ihn erreichen kann (siehe UV_PYTHON_INSTALL_DIR in der
@@ -122,7 +132,7 @@ EOF
 chmod 440 "/etc/sudoers.d/binokel-deploy"
 
 echo "=== [5/10] Verzeichnisstruktur anlegen ==="
-mkdir -p "$APP_DIR" "$DATA_DIR" "$STATIC_DIR" "$LOG_DIR"
+mkdir -p "$APP_DIR" "$DATA_DIR" "$STATIC_DIR" "$FRONTEND_DIR" "$LOG_DIR"
 mkdir -p /etc/binokel
 # Geteiltes Verzeichnis für den von uv verwalteten Python-Interpreter (siehe
 # UV_PYTHON_INSTALL_DIR in /etc/binokel/env). uv lädt den Interpreter sonst nach
@@ -132,7 +142,7 @@ mkdir -p /etc/binokel
 # löst das; die ACL sichert es umask-unabhängig ab.
 mkdir -p "$PYTHON_DIR"
 
-chown "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR" "$PYTHON_DIR" "$STATIC_DIR"
+chown "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR" "$PYTHON_DIR" "$STATIC_DIR" "$FRONTEND_DIR"
 chown "$APP_USER:$APP_USER" "$DATA_DIR" "$LOG_DIR"
 chmod 750 /etc/binokel
 
@@ -176,6 +186,15 @@ setfacl -R -d -m u:"$APP_USER":rwX -m u:"$DEPLOY_USER":rwX "$DATA_DIR"
 setfacl -R -m u:"$APP_USER":rX -m u:"$DEPLOY_USER":rwX "$STATIC_DIR"
 setfacl -R -d -m u:"$APP_USER":rX -m u:"$DEPLOY_USER":rwX "$STATIC_DIR"
 
+# Frontend-SPA (ADR-010): binokel-deploy schreibt das gebaute Vue-Bundle hierhin
+# (rsync im CD, Eigentümer). NUR nginx (www-data) braucht Lesezugriff — der App-Dienst
+# binokel-app NICHT, denn nginx liefert die SPA aus, nicht Gunicorn. Least Privilege:
+# der internet-exponierte App-Dienst hat keinerlei Zugriff auf die Frontend-Dateien.
+# Default-ACL, damit von rsync/collect neu erzeugte Dateien das rX-Recht erben
+# (umask-unabhängig). www-data existiert seit der nginx-Installation (Schritt 2).
+setfacl -R -m u:www-data:rX "$FRONTEND_DIR"
+setfacl -R -d -m u:www-data:rX "$FRONTEND_DIR"
+
 echo "=== [6/10] Repository klonen ==="
 sudo -u "$DEPLOY_USER" git clone "$REPO_URL" "$APP_DIR" || echo "Repo existiert bereits"
 
@@ -190,9 +209,14 @@ if [ ! -f /etc/binokel/env ]; then
 
 DJANGO_SECRET_KEY=REPLACE_WITH_SECURE_RANDOM_KEY_MIN_50_CHARS
 DJANGO_DEBUG=False
+# Beide Domains kommagetrennt eintragen, wenn eine API-Redirect-Domain genutzt wird
+# (der /health/-Proxy der API-Domain erreicht Django mit deren Host-Header):
+#   DJANGO_ALLOWED_HOSTS=binokel.example.com,api.example.com
 DJANGO_ALLOWED_HOSTS=REPLACE_WITH_YOUR_DOMAIN
 DJANGO_DB_PATH=/opt/binokel/data/db.sqlite3
 DJANGO_STATIC_ROOT=/opt/binokel/static
+# Ebenfalls beide Origins, falls API-Redirect-Domain genutzt wird:
+#   DJANGO_CSRF_TRUSTED_ORIGINS=https://binokel.example.com,https://api.example.com
 DJANGO_CSRF_TRUSTED_ORIGINS=https://REPLACE_WITH_YOUR_DOMAIN
 
 # uv installiert den verwalteten Python-Interpreter in dieses geteilte Verzeichnis
@@ -220,6 +244,13 @@ systemctl enable binokel-tracker.service
 echo "=== [9/10] Nginx konfigurieren und TLS-Zertifikat anfordern ==="
 mkdir -p /var/www/certbot
 
+# Certbot-Domainliste: Primärdomain zuerst (bestimmt die Zertifikats-Lineage/den
+# live/-Pfad, den beide Serverblöcke referenzieren), optional die API-Domain als SAN.
+CERTBOT_DOMAIN_ARGS=( -d "$DOMAIN" )
+if [ -n "$API_DOMAIN" ]; then
+    CERTBOT_DOMAIN_ARGS+=( -d "$API_DOMAIN" )
+fi
+
 CERT_LIVE_DIR="/etc/letsencrypt/live/$DOMAIN"
 if [ ! -f "$CERT_LIVE_DIR/fullchain.pem" ]; then
     # Henne-Ei-Problem: Das vollständige Template referenziert TLS-Zertifikate
@@ -227,11 +258,13 @@ if [ ! -f "$CERT_LIVE_DIR/fullchain.pem" ]; then
     # nicht gibt. Deshalb zuerst einen minimalen HTTP-only-Serverblock ausrollen,
     # damit nginx startet und Certbot die ACME-Challenge über Port 80 beantworten
     # kann. Andernfalls schlägt "nginx -t" fehl und bricht das Skript ab.
+    # server_name deckt beide Domains ab, damit die ACME-Challenge für das
+    # SAN-Zertifikat auf beiden Hostnamen beantwortet wird.
     cat > /etc/nginx/sites-available/binokel-tracker << BOOTSTRAP
 server {
     listen 80;
     listen [::]:80;
-    server_name $DOMAIN;
+    server_name $DOMAIN $API_DOMAIN;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -252,15 +285,28 @@ BOOTSTRAP
     # /etc/letsencrypt/options-ssl-nginx.conf und ssl-dhparams.pem an, die das
     # vollständige Template per include benötigt. $CERTBOT_STAGING_FLAG ist im
     # Trockenlauf "--staging" (Test-CA), sonst leer (Produktions-CA).
-    certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos \
+    certbot --nginx "${CERTBOT_DOMAIN_ARGS[@]}" --non-interactive --agree-tos \
         --email "admin@$DOMAIN" --redirect $CERTBOT_STAGING_FLAG
 fi
 
 # Vollständiges Template (inkl. 443/TLS) ausrollen — die Zertifikate und
-# Certbot-Include-Dateien existieren jetzt.
-sed "s/REPLACE_WITH_YOUR_DOMAIN/$DOMAIN/g" \
-    "$APP_DIR/deploy/nginx.conf.template" \
-    > "/etc/nginx/sites-available/binokel-tracker"
+# Certbot-Include-Dateien existieren jetzt. Bei gesetzter API_DOMAIN wird auch der
+# Redirect-Serverblock eingesetzt; sonst entfernt der zweite sed die Marker-Region.
+if [ -n "$API_DOMAIN" ]; then
+    sed -e "s/REPLACE_WITH_YOUR_DOMAIN/$DOMAIN/g" \
+        -e "s/REPLACE_WITH_API_DOMAIN/$API_DOMAIN/g" \
+        "$APP_DIR/deploy/nginx.conf.template" \
+        > "/etc/nginx/sites-available/binokel-tracker"
+else
+    # Redirect-Block zwischen den Sentinel-Markern entfernen und den restlichen
+    # REPLACE_WITH_API_DOMAIN-Platzhalter tilgen (u. a. im Port-80-server_name),
+    # damit keine Literale wie "REPLACE_WITH_API_DOMAIN" als Hostname übrig bleiben.
+    sed "s/REPLACE_WITH_YOUR_DOMAIN/$DOMAIN/g" \
+        "$APP_DIR/deploy/nginx.conf.template" \
+        | sed '/# >>> API_REDIRECT_BLOCK/,/# <<< API_REDIRECT_BLOCK/d' \
+        | sed 's/ REPLACE_WITH_API_DOMAIN//g; s/REPLACE_WITH_API_DOMAIN//g' \
+        > "/etc/nginx/sites-available/binokel-tracker"
+fi
 ln -sf /etc/nginx/sites-available/binokel-tracker /etc/nginx/sites-enabled/binokel-tracker
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
