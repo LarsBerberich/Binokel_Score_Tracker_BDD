@@ -22,6 +22,7 @@ describe('SpielView', () => {
     punktestaendeLadenMock.mockResolvedValue({
       spiel_id: 3,
       punktestaende: { Anna: 0, Bernd: 0, Carla: 0, Dirk: 0 },
+      sterne: { Anna: 0, Bernd: 0, Carla: 0, Dirk: 0 },
     })
   })
 
@@ -56,6 +57,7 @@ describe('SpielView', () => {
     punktestaendeLadenMock.mockResolvedValue({
       spiel_id: 3,
       punktestaende: { Anna: 120, Bernd: 90, Carla: 150, Dirk: 60 },
+      sterne: { Anna: 0, Bernd: 0, Carla: 0, Dirk: 0 },
     })
     const wrapper = mount(SpielView, {
       props: { spielId: '3' },
@@ -74,6 +76,26 @@ describe('SpielView', () => {
       'punktestand-Bernd',
       'punktestand-Dirk',
     ])
+  })
+
+  it('zeigt Tausender-Sterne neben dem Punktestand des Spielers', async () => {
+    useSpielStore().setzeSpiel(beispielSpiel)
+    punktestaendeLadenMock.mockResolvedValue({
+      spiel_id: 3,
+      punktestaende: { Anna: 120, Bernd: 90, Carla: 150, Dirk: 60 },
+      sterne: { Anna: 2, Bernd: 0, Carla: 1, Dirk: 0 },
+    })
+    const wrapper = mount(SpielView, {
+      props: { spielId: '3' },
+      global: { stubs: { RouterLink: RouterLinkStub } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="sterne-Anna"]').text()).toBe('★★')
+    expect(wrapper.find('[data-testid="sterne-Carla"]').text()).toBe('★')
+    // Spieler ohne Sterne bekommen kein Stern-Element.
+    expect(wrapper.find('[data-testid="sterne-Bernd"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sterne-Dirk"]').exists()).toBe(false)
   })
 
   it('zeigt nach der letzten Runde den Beendet-Bereich mit Link zur Auswertung', () => {

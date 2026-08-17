@@ -221,4 +221,83 @@ describe('RundeForm', () => {
     })
     expect(wrapper.find('[data-testid="runde-fehler"]').text()).toBe('Pflichtfeld fehlt.')
   })
+
+  // ── TASK-016: Zehner-Eingabe (§9.1/§9.4) ─────────────────────────────────────
+
+  it('erfasst Stichwerte in Zehnerschritten (step=10)', () => {
+    const wrapper = mountForm()
+    expect(wrapper.find('[data-testid="sm-stichwerte"]').attributes('step')).toBe('10')
+    expect(wrapper.find('[data-testid="gs-stichwerte-Carla"]').attributes('step')).toBe('10')
+  })
+
+  it('lässt eine normale Runde mit Zehner-Stichwerten (100+90+60=250) zu und liefert den Auto-Wert in Zehnern', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="sm-stichwerte"]').setValue(100)
+    await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(90)
+
+    // Auto-3. Stichwert (Dirk) = 250 − 100 − 90 = 60 (Zehner).
+    expect(
+      (wrapper.find('[data-testid="gs-stichwerte-Dirk"]').element as HTMLInputElement).value,
+    ).toBe('60')
+    expect(wrapper.find('[data-testid="stichwerte-summe"]').text()).toContain('250 / 250')
+    expect(wrapper.find('[data-testid="stichwerte-modulo-fehler"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="runde-absenden"]').attributes('disabled')).toBeUndefined()
+
+    await wrapper.find('form').trigger('submit')
+    expect(wrapper.emitted('absenden')).toHaveLength(1)
+  })
+
+  it('sperrt die Runde bei getippten Einerwerten (99+91+60=250) trotz korrekter Summe (Modulo-Guard)', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="sm-stichwerte"]').setValue(99)
+    await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(91)
+
+    // Summe ergibt zwar 250 (Dirk automatisch 60), aber 99 und 91 sind keine Zehner.
+    expect(wrapper.find('[data-testid="stichwerte-summe"]').text()).toContain('250 / 250')
+    expect(wrapper.find('[data-testid="stichwerte-modulo-fehler"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="runde-absenden"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.find('form').trigger('submit')
+    expect(wrapper.emitted('absenden')).toBeUndefined()
+  })
+
+  // ── TASK-015: FND-001 — Auto-Stichwert nach Löschen wieder editierbar ────────
+
+  it('hebt das read-only des Auto-Stichwerts auf, wenn ein manueller Wert geleert wird (FND-001)', async () => {
+    const wrapper = mountForm()
+    // Bernd (Spielmacher) und Carla setzen → Dirk automatisch + read-only.
+    await wrapper.find('[data-testid="sm-stichwerte"]').setValue(100)
+    await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(90)
+    expect(wrapper.find('[data-testid="gs-stichwerte-Dirk"]').attributes('readonly')).toBeDefined()
+
+    // Carla wieder leeren (0) → nur noch ein manueller Wert → Dirk wieder editierbar.
+    await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(0)
+    expect(wrapper.find('[data-testid="gs-stichwerte-Dirk"]').attributes('readonly')).toBeUndefined()
+  })
+
+  // ── TASK-016: Endrunden-Tiebreak (§9.4) ──────────────────────────────────────
+
+  it('bietet in der letzten Runde optionale 1er-Tiebreak-Felder und emittiert die exakten Werte', async () => {
+    const wrapper = mount(RundeForm, {
+      props: { rundennummer: 4, geber: 'Anna', aktive, rundenanzahl: 4 },
+    })
+    expect(wrapper.find('[data-testid="tiebreak-block"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="sm-stichwerte"]').setValue(100)
+    await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(90)
+    await wrapper.find('[data-testid="tiebreak-Bernd"]').setValue(78)
+    await wrapper.find('[data-testid="tiebreak-Carla"]').setValue(72)
+
+    await wrapper.find('form').trigger('submit')
+    const tiebreak = wrapper.emitted('tiebreak-stichwerte')
+    expect(tiebreak).toHaveLength(1)
+    expect(tiebreak?.[0][0]).toEqual({ Bernd: 78, Carla: 72 })
+  })
+
+  it('zeigt in einer normalen (nicht letzten) Runde keine Tiebreak-Felder', () => {
+    const wrapper = mount(RundeForm, {
+      props: { rundennummer: 1, geber: 'Anna', aktive, rundenanzahl: 4 },
+    })
+    expect(wrapper.find('[data-testid="tiebreak-block"]').exists()).toBe(false)
+  })
 })

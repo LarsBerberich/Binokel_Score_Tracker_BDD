@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ApiError, siegerErmitteln, type SiegerErgebnis } from '../api'
+import { useSpielStore } from '../stores/spiel'
 
 const props = defineProps<{ spielId: string }>()
+const spielStore = useSpielStore()
 
 const ergebnis = ref<SiegerErgebnis | null>(null)
 const laedt = ref(false)
@@ -23,11 +25,25 @@ function istSieger(name: string): boolean {
   return sieger.value.includes(name)
 }
 
+/** Anzahl Tausender-Sterne eines Spielers (0, wenn keine geladen). */
+function sterneVon(name: string): number {
+  return ergebnis.value?.sterne?.[name] ?? 0
+}
+
 onMounted(async () => {
   laedt.value = true
   fehler.value = null
   try {
-    ergebnis.value = await siegerErmitteln(Number(props.spielId))
+    // Exakte 1er-Stichwerte der letzten Runde als Tiebreak durchreichen (§9.3/§9.4);
+    // ohne erfasste Werte wie bisher ohne Parameter ermitteln.
+    const exakte = spielStore.endrundenStichwerte
+    const query =
+      exakte && Object.keys(exakte).length > 0
+        ? Object.entries(exakte)
+            .map(([name, wert]) => `${name}:${wert}`)
+            .join(',')
+        : undefined
+    ergebnis.value = await siegerErmitteln(Number(props.spielId), query)
   } catch (error) {
     fehler.value =
       error instanceof ApiError ? error.message : 'Sieger konnte nicht ermittelt werden.'
@@ -69,7 +85,15 @@ onMounted(async () => {
             :class="istSieger(eintrag.name) ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-700'"
           >
             <span>{{ i + 1 }}. {{ eintrag.name }}</span>
-            <span>{{ eintrag.punkte }}</span>
+            <span class="flex items-center gap-2">
+              <span
+                v-if="sterneVon(eintrag.name) > 0"
+                :data-testid="`sterne-${eintrag.name}`"
+                :title="`${sterneVon(eintrag.name)} Tausender-Stern(e)`"
+                class="text-amber-500"
+              >{{ '★'.repeat(sterneVon(eintrag.name)) }}</span>
+              <span>{{ eintrag.punkte }}</span>
+            </span>
           </li>
         </ol>
       </section>

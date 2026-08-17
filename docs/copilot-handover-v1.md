@@ -85,6 +85,27 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
+## Stand 17.08.2026 (Phase 2b — TASK-013 Tausender-Sterne anzeigen, Backend + Frontend)
+
+Der Wertungsbereich zeigt jetzt die **Tausender-Sterne** je Spieler. Ein Stern entsteht
+ausschließlich aus Tausender-Runden (§15): Der Spielmacher erhält bei „Tausender gewonnen"
+einen Stern, bei „Tausender verloren" erhält **jeder aktive Gegenspieler** einen Stern.
+
+Backend: `sterne_laden(spiel_id)` in `repositories.py` aggregiert die booleschen
+`RundeModel.spielmacher_stern`/`gegenspieler_stern`-Felder je Spieler. Beide Slice-6-Endpunkte
+(`punktestaende/` und `sieger/`) liefern additiv ein `sterne: {name: int}`-Mapping
+(rückwärtskompatibel, keine Migration). **Kernfallstrick (RD-bestätigt):** Bei Tausender-Runden
+werden **keine** `GegenspielerRundeModel`-Zeilen angelegt — die aktiven Gegenspieler müssen
+daher aus `alle Spieler − Geber − Spielmacher` hergeleitet werden (der Geber setzt aus und
+bekommt keinen Stern, §15.3). Der Django-Test `SterneApiTest` sichert insbesondere
+„Tausender verloren" gezielt ab.
+
+Frontend: neuer Typ `SterneMap`; `SpielView` (laufender Punktestand) und `SpielendeView`
+(Endstand) zeigen die Sterne symbolisch als `★` (`data-testid="sterne-{name}"`, nur wenn
+count > 0). Doku-Sync: OpenAPI (`Punktestaende` + `SiegerErgebnis` um `sterne`), Typen,
+BACKLOG. Kein neues Datenmodell/Regelwerk nötig (Sterne stammen aus bestehenden Feldern).
+Validierung: 26 Django + 28 Behave + 37 Vitest grün, Build grün. Kein neues E2E (ADR-013).
+
 ## Stand 15.08.2026 (Plausibilitätsregel Meldepunkte — aus Live-Test)
 
 Beim manuellen Durchspielen fiel auf, dass die Meldepunkte eines einzelnen Spielers

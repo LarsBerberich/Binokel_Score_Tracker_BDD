@@ -36,4 +36,10 @@ Funktionalität: Spielende und Siegerermittlung
     Und nach Berücksichtigung exakter 1er-Werte besteht weiterhin Gleichstand
     Wenn das Spiel abgeschlossen wird
     Dann gibt es mehrere Sieger
+
+  Szenario: Endrunden-Gleichstand in Zehnern wird per 1er-Tiebreak entschieden
+    Angenommen ein neues Spiel für den Endrunden-Tiebreak ist angelegt
+    Und die letzte Runde führt zu einem Gleichstand in Zehnern zwischen Bernd und Carla
+    Wenn der Sieger mit exakten 1er-Stichwerten Bernd 78 und Carla 72 ermittelt wird
+    Dann ist Bernd der alleinige Sieger des Spiels
   

@@ -385,13 +385,18 @@ components:
 
     Punktestaende:
       type: object
-      required: [spiel_id, punktestaende]
+      required: [spiel_id, punktestaende, sterne]
       properties:
         spiel_id:
           type: integer
         punktestaende:
           type: object
           description: Mapping Spielername → aktueller Gesamtpunktestand.
+          additionalProperties:
+            type: integer
+        sterne:
+          type: object
+          description: Mapping Spielername → Anzahl Tausender-Sterne.
           additionalProperties:
             type: integer
       examples:
@@ -401,15 +406,25 @@ components:
             Bernd: 90
             Clara: 90
             David: 0
+          sterne:
+            Anna: 1
+            Bernd: 0
+            Clara: 0
+            David: 0
 
     SiegerErgebnis:
       type: object
-      required: [spiel_id, punktestaende, sieger]
+      required: [spiel_id, punktestaende, sterne, sieger]
       properties:
         spiel_id:
           type: integer
         punktestaende:
           type: object
+          additionalProperties:
+            type: integer
+        sterne:
+          type: object
+          description: Mapping Spielername → Anzahl Tausender-Sterne.
           additionalProperties:
             type: integer
         sieger:

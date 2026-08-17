@@ -22,13 +22,17 @@ const props = withDefaults(
     rundennummer: number
     geber: string
     aktive: string[]
+    rundenanzahl?: number
     laedt?: boolean
     fehler?: string | null
   }>(),
-  { laedt: false, fehler: null },
+  { rundenanzahl: 0, laedt: false, fehler: null },
 )
 
-const emit = defineEmits<{ absenden: [payload: RundeRequest] }>()
+const emit = defineEmits<{
+  absenden: [payload: RundeRequest]
+  'tiebreak-stichwerte': [werte: Record<string, number>]
+}>()
 
 const RUNDENTYPEN: { wert: Rundentyp; label: string }[] = [
   { wert: 'normal', label: 'Normales Spiel' },
@@ -54,14 +58,23 @@ const details = reactive<Record<string, SpielerDetail>>({})
 // berechnet und gesperrt (012.5, §8.2).
 const stichwertReihenfolge = ref<string[]>([])
 
+// Optionale exakte 1er-Stichwerte je aktivem Spieler – nur letzte Runde, nur
+// Gleichstand-Tiebreak (§9.4). Getrennt von den Zehner-Stichwerten, die in den
+// STAND einfließen.
+const tiebreakStichwerte = reactive<Record<string, number>>({})
+
 function synchronisiereDetails(namen: string[]): void {
   for (const name of namen) {
     if (!details[name]) {
       details[name] = { meldepunkte: 0, stichwerte: 0 }
     }
+    if (tiebreakStichwerte[name] === undefined) tiebreakStichwerte[name] = 0
   }
   for (const name of Object.keys(details)) {
     if (!namen.includes(name)) delete details[name]
+  }
+  for (const name of Object.keys(tiebreakStichwerte)) {
+    if (!namen.includes(name)) delete tiebreakStichwerte[name]
   }
 }
 
@@ -73,6 +86,9 @@ function resetEingaben(): void {
   for (const name of Object.keys(details)) {
     details[name].meldepunkte = 0
     details[name].stichwerte = 0
+  }
+  for (const name of Object.keys(tiebreakStichwerte)) {
+    tiebreakStichwerte[name] = 0
   }
 }
 
@@ -103,6 +119,12 @@ const istTausender = computed(
 const istNormal = computed(() => typ.value === 'normal')
 const istEinfachesAbgehen = computed(() => typ.value === 'einfaches_abgehen')
 
+// In der letzten Runde werden zusätzlich optionale exakte 1er-Stichwerte für den
+// Gleichstand-Tiebreak angeboten (§9.4). Die Rundenanzahl kommt vom Parent.
+const istLetzteRunde = computed(
+  () => props.rundenanzahl > 0 && props.rundennummer === props.rundenanzahl,
+)
+
 const brauchtReizwert = computed(() => !istTausender.value)
 const reizwertGueltig = computed(
   () =>
@@ -128,6 +150,13 @@ const autoStichwertSpieler = computed(() => {
 
 /** Merkt sich, welcher Stichwert zuletzt manuell bearbeitet wurde (012.5). */
 function stichwertErfasst(name: string): void {
+  // Wird ein Feld geleert/auf 0 gesetzt, gilt es nicht mehr als manuell erfasst;
+  // der Spieler wird aus der Reihenfolge entfernt, damit das automatische dritte
+  // Feld wieder frei editierbar wird (FND-001, §8.2).
+  if (!details[name]?.stichwerte) {
+    stichwertReihenfolge.value = stichwertReihenfolge.value.filter((n) => n !== name)
+    return
+  }
   stichwertReihenfolge.value = [name, ...stichwertReihenfolge.value.filter((n) => n !== name)]
 }
 
@@ -171,6 +200,25 @@ const stichwerteNegativ = computed(() =>
   props.aktive.some((name) => (details[name]?.stichwerte ?? 0) < 0),
 )
 
+// Alle Werte, die in den kumulierten STAND einfließen, müssen Vielfache von 10
+// sein (§9.1/§9.4). step=10 allein genügt nicht, da getippte Einerwerte (z. B. 99)
+// durchrutschen könnten – daher explizite Modulo-Prüfung als Absperr-Bedingung.
+const werteInStand = computed<number[]>(() => {
+  const werte: number[] = []
+  if (brauchtReizwert.value) werte.push(reizwert.value)
+  if (istNormal.value) {
+    for (const name of props.aktive) {
+      werte.push(details[name]?.meldepunkte ?? 0, details[name]?.stichwerte ?? 0)
+    }
+  } else if (istEinfachesAbgehen.value) {
+    for (const name of gegenspieler.value) werte.push(details[name]?.meldepunkte ?? 0)
+  }
+  return werte
+})
+const moduloVerstoss = computed(() =>
+  werteInStand.value.some((w) => !Number.isInteger(w) || w % ZEHNER_SCHRITT !== 0),
+)
+
 /** Gesamtwert des Spielmachers (M + S); < Reizwert ⇒ Runde wird doppeltes Abgehen (§16.1). */
 const spielmacherGesamt = computed(
   () => (spielmacherDetail.value?.meldepunkte ?? 0) + (spielmacherDetail.value?.stichwerte ?? 0),
@@ -184,6 +232,7 @@ const normalGueltig = computed(
     reizwertGueltig.value &&
     stichwerteGueltig.value &&
     !stichwerteNegativ.value &&
+    !moduloVerstoss.value &&
     meldepunkteGueltig.value,
 )
 
@@ -193,7 +242,7 @@ const istGueltig = computed(() => {
   if (istNormal.value) return normalGueltig.value
   // Abgehen: nur der Reizwert ist zwingend; keine 250er-Kontrollsumme,
   // da die Stichwerte des Spielmachers nicht erfasst werden.
-  return reizwertGueltig.value && meldepunkteGueltig.value
+  return reizwertGueltig.value && !moduloVerstoss.value && meldepunkteGueltig.value
 })
 
 function baueGegenspielerNutzlast(): Gegenspieler[] {
@@ -210,6 +259,17 @@ function baueGegenspielerNutzlast(): Gegenspieler[] {
 
 function absenden(): void {
   if (!istGueltig.value || props.laedt) return
+
+  // In der letzten Runde die optionalen exakten 1er-Stichwerte an den Parent
+  // reichen (Ablage im Pinia-Store → Tiebreak in SpielendeView, §9.4).
+  if (istLetzteRunde.value) {
+    const exakte: Record<string, number> = {}
+    for (const name of props.aktive) {
+      const wert = tiebreakStichwerte[name] ?? 0
+      if (wert > 0) exakte[name] = wert
+    }
+    emit('tiebreak-stichwerte', exakte)
+  }
 
   const basis = {
     rundennummer: props.rundennummer,
@@ -319,7 +379,7 @@ function absenden(): void {
               v-model.number="spielmacherDetail.stichwerte"
               type="number"
               min="0"
-              step="1"
+              :step="ZEHNER_SCHRITT"
               :readonly="spielmacher === autoStichwertSpieler"
               data-testid="sm-stichwerte"
               class="rounded border border-slate-300 px-3 py-2 read-only:bg-slate-100 read-only:text-slate-500"
@@ -355,7 +415,7 @@ function absenden(): void {
               v-model.number="details[name].stichwerte"
               type="number"
               min="0"
-              step="1"
+              :step="ZEHNER_SCHRITT"
               :readonly="name === autoStichwertSpieler"
               :data-testid="`gs-stichwerte-${name}`"
               class="rounded border border-slate-300 px-3 py-2 read-only:bg-slate-100 read-only:text-slate-500"
@@ -374,8 +434,8 @@ function absenden(): void {
         </p>
 
         <p class="text-xs text-slate-500">
-          Zwei Stichwerte genügen – der dritte wird automatisch berechnet. Bei knappen Spielen
-          exakt auf 1er-Werte zählen.
+          Zwei Stichwerte genügen – der dritte wird automatisch berechnet. Stichwerte auf die
+          nächste Zehner runden (Eingabeschritt 10).
         </p>
 
         <p v-if="stichwerteNegativ" data-testid="stichwerte-fehler" class="text-sm text-red-700">
@@ -428,7 +488,42 @@ function absenden(): void {
           korrigieren.
         </p>
       </div>
+
+      <!-- Letzte Runde: optionale exakte 1er-Stichwerte für den Gleichstand-Tiebreak (§9.4) -->
+      <fieldset
+        v-if="istLetzteRunde && !istTausender"
+        data-testid="tiebreak-block"
+        class="flex flex-col gap-2 rounded border border-amber-200 bg-amber-50 p-3"
+      >
+        <legend class="px-1 text-sm font-semibold text-amber-800">
+          Letzte Runde – exakte Stichwerte (Tiebreak, optional)
+        </legend>
+        <p class="text-xs text-amber-700">
+          Nur bei möglichem Gleichstand um den Gesamtsieg nötig: die exakten 1er-Stichwerte je
+          Spieler. Sie fließen nicht in den STAND ein.
+        </p>
+        <label v-for="name in aktive" :key="name" class="flex flex-col gap-1">
+          <span class="text-sm text-slate-600">{{ name }}</span>
+          <input
+            v-model.number="tiebreakStichwerte[name]"
+            type="number"
+            min="0"
+            step="1"
+            :data-testid="`tiebreak-${name}`"
+            class="rounded border border-slate-300 px-3 py-2"
+          />
+        </label>
+      </fieldset>
     </fieldset>
+
+    <p
+      v-if="moduloVerstoss"
+      data-testid="stichwerte-modulo-fehler"
+      class="text-sm text-red-700"
+    >
+      Alle Werte, die in den STAND einfließen (Reizwert, Meldepunkte, Stichwerte), müssen volle
+      Zehner sein (Vielfache von {{ ZEHNER_SCHRITT }}) – bitte korrigieren.
+    </p>
 
     <p v-if="fehler" data-testid="runde-fehler" role="alert" class="text-sm text-red-700">
       {{ fehler }}

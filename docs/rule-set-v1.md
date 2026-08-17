@@ -171,7 +171,7 @@ Dabei gilt:
 - **Reizwerte** sind immer volle 10er-Werte
 - **Reizwerte** starten bei einem Minimum von **150** (Hausregel; entspricht gängiger Turnierpraxis) und werden im Erfassungs-UI mit 150 vorbelegt
 - **Mitpunkte** sind immer volle 10er-Werte
-- **nur Stichwerte** können 1er-genaue Werte enthalten
+- **Stichwerte** werden für den STAND ebenfalls in vollen 10er-Werten erfasst (Zehner-Eingabe, §9.1); 1er-genaue Stichwerte gibt es nur in der letzten Runde für den Gleichstand-Tiebreak (§9.4)
 - beim Spielmacher umfassen die Stichwerte auch die gedrückten Karten
 
 ### 7.1 Plausibilitätsgrenze der Meldepunkte
@@ -207,28 +207,53 @@ Dies soll in der UI flexibel möglich sein, unabhängig davon, von welchen zwei 
 
 ---
 
-## 9. Rundung der Stichwerte
+## 9. Erfassung der Stichwerte und STAND-Rundung
 
-### 9.1 Grundregel
+### 9.1 Grundregel — Zehner-Eingabe
 
-Nur die Stichwerte bzw. Stichaugen können 1er-genau sein.
+Normale Runden werden in **vollen Zehnern** erfasst (Eingabeschritt 10). Alle Werte,
+die in den kumulierten **STAND** (Zwischen- und Endstand) einfließen — Stichwerte,
+Meldepunkte und Reizwert —, sind stets Vielfache von 10.
 
-Das Erfassungs-UI nimmt Stichwerte grundsätzlich **1er-genau** entgegen (Eingabeschritt 1), damit knappe Spiele exakt gezählt werden können. Bei knappen Spielen ist ein genaues Zählen auf Einer-Werte notwendig (siehe §9.3).
+Damit wird der STAND ausschließlich in Zehnern geführt und zeigt nie eine Einerstelle
+(vgl. Anschreibetabelle §5, alle STAND-Werte auf Zehner). Der Spieler rundet Grenzfälle
+bereits **bei der Eingabe** sauber auf Zehner (z. B. real 95/95/60 → 100/90/60), sodass
+die 250er-Kontrollsumme (§5.2) trivial auf Zehnern gilt und nie überschritten wird.
 
-Eine Rundung auf volle 10 ist lediglich eine **optionale Bequemlichkeit** in klar entschiedenen Runden und wird vom UI **nicht erzwungen**. Die Speicherung erfolgt in der tatsächlich erfassten (ggf. 1er-genauen) Form.
+Die Zehner-Eingabe wird erzwungen: Das Erfassungs-UI sperrt das Absenden bei einem Wert,
+der kein Vielfaches von 10 ist (Modulo-10-Prüfung), und die API weist solche Werte im
+Rundentyp `normal` und `doppeltes_abgehen` mit HTTP 400 ab.
 
-### 9.2 Geltungsbereich der Rundung
+### 9.2 Geltungsbereich
 
-Die Rundung betrifft die Stichwerte,
+Die Zehner-Eingabe betrifft die Stichwerte,
 
 - bei Gegenspielern auf Basis ihrer gewonnenen Stiche,
-- beim Spielmacher auf Basis seiner gewonnenen Stiche einschließlich der gedrückten Karten.
+- beim Spielmacher auf Basis seiner gewonnenen Stiche einschließlich der gedrückten Karten,
+
+sowie Meldepunkte und Reizwert. Der automatisch berechnete dritte Stichwert
+(`250 − w1 − w2`, §8.2) ergibt sich aus zwei Zehner-Werten und ist daher selbst ein Zehner.
 
 ### 9.3 Ausnahme bei möglichem Gleichstand am Spielende
 
-In der letzten Runde müssen bei möglichem Gleichstand um den Gesamtsieg zusätzlich die exakten 1er-Werte berücksichtigt werden, damit eine punktgenaue Siegerermittlung möglich ist.
+In der letzten Runde werden bei möglichem Gleichstand um den Gesamtsieg zusätzlich die
+**exakten 1er-Werte** der Stiche berücksichtigt, damit eine punktgenaue Siegerermittlung
+möglich ist. Der Tiebreak wirkt über die **aktiven Spieler der letzten Runde**; der in der
+letzten Runde aussetzende Geber bringt keinen Endrunden-Stich ein und nimmt am 1er-Tiebreak
+nicht teil.
 
 Nur wenn danach weiterhin Gleichstand besteht, gibt es mehrere Sieger.
+
+### 9.4 1er-Werte nur für den Endrunden-Tiebreak
+
+Die 1er-genauen Stichwerte werden **ausschließlich in der letzten Runde** und **ausschließlich
+für den Gleichstand-Tiebreak** (§9.3) erfasst. Sie fließen **nicht** in den STAND ein: Der STAND
+bleibt in Zehnern, die 1er-Werte entscheiden nur bei einem Gleichstand in Zehnern über den
+Einzelsieger.
+
+Technisch werden die 1er-Werte der letzten Runde vom Erfassungs-UI getrennt von den
+Zehner-Stichfeldern aufgenommen und bei der Siegerermittlung als Tiebreak-Kriterium
+(`?exakte_stichwerte=Name:Wert,…`) übergeben.
 
 ---
 
@@ -445,9 +470,9 @@ Mehrere Spieler können daher gemeinsam Sieger sein.
 
 ### 17.2 Punktgenaue Entscheidung in der letzten Runde
 
-Da Stichwerte in klar entschiedenen Runden oft auf volle 10 gerundet erfasst werden, gilt für die letzte Runde:
+Da der STAND in vollen Zehnern geführt wird (§9.1), kann in der letzten Runde ein Gleichstand in Zehnern auftreten. Dann gilt:
 
-Wenn um den Gesamtsieg ein Gleichstand möglich ist, müssen zusätzlich die exakten 1er-Werte berücksichtigt werden, um den Sieger punktgenau zu bestimmen. Das Erfassungs-UI erlaubt die 1er-genaue Eingabe der Stichwerte daher durchgängig (Eingabeschritt 1).
+Wenn um den Gesamtsieg ein Gleichstand möglich ist, werden zusätzlich die exakten 1er-Werte der Stiche berücksichtigt, um den Sieger punktgenau zu bestimmen. Das Erfassungs-UI bietet dafür in der letzten Runde separate, optionale 1er-Felder je aktivem Spieler an (§9.4); die Zehner-Stichfelder bleiben für den STAND unverändert.
 
 Nur wenn danach weiterhin Gleichstand besteht, gibt es mehrere Sieger.
 

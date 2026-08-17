@@ -27,12 +27,14 @@ from scoring.domain import (
     UngueltigeStichwerte,
     UngueltigeSpielerzahl,
     UngueltigeMeldepunkte,
+    UngueltigerZehnerwert,
 )
 from scoring.repositories import (
     punktestaende_laden,
     runde_persistieren,
     spiel_laden,
     spiel_persistieren,
+    sterne_laden,
 )
 from scoring.use_cases import (
     doppeltes_abgehen_auswerten,
@@ -42,6 +44,8 @@ from scoring.use_cases import (
     normales_spiel_auswerten,
     sieger_ermitteln,
     spiel_anlegen,
+    stichwerte_validieren,
+    zehnerwert_validieren,
 )
 
 
@@ -65,7 +69,9 @@ def _validierungsfehler_nachricht(exc: Exception) -> str:
     if isinstance(exc, UngueltigeRundenanzahl):
         return "Ungültige Rundenzahl: Die Rundenzahl muss ein Vielfaches von 4 sein."
     if isinstance(exc, UngueltigeStichwerte):
-        return "Ungültige Stichwerte."
+        return str(exc)
+    if isinstance(exc, UngueltigerZehnerwert):
+        return str(exc)
     if isinstance(exc, UngueltigeMeldepunkte):
         return str(exc)
     return "Ungültige Eingabedaten."
@@ -81,6 +87,40 @@ def _meldepunkte_pruefen(body: dict) -> None:
     for gegenspieler in body.get("gegenspieler", []):
         if isinstance(gegenspieler, dict) and "meldepunkte" in gegenspieler:
             meldepunkte_validieren(gegenspieler["meldepunkte"])
+
+
+def _zehner_und_kontrollsumme_pruefen(body: dict, *, mit_spielmacher_stichwert: bool) -> None:
+    """Erzwingt die Zehner-Eingabe (§9.1/§9.4) für alle in den STAND einfließenden Werte.
+
+    Gilt für die Rundentypen 'normal' und 'doppeltes_abgehen': Reizwert und alle
+    Meldepunkte müssen Vielfache von 10 sein; die Stichwerte zusätzlich ≤ 250
+    (Kontrollsumme) und ebenfalls Vielfache von 10.
+
+    Args:
+        mit_spielmacher_stichwert: True bei 'normal' (Spielmacher hat einen
+            eigenen Stichwert), False bei 'doppeltes_abgehen' (Stichwert verfällt).
+
+    Raises:
+        UngueltigerZehnerwert: Reizwert/Meldepunkte kein Zehner.
+        UngueltigeStichwerte:  Stichwert kein Zehner oder Summe > 250.
+    """
+    if "reizwert" in body:
+        zehnerwert_validieren(body["reizwert"], "Reizwert")
+    if "meldepunkte" in body:
+        zehnerwert_validieren(body["meldepunkte"], "Meldepunkte")
+    for gs in body.get("gegenspieler", []):
+        if isinstance(gs, dict) and "meldepunkte" in gs:
+            zehnerwert_validieren(gs["meldepunkte"], "Meldepunkte")
+
+    stichwerte = [
+        gs["stichwerte"]
+        for gs in body.get("gegenspieler", [])
+        if isinstance(gs, dict) and "stichwerte" in gs
+    ]
+    if mit_spielmacher_stichwert and "stichwerte" in body:
+        stichwerte.append(body["stichwerte"])
+    if stichwerte:
+        stichwerte_validieren(stichwerte)
 
 
 def _pflichtfeld(body: dict, *felder: str) -> str | None:
@@ -202,6 +242,12 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
         if fehlendes:
             return _fehler(f"Pflichtfeld fehlt für typ 'normal': '{fehlendes}'.")
 
+        # Zehner-Eingabe + 250-Kontrollsumme erzwingen (normativ: §9.1/§9.4).
+        try:
+            _zehner_und_kontrollsumme_pruefen(body, mit_spielmacher_stichwert=True)
+        except (UngueltigeStichwerte, UngueltigerZehnerwert) as exc:
+            return _fehler(_validierungsfehler_nachricht(exc))
+
         sm_melde = meldepunkte_mit_stich_zwang(
             body["meldepunkte"], body["hat_eigenen_stich"]
         )
@@ -255,6 +301,12 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
         fehlendes = _pflichtfeld(body, "reizwert", "gegenspieler")
         if fehlendes:
             return _fehler(f"Pflichtfeld fehlt für typ 'doppeltes_abgehen': '{fehlendes}'.")
+
+        # Zehner-Eingabe + 250-Kontrollsumme erzwingen; Spielmacher-Stichwert verfällt (§9.1/§9.4).
+        try:
+            _zehner_und_kontrollsumme_pruefen(body, mit_spielmacher_stichwert=False)
+        except (UngueltigeStichwerte, UngueltigerZehnerwert) as exc:
+            return _fehler(_validierungsfehler_nachricht(exc))
 
         ausgang = Rundenausgang.DOPPELTES_ABGEHEN
         spielmacher_punkte = 0
@@ -332,13 +384,16 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
 
 @require_GET
 def punktestaende_view(request, spiel_id: int) -> JsonResponse:
-    """GET /api/spiele/{id}/punktestaende/ — Aktuelle Punktestände aller Spieler."""
+    """GET /api/spiele/{id}/punktestaende/ — Aktuelle Punktestände + Sterne aller Spieler."""
     try:
         punkte = punktestaende_laden(spiel_id)
+        sterne = sterne_laden(spiel_id)
     except ObjectDoesNotExist:
         return _fehler(f"Spiel {spiel_id} nicht gefunden.", status=404)
 
-    return JsonResponse({"spiel_id": spiel_id, "punktestaende": punkte})
+    return JsonResponse(
+        {"spiel_id": spiel_id, "punktestaende": punkte, "sterne": sterne}
+    )
 
 
 @require_GET
@@ -350,6 +405,7 @@ def sieger_view(request, spiel_id: int) -> JsonResponse:
     """
     try:
         punkte = punktestaende_laden(spiel_id)
+        sterne = sterne_laden(spiel_id)
     except ObjectDoesNotExist:
         return _fehler(f"Spiel {spiel_id} nicht gefunden.", status=404)
 
@@ -374,6 +430,7 @@ def sieger_view(request, spiel_id: int) -> JsonResponse:
         {
             "spiel_id": spiel_id,
             "punktestaende": punkte,
+            "sterne": sterne,
             "sieger": gewinner,
         }
     )

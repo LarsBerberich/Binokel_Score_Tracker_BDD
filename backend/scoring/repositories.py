@@ -213,3 +213,38 @@ def punktestaende_laden(spiel_id: int) -> dict[str, int]:
             )
 
     return punkte
+
+
+def sterne_laden(spiel_id: int) -> dict[str, int]:
+    """
+    Aggregiert die Tausender-Sterne je Spieler über alle Runden eines Spiels.
+
+    Sterne stammen ausschließlich aus Tausender-Runden (normativ: docs/rule-set-v1.md §15):
+    - spielmacher_stern gesetzt  → +1 für den Spielmacher (Tausender gewonnen).
+    - gegenspieler_stern gesetzt → +1 für jeden aktiven Gegenspieler (Tausender verloren).
+
+    Wichtig: Bei Tausender-Runden werden KEINE GegenspielerRundeModel-Zeilen angelegt.
+    Die aktiven Gegenspieler werden daher aus „alle Spieler − Geber − Spielmacher"
+    hergeleitet (der Geber setzt aus und erhält keinen Stern, §15.3).
+
+    Returns:
+        Mapping Spielername → Anzahl Sterne.
+
+    Raises:
+        SpielModel.DoesNotExist: Wenn das Spiel nicht gefunden wird.
+    """
+    spiel_model = SpielModel.objects.prefetch_related("spieler").get(pk=spiel_id)
+    sterne: dict[str, int] = {s.name: 0 for s in spiel_model.spieler.all()}
+    alle_namen = set(sterne)
+
+    runden = spiel_model.runden.select_related("spielmacher", "geber")
+
+    for runde in runden:
+        if runde.spielmacher_stern:
+            sterne[runde.spielmacher.name] += 1
+        if runde.gegenspieler_stern:
+            gegenspieler = alle_namen - {runde.geber.name, runde.spielmacher.name}
+            for name in gegenspieler:
+                sterne[name] += 1
+
+    return sterne

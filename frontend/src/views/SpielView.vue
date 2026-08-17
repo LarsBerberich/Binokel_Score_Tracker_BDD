@@ -9,6 +9,7 @@ import {
   type RundeErgebnis,
   type RundeRequest,
   type Spiel,
+  type SterneMap,
 } from '../api'
 import { useSpielStore } from '../stores/spiel'
 import { aktiveSpieler, geberFuerRunde } from '../domain/rotation'
@@ -25,6 +26,7 @@ const rundeLaedt = ref(false)
 const rundeFehler = ref<string | null>(null)
 const letztesErgebnis = ref<RundeErgebnis | null>(null)
 const punktestaende = ref<PunktestandMap | null>(null)
+const sterne = ref<SterneMap | null>(null)
 
 const rundennummer = computed(() => spielStore.aktuelleRundennummer)
 const geber = computed(() =>
@@ -45,14 +47,21 @@ const sortierteStaende = computed(() => {
     .sort((a, b) => b.punkte - a.punkte)
 })
 
+/** Anzahl Tausender-Sterne eines Spielers (0, wenn keine geladen). */
+function sterneVon(name: string): number {
+  return sterne.value?.[name] ?? 0
+}
+
 async function punktestaendeAktualisieren(): Promise<void> {
   if (!spiel.value) return
   try {
     const antwort = await punktestaendeLaden(spiel.value.id)
     punktestaende.value = antwort.punktestaende
+    sterne.value = antwort.sterne
   } catch {
     // Punktestände sind ergänzende Info – ein Ladefehler blockiert die Runde nicht.
     punktestaende.value = null
+    sterne.value = null
   }
 }
 
@@ -70,6 +79,11 @@ async function rundeAbsenden(payload: RundeRequest): Promise<void> {
   } finally {
     rundeLaedt.value = false
   }
+}
+
+/** Exakte 1er-Stichwerte der letzten Runde im Store ablegen (Tiebreak, §9.4). */
+function tiebreakStichwerteErfassen(werte: Record<string, number>): void {
+  spielStore.setzeEndrundenStichwerte(werte)
 }
 
 onMounted(async () => {
@@ -122,7 +136,15 @@ onMounted(async () => {
             :class="i === 0 ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-700'"
           >
             <span>{{ i + 1 }}. {{ eintrag.name }}</span>
-            <span data-testid="punktestand-wert">{{ eintrag.punkte }}</span>
+            <span class="flex items-center gap-2">
+              <span
+                v-if="sterneVon(eintrag.name) > 0"
+                :data-testid="`sterne-${eintrag.name}`"
+                :title="`${sterneVon(eintrag.name)} Tausender-Stern(e)`"
+                class="text-amber-500"
+              >{{ '★'.repeat(sterneVon(eintrag.name)) }}</span>
+              <span data-testid="punktestand-wert">{{ eintrag.punkte }}</span>
+            </span>
           </li>
         </ol>
       </section>
@@ -158,9 +180,11 @@ onMounted(async () => {
           :rundennummer="rundennummer"
           :geber="geber"
           :aktive="aktive"
+          :rundenanzahl="spiel.rundenanzahl"
           :laedt="rundeLaedt"
           :fehler="rundeFehler"
           @absenden="rundeAbsenden"
+          @tiebreak-stichwerte="tiebreakStichwerteErfassen"
         />
       </section>
 

@@ -33,6 +33,7 @@ In jedem regulär ausgespielten Spiel gibt es ein mathematisch fixes Limit für 
 * Rundlauf (Familie in allen vier Farben): 240 Punkte
 * Doppelter Binokel (2x Karo-Unter + 2x Pik-Ober): 300 Punkte
 * Höchstbild: Alle 8 Karten eines Typs (z. B. alle 8 Asse): 1000 Punkte
+* Doppelte Familie: Alle 10 Karten einer Farbe (je zwei mal Ass, 10, König, Ober, Unter in Trumpf): 1500 Punkte
 
 ------------------------------
 ## 2. Grundsatz: Stich-Zwang für Meldungen

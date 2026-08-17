@@ -13,10 +13,12 @@ from scoring.domain import (
     GUELTIGE_SPIELERZAHL,
     STICHWERT_KONTROLLSUMME,
     MELDEPUNKTE_MAXIMUM,
+    ZEHNER_SCHRITT,
     UngueltigeSpielerzahl,
     UngueltigeRundenanzahl,
     UngueltigeStichwerte,
     UngueltigeMeldepunkte,
+    UngueltigerZehnerwert,
 )
 
 
@@ -98,16 +100,42 @@ def dritten_stichwert_ermitteln(wert1: int, wert2: int) -> int:
 
 def stichwerte_validieren(werte: list[int]) -> None:
     """
-    Prüft, ob alle drei Stichwerte zusammen die Kontrollsumme 250 nicht überschreiten.
+    Prüft die Stichwerte, die in den STAND einfließen.
+
+    Zwei Regeln (normativ: docs/rule-set-v1.md §9.1/§9.4):
+    - Die Summe aller Stichwerte darf die Kontrollsumme 250 nicht überschreiten.
+    - Jeder einzelne Stichwert muss ein Vielfaches von 10 sein (Zehner-Eingabe);
+      1er-genaue Werte gibt es nur für den Endrunden-Tiebreak (§9.4) und fließen
+      nicht in den STAND ein.
 
     Raises:
-        UngueltigeStichwerte: Wenn die Summe größer als 250 ist.
+        UngueltigeStichwerte: Wenn die Summe > 250 ist oder ein Wert kein Zehner ist.
     """
     gesamt = sum(werte)
     if gesamt > STICHWERT_KONTROLLSUMME:
         raise UngueltigeStichwerte(
             f"Die Summe der Stichwerte ({gesamt}) überschreitet "
             f"die Kontrollsumme {STICHWERT_KONTROLLSUMME}."
+        )
+    for wert in werte:
+        if wert % ZEHNER_SCHRITT != 0:
+            raise UngueltigeStichwerte(
+                f"Der Stichwert {wert} ist kein Vielfaches von {ZEHNER_SCHRITT}. "
+                "In den STAND einfließende Stichwerte werden in vollen Zehnern erfasst."
+            )
+
+
+def zehnerwert_validieren(wert: int, bezeichnung: str = "Wert") -> None:
+    """
+    Prüft, ob ein in den STAND einfließender Wert (Reizwert oder Meldepunkte) ein
+    Vielfaches von 10 ist (normativ: docs/rule-set-v1.md §9.1/§9.4).
+
+    Raises:
+        UngueltigerZehnerwert: Wenn der Wert kein Vielfaches von 10 ist.
+    """
+    if wert % ZEHNER_SCHRITT != 0:
+        raise UngueltigerZehnerwert(
+            f"{bezeichnung} ({wert}) muss ein Vielfaches von {ZEHNER_SCHRITT} sein."
         )
 
 

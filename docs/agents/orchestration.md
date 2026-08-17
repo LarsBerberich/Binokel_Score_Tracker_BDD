@@ -1,6 +1,6 @@
 # Agenten-Orchestrierung — Binokel Score Tracker
 
-Dieses Dokument beschreibt, wie die drei Copilot-Agenten zusammenarbeiten.
+Dieses Dokument beschreibt, wie die vier Copilot-Agenten zusammenarbeiten.
 
 > **Status dieses Dokuments:** Prozess-„Verfassung“, **kein** Zustandsdokument.
 > Es wird **beim Aufgaben-Routing** (welcher Agent? parallel?), **bei Unsicherheit/
@@ -12,13 +12,14 @@ Dieses Dokument beschreibt, wie die drei Copilot-Agenten zusammenarbeiten.
 
 ---
 
-## Die drei Agenten im Überblick
+## Die vier Agenten im Überblick
 
 | Agent | Kernaufgabe | Entscheidungsmacht |
 |---|---|---|
 | **Coding-Agent** | Features implementieren, Bugs beheben, Code-Änderungen | Implementierungsentscheidungen innerhalb der Architekturleitlinien |
 | **Rubber-Duck-Agent** | Pläne und Änderungen kritisch prüfen, Risiken benennen | Veto bei erkannten Architekturbrüchen oder hohen Risiken |
 | **Dev/Ops-Agent** | CI/CD, Deployment, Server-Betrieb | Infrastruktur- und Release-Entscheidungen |
+| **Tester-Agent** | Manuell/explorativ durchspielen, Test-Suiten ausführen, Regelabgleich | Qualitätsurteil (Finding-Schwere); Bugs gehen zur Behebung an den Coding-Agent |
 
 ---
 
@@ -128,6 +129,17 @@ Rückgabe-Artefakt:
   - Deployment-Anforderungen (z. B. collectstatic, migrate)
 ```
 
+### Tester-Agent → Coding-Agent
+
+```
+Übergabe-Artefakt:
+  - Finding-ID + Kurzbeschreibung (docs/testing/explorative-testprotokoll.md)
+  - Repro-Schritte
+  - Erwartet (mit Regelbezug) vs. Ist
+  - Schwere: HOCH / MITTEL / NIEDRIG
+  - Vorhandener Repro-Test (Pfad) oder Hinweis, dass keiner existiert
+```
+
 ---
 
 ## Aktivierungsregeln
@@ -155,6 +167,17 @@ Rückgabe-Artefakt:
 - **Immer** vor einer Infrastruktur-Änderung, die Downtime riskiert
 - **Immer** wenn ein Agent bei einer Entscheidung unsicher ist
 - Optional: vor der Planung einer neuen Domänenlogik
+
+### Wann wird der Tester-Agent aktiviert?
+
+- Manuelles/exploratives Durchspielen der App (Pairing mit dem Nutzer)
+- Selbstständiger Testlauf: behave, Django-Tests, Vitest und Playwright-Smoke ausführen und auswerten
+- Regelabgleich der laufenden App gegen `docs/rule-set-v1.md` und `docs/Anschreibetabelle_4_Spieler.md`
+- Reproduktion eines gemeldeten Defekts (Repro-Test), UX-Findings sammeln
+- **Nicht** für Feature-Fixes: bestätigte Bugs übergibt der Tester-Agent an den Coding-Agenten
+
+> **Leitplanke (ADR-013):** Der Tester-Agent baut die committete E2E-Suite nicht ohne Einzel-Freigabe aus.
+> Fachlichkeit wird auf API-Ebene (behave + Django) abgesichert.
 
 ---
 

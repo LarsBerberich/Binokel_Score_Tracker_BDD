@@ -373,3 +373,170 @@ class PunktestaendeUndSiegerApiTest(TestCase):
         )
         self.assertEqual(antwort.status_code, 200)
         self.assertIn("sieger", antwort.json())
+
+
+# ── Slice 6: Tausender-Sterne aggregieren ─────────────────────────────────────
+
+class SterneApiTest(TestCase):
+    """
+    Prüft die Aggregation der Tausender-Sterne (TASK-013).
+
+    Absicherung insb. „Tausender verloren": dabei werden KEINE
+    GegenspielerRundeModel-Zeilen angelegt → die aktiven Gegenspieler
+    (alle − Geber − Spielmacher) müssen dennoch je einen Stern erhalten,
+    der Geber (setzt aus) keinen (normativ: rule-set-v1.md §15.3).
+    """
+
+    def setUp(self):
+        self.spiel_id = _neues_spiel(self.client)
+        url = f"/api/spiele/{self.spiel_id}/runden/"
+
+        # Runde 1: Anna gewinnt einen Tausender → Stern für Anna (Spielmacher).
+        _post_json(self.client, url, {
+            "typ": "tausender_gewonnen",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+        })
+
+        # Runde 2: Bernd verliert einen Tausender → Sterne für die aktiven
+        # Gegenspieler (alle − Geber Anna − Spielmacher Bernd) = Clara, Dieter.
+        _post_json(self.client, url, {
+            "typ": "tausender_verloren",
+            "rundennummer": 2,
+            "spielmacher": "Bernd",
+            "geber": "Anna",
+        })
+
+    def test_punktestaende_enthaelt_sterne(self):
+        """GET punktestaende/ liefert additiv das sterne-Mapping."""
+        antwort = self.client.get(f"/api/spiele/{self.spiel_id}/punktestaende/")
+        self.assertEqual(antwort.status_code, 200)
+        daten = antwort.json()
+        self.assertIn("sterne", daten)
+        self.assertEqual(
+            daten["sterne"], {"Anna": 1, "Bernd": 0, "Clara": 1, "Dieter": 1}
+        )
+
+    def test_tausender_verloren_verteilt_sterne_ohne_geber(self):
+        """Tausender verloren: aktive Gegenspieler bekommen Sterne, der Geber nicht."""
+        antwort = self.client.get(f"/api/spiele/{self.spiel_id}/punktestaende/")
+        sterne = antwort.json()["sterne"]
+        # Runde 2: Geber Anna setzt aus → kein zusätzlicher Stern durch die Niederlage.
+        self.assertEqual(sterne["Clara"], 1)
+        self.assertEqual(sterne["Dieter"], 1)
+        # Anna hat ihren Stern nur aus Runde 1 (Spielmacher-Sieg), nicht aus Runde 2.
+        self.assertEqual(sterne["Anna"], 1)
+
+    def test_sieger_enthaelt_sterne(self):
+        """GET sieger/ liefert das sterne-Mapping ebenfalls (konsistenter Endstand)."""
+        antwort = self.client.get(f"/api/spiele/{self.spiel_id}/sieger/")
+        self.assertEqual(antwort.status_code, 200)
+        daten = antwort.json()
+        self.assertIn("sterne", daten)
+        self.assertEqual(
+            daten["sterne"], {"Anna": 1, "Bernd": 0, "Clara": 1, "Dieter": 1}
+        )
+
+    def test_sterne_null_ohne_tausender(self):
+        """Ohne Tausender-Runde sind alle Sternwerte 0."""
+        leeres_spiel = _neues_spiel(self.client)
+        antwort = self.client.get(f"/api/spiele/{leeres_spiel}/punktestaende/")
+        self.assertEqual(
+            antwort.json()["sterne"],
+            {"Anna": 0, "Bernd": 0, "Clara": 0, "Dieter": 0},
+        )
+
+
+# ── TASK-016: Zehner-Eingabe (§9.1/§9.4) ──────────────────────────────────────
+
+class ZehnerEingabeApiTest(TestCase):
+    """
+    Sichert die Backend-Erzwingung der Zehner-Eingabe (STAND immer auf Zehner)
+    und die 250-Kontrollsumme im HTTP-Pfad ab (normativ: rule-set-v1.md §9.1/§9.4).
+    """
+
+    def setUp(self):
+        self.spiel_id = _neues_spiel(self.client)
+        self.url = f"/api/spiele/{self.spiel_id}/runden/"
+
+    def test_stand_ohne_einerstelle(self):
+        """Runde mit Zehner-Stichwerten → alle Punktestände sind Vielfache von 10 (FND-002)."""
+        antwort = _post_json(self.client, self.url, {
+            "typ": "normal",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+            "reizwert": 200,
+            "meldepunkte": 100,
+            "stichwerte": 100,
+            "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Clara", "meldepunkte": 0,  "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 201)
+
+        punkte = self.client.get(
+            f"/api/spiele/{self.spiel_id}/punktestaende/"
+        ).json()["punktestaende"]
+        for name, wert in punkte.items():
+            self.assertEqual(wert % 10, 0, f"Stand von {name} ({wert}) hat eine Einerstelle")
+
+    def test_stichwerte_kein_zehner_abgelehnt(self):
+        """POST mit einem Stichwert, der kein Vielfaches von 10 ist → 400 (Modulo-Guard)."""
+        antwort = _post_json(self.client, self.url, {
+            "typ": "normal",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+            "reizwert": 200,
+            "meldepunkte": 100,
+            "stichwerte": 95,  # kein Zehner
+            "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20, "stichwerte": 60, "hat_eigenen_stich": True},
+                {"name": "Clara", "meldepunkte": 0,  "stichwerte": 40, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 400)
+        self.assertIn("fehler", antwort.json())
+
+    def test_reizwert_kein_zehner_abgelehnt(self):
+        """POST mit einem Reizwert, der kein Vielfaches von 10 ist → 400."""
+        antwort = _post_json(self.client, self.url, {
+            "typ": "normal",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+            "reizwert": 155,  # kein Zehner
+            "meldepunkte": 100,
+            "stichwerte": 100,
+            "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Clara", "meldepunkte": 0,  "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 400)
+        self.assertIn("fehler", antwort.json())
+
+    def test_stichwerte_summe_ueber_250_abgelehnt(self):
+        """POST mit Zehner-Stichwerten, deren Summe 250 übersteigt → 400 (Kontrollsumme)."""
+        antwort = _post_json(self.client, self.url, {
+            "typ": "normal",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+            "reizwert": 200,
+            "meldepunkte": 100,
+            "stichwerte": 120,
+            "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Clara", "meldepunkte": 0,  "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 400)
+        self.assertIn("fehler", antwort.json())

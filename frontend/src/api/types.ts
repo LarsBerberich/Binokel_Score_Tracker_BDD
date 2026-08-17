@@ -106,14 +106,19 @@ export interface RundeErgebnis {
 /** Mapping Spielername → Gesamtpunktestand. */
 export type PunktestandMap = Record<string, number>
 
+/** Mapping Spielername → Anzahl Tausender-Sterne. */
+export type SterneMap = Record<string, number>
+
 export interface Punktestaende {
   spiel_id: number
   punktestaende: PunktestandMap
+  sterne: SterneMap
 }
 
 export interface SiegerErgebnis {
   spiel_id: number
   punktestaende: PunktestandMap
+  sterne: SterneMap
   /** Sieger-Namen; leer, wenn kein eindeutiger Sieger feststeht. */
   sieger: string[]
 }

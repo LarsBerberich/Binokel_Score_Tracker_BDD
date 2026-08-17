@@ -15,6 +15,11 @@ STANDARD_RUNDENANZAHL: int = 12
 GUELTIGE_SPIELERZAHL: int = 4
 STICHWERT_KONTROLLSUMME: int = 250
 
+# Alle Werte, die in den kumulierten STAND einfließen (Stichwerte, Meldepunkte,
+# Reizwert), werden in vollen Zehnern geführt. 1er-genaue Werte gibt es nur in der
+# letzten Runde für den Gleichstand-Tiebreak (normativ: docs/rule-set-v1.md §9.1/§9.4).
+ZEHNER_SCHRITT: int = 10
+
 # Höchstmögliche Meldung eines einzelnen Spielers (württembergisches Doppelblatt):
 # doppelte Familie einer Farbe (1500) + doppelter Binokel (300); die beiden Blatt-Ober
 # der Familie bilden zugleich den doppelten Binokel. Normativ: docs/rule-set-v1.md §7.1.
@@ -36,7 +41,13 @@ class UngueltigeRundenanzahl(SpielFehler):
 
 
 class UngueltigeStichwerte(SpielFehler):
-    """Wird ausgelöst, wenn die Summe aller drei Stichwerte 250 überschreitet."""
+    """Wird ausgelöst, wenn die Summe aller drei Stichwerte 250 überschreitet
+    oder ein Stichwert kein Vielfaches von 10 ist (normativ: §9.1/§9.4)."""
+
+
+class UngueltigerZehnerwert(SpielFehler):
+    """Wird ausgelöst, wenn ein Wert, der in den STAND einfließt (Reizwert oder
+    Meldepunkte), kein Vielfaches von 10 ist (normativ: docs/rule-set-v1.md §9.1/§9.4)."""
 
 
 class UngueltigeMeldepunkte(SpielFehler):
