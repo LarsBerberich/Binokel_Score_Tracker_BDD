@@ -172,19 +172,52 @@ def runde_persistieren(
 
 # ── Slice 6: Punktestände laden ────────────────────────────────────────────────
 
+def _runde_beitrag(runde: RundeModel) -> dict[str, int]:
+    """
+    Beitrag einer einzelnen Runde zum kumulierten STAND je Spieler.
+
+    Gemeinsame Wahrheit für den Gesamt-Punktestand (Summe über alle Runden) und
+    die laufende STAND-Zeile der Anschreibetabelle (laufende Summe je Runde), damit
+    beide garantiert identisch rechnen (HOCH-4).
+
+    Wertungsregeln (normativ: docs/rule-set-v1.md, docs/Anschreibetabelle_4_Spieler.md §4):
+    - Gewonnenes Spiel:       Spielmacher +spielmacher_punkte.
+    - Einfaches/Doppeltes Abgehen: Spielmacher +verlustwert (negativ).
+    - Tausender:              Kein numerischer Einfluss (leerer Beitrag).
+    - Jeder Gegenspieler:     +meldepunkte +stichwerte +mitpunkte_pro_gegenspieler.
+      (meldepunkte sind bereits stich-zwang-gewertet gespeichert; §12.2, §13.3, §14.3)
+
+    Returns:
+        Mapping Spielername → Beitrag dieser Runde. Nicht enthaltene Spieler tragen 0 bei.
+    """
+    beitrag: dict[str, int] = {}
+    ausgang = Rundenausgang(runde.rundenausgang)
+
+    if ausgang in (Rundenausgang.TAUSENDER_GEWONNEN, Rundenausgang.TAUSENDER_VERLOREN):
+        return beitrag  # Tausender: STAND friert ein
+
+    if ausgang == Rundenausgang.GEWONNENES_SPIEL:
+        beitrag[runde.spielmacher.name] = runde.spielmacher_punkte
+    else:
+        # Einfaches oder doppeltes Abgehen: nur Spielmacher trägt den Verlust (negativ).
+        beitrag[runde.spielmacher.name] = runde.verlustwert
+
+    for gs in runde.gegenspieler.all():
+        beitrag[gs.spieler.name] = (
+            beitrag.get(gs.spieler.name, 0)
+            + gs.meldepunkte + gs.stichwerte + runde.mitpunkte_pro_gegenspieler
+        )
+
+    return beitrag
+
+
 def punktestaende_laden(spiel_id: int) -> dict[str, int]:
     """
     Berechnet den aktuellen numerischen Punktestand aller Spieler.
 
-    Aggregiert alle gespeicherten Runden eines Spiels.
-
-    Wertungsregeln (normativ: docs/rule-set-v1.md):
-    - Gewonnenes Spiel:       Spielmacher +spielmacher_punkte,
-                              jeder Gegenspieler +mitpunkte_pro_gegenspieler.
-    - Einfaches/Doppeltes Abgehen: Spielmacher +verlustwert (negativ),
-                              Gegenspieler erhalten nichts.
-    - Tausender:              Kein Einfluss auf numerischen Punktestand.
-    - Geber:                  Setzt aus, erhält keine Punkte für diese Runde.
+    Aggregiert die Pro-Runde-Beiträge (`_runde_beitrag`) über alle gespeicherten
+    Runden eines Spiels. Nutzt denselben Beitrag wie die STAND-Zeile der
+    Anschreibetabelle (HOCH-4), sodass beide garantiert übereinstimmen.
 
     Returns:
         Mapping Spielername → Gesamtpunktestand.
@@ -202,23 +235,8 @@ def punktestaende_laden(spiel_id: int) -> dict[str, int]:
     )
 
     for runde in runden:
-        ausgang = Rundenausgang(runde.rundenausgang)
-
-        if ausgang in (Rundenausgang.TAUSENDER_GEWONNEN, Rundenausgang.TAUSENDER_VERLOREN):
-            continue  # Tausender: kein numerischer Einfluss
-
-        if ausgang == Rundenausgang.GEWONNENES_SPIEL:
-            punkte[runde.spielmacher.name] += runde.spielmacher_punkte
-        else:
-            # Einfaches oder doppeltes Abgehen: nur Spielmacher trägt Verlust
-            punkte[runde.spielmacher.name] += runde.verlustwert  # verlustwert ist negativ
-
-        # Gegenspieler: gewertete Meldepunkte + Stichwerte + Mitpunkte (normativ: §12.2, §13.3, §14.3)
-        # Hinweis: meldepunkte in GegenspielerRundeModel sind bereits stich-zwang-gewertet gespeichert.
-        for gs in runde.gegenspieler.all():
-            punkte[gs.spieler.name] += (
-                gs.meldepunkte + gs.stichwerte + runde.mitpunkte_pro_gegenspieler
-            )
+        for name, wert in _runde_beitrag(runde).items():
+            punkte[name] += wert
 
     return punkte
 
