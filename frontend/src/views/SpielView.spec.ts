@@ -6,19 +6,29 @@ import { useSpielStore } from '../stores/spiel'
 
 vi.mock('../api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api')>()
-  return { ...actual, spielLaden: vi.fn(), punktestaendeLaden: vi.fn() }
+  return {
+    ...actual,
+    spielLaden: vi.fn(),
+    punktestaendeLaden: vi.fn(),
+    rundenHistorieLaden: vi.fn(),
+  }
 })
-import { ApiError, punktestaendeLaden, spielLaden } from '../api'
+import { ApiError, punktestaendeLaden, rundenHistorieLaden, spielLaden } from '../api'
 
 const spielLadenMock = vi.mocked(spielLaden)
 const punktestaendeLadenMock = vi.mocked(punktestaendeLaden)
+const rundenHistorieLadenMock = vi.mocked(rundenHistorieLaden)
 const beispielSpiel = { id: 3, rundenanzahl: 12, spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'] }
+
+const leereHistorie = { spiel_id: 3, spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'], runden: [] }
 
 describe('SpielView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     spielLadenMock.mockReset()
     punktestaendeLadenMock.mockReset()
+    rundenHistorieLadenMock.mockReset()
+    rundenHistorieLadenMock.mockResolvedValue(leereHistorie)
     punktestaendeLadenMock.mockResolvedValue({
       spiel_id: 3,
       punktestaende: { Anna: 0, Bernd: 0, Carla: 0, Dirk: 0 },
@@ -112,5 +122,40 @@ describe('SpielView', () => {
     expect(wrapper.find('[data-testid="beendet"]').exists()).toBe(true)
     const link = wrapper.findComponent(RouterLinkStub)
     expect(link.props().to).toEqual({ name: 'spielende', params: { spielId: '3' } })
+  })
+
+  it('zeigt die Anschreibetabelle, sobald Runden in der Historie vorliegen', async () => {
+    useSpielStore().setzeSpiel(beispielSpiel)
+    rundenHistorieLadenMock.mockResolvedValue({
+      spiel_id: 3,
+      spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'],
+      runden: [
+        {
+          rundennummer: 1,
+          geber: 'Anna',
+          spielmacher: 'Bernd',
+          reizwert: 150,
+          rundenausgang: 'gewonnenes_spiel',
+          ist_tausender: false,
+          verlustwert: 0,
+          spieler: {
+            Anna: { rolle: 'geber', meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
+            Bernd: { rolle: 'spielmacher', meldepunkte: 100, stichwerte: 120, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+            Carla: { rolle: 'gegenspieler', meldepunkte: 40, stichwerte: 130, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+            Dirk: { rolle: 'gegenspieler', meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
+          },
+          stand: { Anna: 0, Bernd: 220, Carla: 170, Dirk: 0 },
+        },
+      ],
+    })
+    const wrapper = mount(SpielView, {
+      props: { spielId: '3' },
+      global: { stubs: { RouterLink: RouterLinkStub } },
+    })
+    await flushPromises()
+
+    expect(rundenHistorieLadenMock).toHaveBeenCalledWith(3)
+    expect(wrapper.find('[data-testid="anschreibetabelle"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="stand-1-Bernd"]').text()).toBe('220')
   })
 })

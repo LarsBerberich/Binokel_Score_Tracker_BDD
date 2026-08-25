@@ -9,6 +9,7 @@
 import type {
   Health,
   Punktestaende,
+  Rundenhistorie,
   RundeErgebnis,
   RundeRequest,
   Spiel,
@@ -76,6 +77,11 @@ export function rundeAuswerten(
   body: RundeRequest,
 ): Promise<RundeErgebnis> {
   return request<RundeErgebnis>(`${API_BASE}/spiele/${spielId}/runden/`, jsonBody(body))
+}
+
+/** Rundenhistorie (Anschreibetabelle) laden – GET /runden/ (TASK-014). */
+export function rundenHistorieLaden(spielId: number): Promise<Rundenhistorie> {
+  return request<Rundenhistorie>(`${API_BASE}/spiele/${spielId}/runden/`)
 }
 
 // ── Slice 6: Auswertung ───────────────────────────────────────────────────────

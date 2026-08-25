@@ -101,6 +101,44 @@ export interface RundeErgebnis {
   mitpunkte_pro_gegenspieler: number
 }
 
+// ── TASK-014: Rundenhistorie / Anschreibetabelle ──────────────────────────────
+
+/** Rolle eines Spielers in einer Runde (der Geber setzt aus). */
+export type SpielerRolle = 'geber' | 'spielmacher' | 'gegenspieler'
+
+/** Aufschlüsselung eines Spielers in einer Runde (M | S | Mit + Stern-Kennzeichen). */
+export interface RundenhistorieZelle {
+  rolle: SpielerRolle
+  meldepunkte: number
+  stichwerte: number
+  mitpunkte: number
+  hat_eigenen_stich: boolean
+  stern: boolean
+}
+
+/** Eine Runde der Anschreibetabelle inkl. kumuliertem STAND je Spieler. */
+export interface RundenhistorieRunde {
+  rundennummer: number
+  geber: string
+  spielmacher: string
+  reizwert: number
+  /** Interner Ausgangs-Code (z. B. gewonnenes_spiel). */
+  rundenausgang: string
+  ist_tausender: boolean
+  /** Negativer Verlustwert bei Abgehen; sonst 0. */
+  verlustwert: number
+  spieler: Record<string, RundenhistorieZelle>
+  stand: Record<string, number>
+}
+
+/** Vollständige Anschreibetabelle eines Spiels (zweizeilig je Runde). */
+export interface Rundenhistorie {
+  spiel_id: number
+  /** Feste Sitzreihenfolge (Spaltenreihenfolge der Tabelle). */
+  spieler: string[]
+  runden: RundenhistorieRunde[]
+}
+
 // ── Slice 6: Auswertung ───────────────────────────────────────────────────────
 
 /** Mapping Spielername → Gesamtpunktestand. */

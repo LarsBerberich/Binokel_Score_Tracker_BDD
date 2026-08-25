@@ -4,8 +4,10 @@ import {
   ApiError,
   punktestaendeLaden,
   rundeAuswerten,
+  rundenHistorieLaden,
   spielLaden,
   type PunktestandMap,
+  type Rundenhistorie,
   type RundeErgebnis,
   type RundeRequest,
   type Spiel,
@@ -14,6 +16,7 @@ import {
 import { useSpielStore } from '../stores/spiel'
 import { aktiveSpieler, geberFuerRunde } from '../domain/rotation'
 import RundeForm from '../components/RundeForm.vue'
+import Anschreibetabelle from '../components/Anschreibetabelle.vue'
 
 const props = defineProps<{ spielId: string }>()
 const spielStore = useSpielStore()
@@ -27,6 +30,7 @@ const rundeFehler = ref<string | null>(null)
 const letztesErgebnis = ref<RundeErgebnis | null>(null)
 const punktestaende = ref<PunktestandMap | null>(null)
 const sterne = ref<SterneMap | null>(null)
+const historie = ref<Rundenhistorie | null>(null)
 
 const rundennummer = computed(() => spielStore.aktuelleRundennummer)
 const geber = computed(() =>
@@ -65,6 +69,16 @@ async function punktestaendeAktualisieren(): Promise<void> {
   }
 }
 
+async function historieAktualisieren(): Promise<void> {
+  if (!spiel.value) return
+  try {
+    historie.value = await rundenHistorieLaden(spiel.value.id)
+  } catch {
+    // Anschreibetabelle ist ergänzende Info – ein Ladefehler blockiert die Runde nicht.
+    historie.value = null
+  }
+}
+
 async function rundeAbsenden(payload: RundeRequest): Promise<void> {
   if (!spiel.value) return
   rundeLaedt.value = true
@@ -73,6 +87,7 @@ async function rundeAbsenden(payload: RundeRequest): Promise<void> {
     letztesErgebnis.value = await rundeAuswerten(spiel.value.id, payload)
     spielStore.naechsteRunde()
     await punktestaendeAktualisieren()
+    await historieAktualisieren()
   } catch (error) {
     rundeFehler.value =
       error instanceof ApiError ? error.message : 'Runde konnte nicht ausgewertet werden.'
@@ -105,6 +120,7 @@ onMounted(async () => {
     }
   }
   await punktestaendeAktualisieren()
+  await historieAktualisieren()
 })
 </script>
 
@@ -209,6 +225,8 @@ onMounted(async () => {
           Zur Auswertung
         </RouterLink>
       </section>
+
+      <Anschreibetabelle v-if="historie && historie.runden.length" :historie="historie" />
     </template>
   </main>
 </template>
