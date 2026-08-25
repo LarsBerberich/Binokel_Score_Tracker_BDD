@@ -29,6 +29,12 @@ Für Entwicklungsprozess und technische Entscheidungen:
 - `docs/adr/ADR-007-github-actions-ci-cd.md` – GitHub Actions als CI/CD-Toolchain
 - `docs/adr/ADR-008-vm-deployment-strategie.md` – VM-Deployment via systemd/Gunicorn/Nginx
 - `docs/adr/ADR-009-internet-hardening-baseline.md` – Internet-Hardening-Baseline der VM
+- `docs/adr/ADR-010-frontend-deployment-same-origin.md` – Frontend Same-Origin-Deployment
+- `docs/adr/ADR-011-frontend-stack-und-bdd-toolchain.md` – Frontend-Stack (Vue) und BDD-Toolchain
+- `docs/adr/ADR-012-node-toolchain-fnm.md` – Node-Toolchain via fnm
+- `docs/adr/ADR-013-teststrategie-testpyramide.md` – Teststrategie/Testpyramide
+- `docs/adr/ADR-014-zehner-eingabe-und-endrunden-tiebreak.md` – Zehner-Eingabe des STAND + Endrunden-Tiebreak
+- `docs/adr/ADR-015-korrektur-nur-letzte-runde.md` – Korrektur: nur die letzte Runde bearbeitbar
 
 ## V1-Scope
 V1 unterstützt ausschließlich:

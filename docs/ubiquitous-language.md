@@ -383,6 +383,30 @@ Dies hilft dabei, fachliche Bedeutung von bloßen Zahlenwerten zu trennen.
 
 ---
 
+### 4.24 Anschreibetabelle
+
+Die **Anschreibetabelle** ist die tabellarische Verlaufsdarstellung aller Runden eines Spiels
+(`docs/Anschreibetabelle_4_Spieler.md` §5). Jede Runde belegt zwei Zeilen: die **Rundenzeile**
+mit der getrennten Erfassung `M | S | Mit` (Meldepunkte | Stichpunkte | Mitpunkte) je Spieler und
+die **STAND-Zeile** mit dem kumulierten Kontostand. Bei Spielverlust des Spielmachers steht der
+eingeklammerte Verlustwert `(-x)` im ersten Feld; bei Tausender erscheint ein Stern `★` und der
+STAND friert ein; der aussetzende Geber wird als „— (setzt aus)" dargestellt.
+
+**Bevorzugte Verwendung im Code:** `Anschreibetabelle` (Frontend-Komponente), `STAND`
+
+---
+
+### 4.25 Korrektur der letzten Runde
+
+Die **Korrektur der letzten Runde** bezeichnet das nachträgliche Bearbeiten der zuletzt erfassten
+Runde (höchste Rundennummer), ohne das Spiel neu anzulegen. Nur diese eine Runde ist bearbeitbar;
+Rundennummer und Geber bleiben dabei fix (ADR-015). Alle übrigen Werte inklusive Spielmacher und
+Ausgangstyp dürfen geändert werden; der STAND wird automatisch neu aggregiert.
+
+**Bevorzugte Verwendung im Code:** `letzteRundeAktualisieren` / `runde_aktualisieren`
+
+---
+
 ## 5. Bevorzugte Begriffsmappings
 
 Im Projekt können deutsche Begriffe, Quellbegriffe und informelle Begriffe nebeneinander vorkommen. Für die gemeinsame Fachsprache gelten die folgenden bevorzugten Zuordnungen:
