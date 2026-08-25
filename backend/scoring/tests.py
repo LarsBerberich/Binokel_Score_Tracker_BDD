@@ -670,3 +670,120 @@ class SpielmacherMSInvarianteApiTest(TestCase):
         self.assertEqual(runde.spielmacher_stichwerte, 0)
         self.assertEqual(runde.spielmacher_punkte, 0)
         self._assert_invariante(runde)
+
+
+# ── TASK-014 Slice 3: Rundenhistorie / Anschreibetabelle ──────────────────────
+
+class RundenhistorieApiTest(TestCase):
+    """
+    GET /api/spiele/{id}/runden/ liefert die zweizeilige Anschreibetabelle:
+    je Runde die M|S|Mit-Aufschlüsselung pro Spieler plus den kumulierten STAND
+    (normativ: docs/Anschreibetabelle_4_Spieler.md §5). Der letzte STAND je Spieler
+    muss `punktestaende_laden` entsprechen (HOCH-4).
+    """
+
+    def setUp(self):
+        self.spiel_id = _neues_spiel(self.client)
+        self.url = f"/api/spiele/{self.spiel_id}/runden/"
+
+    def test_leere_historie_ohne_runden(self):
+        """0 Runden → 200 mit leerer Rundenliste und 0-STAND (kein 404)."""
+        antwort = self.client.get(self.url)
+        self.assertEqual(antwort.status_code, 200)
+        daten = antwort.json()
+        self.assertEqual(daten["runden"], [])
+        self.assertEqual(daten["spieler"], ["Anna", "Bernd", "Clara", "Dieter"])
+
+    def test_historie_nicht_vorhandenes_spiel(self):
+        """GET auf nicht existierendes Spiel → 404."""
+        antwort = self.client.get("/api/spiele/9999/runden/")
+        self.assertEqual(antwort.status_code, 404)
+
+    def test_historie_struktur_und_stand(self):
+        """Nach einer gewonnenen Runde: M|S getrennt, Mit, STAND korrekt."""
+        _post_json(self.client, self.url, {
+            "typ": "normal",
+            "rundennummer": 1,
+            "spielmacher": "Bernd",
+            "geber": "Anna",
+            "reizwert": 180,
+            "meldepunkte": 100,
+            "stichwerte": 120,
+            "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 40, "stichwerte": 130, "hat_eigenen_stich": True},
+                {"name": "Dieter", "meldepunkte": 40, "stichwerte": 0, "hat_eigenen_stich": False},
+            ],
+        })
+        daten = self.client.get(self.url).json()
+        self.assertEqual(len(daten["runden"]), 1)
+        runde = daten["runden"][0]
+        self.assertEqual(runde["geber"], "Anna")
+        self.assertEqual(runde["spielmacher"], "Bernd")
+
+        anna = runde["spieler"]["Anna"]
+        self.assertEqual(anna["rolle"], "geber")
+
+        bernd = runde["spieler"]["Bernd"]
+        self.assertEqual(bernd["rolle"], "spielmacher")
+        self.assertEqual(bernd["meldepunkte"], 100)
+        self.assertEqual(bernd["stichwerte"], 120)
+
+        # Dieter: kein eigener Stich → M gestrichen (0), annotierbar (SOLLTE-6).
+        dieter = runde["spieler"]["Dieter"]
+        self.assertEqual(dieter["meldepunkte"], 0)
+        self.assertFalse(dieter["hat_eigenen_stich"])
+
+        # STAND-Zeile stimmt mit punktestaende überein (HOCH-4).
+        punkte = self.client.get(
+            f"/api/spiele/{self.spiel_id}/punktestaende/"
+        ).json()["punktestaende"]
+        self.assertEqual(runde["stand"], punkte)
+
+    def test_letzte_stand_zeile_gleich_punktestaende(self):
+        """Über mehrere Runden: letzte STAND-Zeile == punktestaende (HOCH-4)."""
+        _post_json(self.client, self.url, {
+            "typ": "normal", "rundennummer": 1, "spielmacher": "Anna", "geber": "Dieter",
+            "reizwert": 200, "meldepunkte": 110, "stichwerte": 100, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Clara", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        _post_json(self.client, self.url, {
+            "typ": "einfaches_abgehen", "rundennummer": 2, "spielmacher": "Bernd", "geber": "Anna",
+            "reizwert": 250,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 40},
+                {"name": "Dieter", "meldepunkte": 20},
+            ],
+        })
+        daten = self.client.get(self.url).json()
+        letzter_stand = daten["runden"][-1]["stand"]
+        punkte = self.client.get(
+            f"/api/spiele/{self.spiel_id}/punktestaende/"
+        ).json()["punktestaende"]
+        self.assertEqual(letzter_stand, punkte)
+
+    def test_tausender_stern_und_stand_friert_ein(self):
+        """Tausender: Stern gesetzt, STAND unverändert gegenüber Vorrunde."""
+        _post_json(self.client, self.url, {
+            "typ": "normal", "rundennummer": 1, "spielmacher": "Anna", "geber": "Dieter",
+            "reizwert": 200, "meldepunkte": 110, "stichwerte": 100, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Clara", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        _post_json(self.client, self.url, {
+            "typ": "tausender_verloren", "rundennummer": 2, "spielmacher": "Bernd", "geber": "Anna",
+        })
+        daten = self.client.get(self.url).json()
+        r1_stand = daten["runden"][0]["stand"]
+        r2 = daten["runden"][1]
+        self.assertTrue(r2["ist_tausender"])
+        self.assertEqual(r2["stand"], r1_stand)  # STAND friert ein
+        # Tausender verloren: aktive Gegenspieler (alle − Geber Anna − SM Bernd) = Clara, Dieter.
+        self.assertTrue(r2["spieler"]["Clara"]["stern"])
+        self.assertTrue(r2["spieler"]["Dieter"]["stern"])
+        self.assertFalse(r2["spieler"]["Anna"]["stern"])  # Geber setzt aus

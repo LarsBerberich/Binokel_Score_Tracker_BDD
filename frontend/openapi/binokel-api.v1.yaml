@@ -86,6 +86,25 @@ paths:
   /api/spiele/{spiel_id}/runden/:
     parameters:
       - $ref: '#/components/parameters/SpielId'
+    get:
+      tags: [Runde]
+      operationId: rundenHistorieLaden
+      summary: Rundenhistorie (Anschreibetabelle) laden
+      description: >-
+        Liefert je Runde die getrennte M|S|Mit-Aufschlüsselung pro Spieler und
+        den kumulierten STAND-Zwischenstand (zweizeilige Anschreibetabelle,
+        normativ: docs/Anschreibetabelle_4_Spieler.md §5). Ohne Runden wird eine
+        leere Historie mit 200 geliefert (kein 404). Die letzte STAND-Zeile
+        entspricht garantiert `punktestaendeLaden`.
+      responses:
+        '200':
+          description: Rundenhistorie (ggf. leer).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rundenhistorie'
+        '404':
+          $ref: '#/components/responses/Fehler'
     post:
       tags: [Runde]
       operationId: rundeAuswerten
@@ -432,3 +451,84 @@ components:
           description: Sieger-Namen; leer, wenn kein eindeutiger Sieger feststeht.
           items:
             type: string
+
+    HistorieSpielerZeile:
+      type: object
+      description: >-
+        M|S|Mit-Aufschlüsselung eines Spielers für eine Runde
+        (Rundenzeile der Anschreibetabelle, §5).
+      required: [rolle, meldepunkte, stichwerte, mitpunkte, hat_eigenen_stich, stern]
+      properties:
+        rolle:
+          type: string
+          enum: [geber, spielmacher, gegenspieler]
+        meldepunkte:
+          type: integer
+          description: Stich-zwang-gewertete Meldung (M); bei Schneider 0.
+        stichwerte:
+          type: integer
+          description: Stichwerte (S).
+        mitpunkte:
+          type: integer
+          description: +30 „Mit" für Gegenspieler bei Abgehen des Spielmachers, sonst 0.
+        hat_eigenen_stich:
+          type: boolean
+          description: false → Meldung verfällt (Schneider, M als 0 angezeigt).
+        stern:
+          type: boolean
+          description: Tausender-Stern (★) dieser Runde.
+
+    HistorieRunde:
+      type: object
+      required:
+        - rundennummer
+        - geber
+        - spielmacher
+        - reizwert
+        - rundenausgang
+        - ist_tausender
+        - verlustwert
+        - spieler
+        - stand
+      properties:
+        rundennummer:
+          type: integer
+        geber:
+          type: string
+        spielmacher:
+          type: string
+        reizwert:
+          type: integer
+        rundenausgang:
+          type: string
+        ist_tausender:
+          type: boolean
+        verlustwert:
+          type: integer
+          description: Negativer Verlustwert (-x) beim verlierenden Spielmacher, sonst 0.
+        spieler:
+          type: object
+          description: Mapping Spielername → M|S|Mit-Zeile.
+          additionalProperties:
+            $ref: '#/components/schemas/HistorieSpielerZeile'
+        stand:
+          type: object
+          description: Kumulierter STAND je Spieler nach dieser Runde.
+          additionalProperties:
+            type: integer
+
+    Rundenhistorie:
+      type: object
+      required: [spiel_id, spieler, runden]
+      properties:
+        spiel_id:
+          type: integer
+        spieler:
+          type: array
+          description: Spielernamen in fester Sitzreihenfolge.
+          items:
+            type: string
+        runden:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistorieRunde'

@@ -274,3 +274,111 @@ def sterne_laden(spiel_id: int) -> dict[str, int]:
                 sterne[name] += 1
 
     return sterne
+
+
+# ── TASK-014: Rundenhistorie / Anschreibetabelle ──────────────────────────────
+
+def rundenhistorie_laden(spiel_id: int) -> dict:
+    """
+    Baut die zweizeilige Anschreibetabelle (docs/Anschreibetabelle_4_Spieler.md §5).
+
+    Je Runde eine Rundenzeile (M | S | Mit pro Spieler, Verlustwert beim
+    verlierenden Spielmacher, Stern bei Tausender, „setzt aus" für den Geber) und
+    der kumulierte STAND-Zwischenstand je Spieler. Der STAND wird über den
+    gemeinsamen `_runde_beitrag` als laufende Summe gebildet (HOCH-4), sodass die
+    letzte STAND-Zeile garantiert `punktestaende_laden` entspricht.
+
+    Bei Tausender-Runden existieren KEINE GegenspielerRundeModel-Zeilen; die
+    aktiven Gegenspieler werden aus „alle − Geber − Spielmacher" hergeleitet und
+    erhalten (bei Tausender verloren) ihren Stern (§15.3). Der STAND friert ein.
+
+    Returns:
+        {
+          "spieler": [Name, …]        # feste Sitzreihenfolge
+          "runden": [
+            {
+              "rundennummer", "geber", "spielmacher", "reizwert",
+              "rundenausgang", "ist_tausender", "verlustwert",
+              "spieler": {Name: {rolle, meldepunkte, stichwerte, mitpunkte,
+                                 hat_eigenen_stich, stern}},
+              "stand": {Name: kumulierter STAND}
+            }, …
+          ]
+        }
+
+    Raises:
+        SpielModel.DoesNotExist: Wenn das Spiel nicht gefunden wird.
+    """
+    spiel_model = SpielModel.objects.prefetch_related("spieler").get(pk=spiel_id)
+    alle_namen = list(
+        spiel_model.spieler.order_by("position").values_list("name", flat=True)
+    )
+
+    runden = (
+        spiel_model.runden
+        .select_related("spielmacher", "geber")
+        .prefetch_related("gegenspieler__spieler")
+        .order_by("rundennummer")
+    )
+
+    laufender_stand: dict[str, int] = {name: 0 for name in alle_namen}
+    historie: list[dict] = []
+
+    for runde in runden:
+        ausgang = Rundenausgang(runde.rundenausgang)
+        ist_tausender = ausgang in (
+            Rundenausgang.TAUSENDER_GEWONNEN,
+            Rundenausgang.TAUSENDER_VERLOREN,
+        )
+
+        # STAND fortschreiben – gemeinsamer Beitrag (HOCH-4).
+        for name, wert in _runde_beitrag(runde).items():
+            laufender_stand[name] += wert
+
+        aktive_gegenspieler = set(alle_namen) - {runde.geber.name, runde.spielmacher.name}
+        gs_map = {gs.spieler.name: gs for gs in runde.gegenspieler.all()}
+
+        spieler_daten: dict[str, dict] = {}
+        for name in alle_namen:
+            if name == runde.geber.name:
+                spieler_daten[name] = {
+                    "rolle": "geber",
+                    "meldepunkte": 0,
+                    "stichwerte": 0,
+                    "mitpunkte": 0,
+                    "hat_eigenen_stich": False,
+                    "stern": False,
+                }
+            elif name == runde.spielmacher.name:
+                spieler_daten[name] = {
+                    "rolle": "spielmacher",
+                    "meldepunkte": runde.spielmacher_meldepunkte,
+                    "stichwerte": runde.spielmacher_stichwerte,
+                    "mitpunkte": 0,
+                    "hat_eigenen_stich": runde.spielmacher_stichwerte > 0,
+                    "stern": runde.spielmacher_stern,
+                }
+            else:
+                gs = gs_map.get(name)
+                spieler_daten[name] = {
+                    "rolle": "gegenspieler",
+                    "meldepunkte": gs.meldepunkte if gs else 0,
+                    "stichwerte": gs.stichwerte if gs else 0,
+                    "mitpunkte": runde.mitpunkte_pro_gegenspieler if gs else 0,
+                    "hat_eigenen_stich": gs.hat_eigenen_stich if gs else False,
+                    "stern": runde.gegenspieler_stern and name in aktive_gegenspieler,
+                }
+
+        historie.append({
+            "rundennummer": runde.rundennummer,
+            "geber": runde.geber.name,
+            "spielmacher": runde.spielmacher.name,
+            "reizwert": runde.reizwert,
+            "rundenausgang": runde.rundenausgang,
+            "ist_tausender": ist_tausender,
+            "verlustwert": runde.verlustwert,
+            "spieler": spieler_daten,
+            "stand": dict(laufender_stand),
+        })
+
+    return {"spieler": alle_namen, "runden": historie}

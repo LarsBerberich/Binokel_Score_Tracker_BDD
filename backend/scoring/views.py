@@ -32,6 +32,7 @@ from scoring.domain import (
 from scoring.repositories import (
     punktestaende_laden,
     runde_persistieren,
+    rundenhistorie_laden,
     spiel_laden,
     spiel_persistieren,
     sterne_laden,
@@ -187,9 +188,20 @@ def spiel_detail_view(request, spiel_id: int) -> JsonResponse:
 
 # ── Slices 2–5: Runde auswerten und persistieren ──────────────────────────────
 
+def _rundenhistorie_antwort(spiel_id: int) -> JsonResponse:
+    """Rundenhistorie (Anschreibetabelle) laden; 0 Runden → leere Historie (200)."""
+    try:
+        historie = rundenhistorie_laden(spiel_id)
+    except ObjectDoesNotExist:
+        return _fehler(f"Spiel {spiel_id} nicht gefunden.", status=404)
+
+    return JsonResponse({"spiel_id": spiel_id, **historie})
+
+
 @csrf_exempt
 def runden_view(request, spiel_id: int) -> JsonResponse:
     """POST /api/spiele/{id}/runden/ — Runde auswerten und speichern.
+    GET  /api/spiele/{id}/runden/ — Rundenhistorie (Anschreibetabelle) laden.
 
     Body-Felder (alle Typen):
         typ          : "normal" | "einfaches_abgehen" | "doppeltes_abgehen"
@@ -209,8 +221,11 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
     Sterne (optional, Default false):
         spielmacher_stern, gegenspieler_stern
     """
+    if request.method == "GET":
+        return _rundenhistorie_antwort(spiel_id)
+
     if request.method != "POST":
-        return _fehler("Nur POST erlaubt.", status=405)
+        return _fehler("Nur GET oder POST erlaubt.", status=405)
 
     try:
         body = _json_body(request)
