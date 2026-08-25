@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import {
   ApiError,
+  letzteRundeAktualisieren,
   punktestaendeLaden,
   rundeAuswerten,
   rundenHistorieLaden,
@@ -10,6 +11,7 @@ import {
   type Rundenhistorie,
   type RundeErgebnis,
   type RundeRequest,
+  type RundeVorbelegung,
   type Spiel,
   type SterneMap,
 } from '../api'
@@ -31,6 +33,9 @@ const letztesErgebnis = ref<RundeErgebnis | null>(null)
 const punktestaende = ref<PunktestandMap | null>(null)
 const sterne = ref<SterneMap | null>(null)
 const historie = ref<Rundenhistorie | null>(null)
+
+/** Korrektur-Modus für die letzte Runde (TASK-014 Slice 6, ADR-015). */
+const korrekturModus = ref(false)
 
 const rundennummer = computed(() => spielStore.aktuelleRundennummer)
 const geber = computed(() =>
@@ -73,10 +78,70 @@ async function historieAktualisieren(): Promise<void> {
   if (!spiel.value) return
   try {
     historie.value = await rundenHistorieLaden(spiel.value.id)
+    // Letzte Runde für die Korrektur bereitstellen (Slice 6).
+    spielStore.setzeLetzteRunde(historie.value.runden.at(-1) ?? null)
   } catch {
     // Anschreibetabelle ist ergänzende Info – ein Ladefehler blockiert die Runde nicht.
     historie.value = null
+    spielStore.setzeLetzteRunde(null)
   }
+}
+
+/** Interner Rundenausgang → Rundentyp der Erfassung (§16.1: doppeltes Abgehen wird abgeleitet). */
+function ausgangZuTyp(ausgang: string): RundeVorbelegung['typ'] {
+  switch (ausgang) {
+    case 'einfaches_abgehen':
+      return 'einfaches_abgehen'
+    case 'tausender_gewonnen':
+      return 'tausender_gewonnen'
+    case 'tausender_verloren':
+      return 'tausender_verloren'
+    default:
+      // gewonnenes_spiel und doppeltes_abgehen werden über „normal" erfasst.
+      return 'normal'
+  }
+}
+
+/** Die zu korrigierende (letzte) Runde aus dem Store. */
+const korrekturRunde = computed(() => spielStore.letzteRunde)
+const korrekturGeber = computed(() => korrekturRunde.value?.geber ?? '')
+const korrekturAktive = computed(() =>
+  spiel.value && korrekturRunde.value
+    ? aktiveSpieler(spiel.value.spieler, korrekturGeber.value)
+    : [],
+)
+
+/** Formular-Vorbelegung aus der letzten Runde (M|S je aktivem Spieler). */
+const korrekturVorbelegung = computed<RundeVorbelegung | null>(() => {
+  const runde = korrekturRunde.value
+  if (!runde) return null
+  const meldepunkte: Record<string, number> = {}
+  const stichwerte: Record<string, number> = {}
+  for (const name of korrekturAktive.value) {
+    const zelle = runde.spieler[name]
+    meldepunkte[name] = zelle?.meldepunkte ?? 0
+    stichwerte[name] = zelle?.stichwerte ?? 0
+  }
+  return {
+    typ: ausgangZuTyp(runde.rundenausgang),
+    reizwert: runde.reizwert,
+    spielmacher: runde.spielmacher,
+    meldepunkte,
+    stichwerte,
+  }
+})
+
+/** Ob die Korrektur der letzten Runde angeboten werden kann. */
+const kannKorrigieren = computed(() => !!korrekturRunde.value)
+
+function korrekturStarten(): void {
+  rundeFehler.value = null
+  korrekturModus.value = true
+}
+
+function korrekturAbbrechen(): void {
+  korrekturModus.value = false
+  rundeFehler.value = null
 }
 
 async function rundeAbsenden(payload: RundeRequest): Promise<void> {
@@ -91,6 +156,31 @@ async function rundeAbsenden(payload: RundeRequest): Promise<void> {
   } catch (error) {
     rundeFehler.value =
       error instanceof ApiError ? error.message : 'Runde konnte nicht ausgewertet werden.'
+  } finally {
+    rundeLaedt.value = false
+  }
+}
+
+/** PUT-Korrektur der letzten Runde; danach Punktestände, Sterne & Anschreibetabelle neu laden. */
+async function korrekturAbsenden(payload: RundeRequest): Promise<void> {
+  if (!spiel.value || !korrekturRunde.value) return
+  rundeLaedt.value = true
+  rundeFehler.value = null
+  try {
+    letztesErgebnis.value = await letzteRundeAktualisieren(
+      spiel.value.id,
+      korrekturRunde.value.rundennummer,
+      payload,
+    )
+    korrekturModus.value = false
+    // Punktestände + Sterne und Anschreibetabelle spiegeln die neu berechneten
+    // Stände; der Sieger wird serverseitig neu berechnet und von SpielendeView
+    // beim Öffnen frisch geladen (§9.3).
+    await punktestaendeAktualisieren()
+    await historieAktualisieren()
+  } catch (error) {
+    rundeFehler.value =
+      error instanceof ApiError ? error.message : 'Korrektur konnte nicht gespeichert werden.'
   } finally {
     rundeLaedt.value = false
   }
@@ -165,7 +255,7 @@ onMounted(async () => {
         </ol>
       </section>
 
-      <section v-if="!istBeendet" class="flex flex-col gap-3">
+      <section v-if="!istBeendet && !korrekturModus" class="flex flex-col gap-3">
         <p class="text-slate-600">
           Geber (setzt aus): <strong data-testid="geber">{{ geber }}</strong>
         </p>
@@ -202,9 +292,23 @@ onMounted(async () => {
           @absenden="rundeAbsenden"
           @tiebreak-stichwerte="tiebreakStichwerteErfassen"
         />
+
+        <button
+          v-if="kannKorrigieren"
+          type="button"
+          data-testid="korrektur-starten"
+          class="self-start rounded border border-amber-500 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+          @click="korrekturStarten"
+        >
+          Letzte Runde korrigieren
+        </button>
       </section>
 
-      <section v-else data-testid="beendet" class="flex flex-col gap-3">
+      <section
+        v-else-if="istBeendet && !korrekturModus"
+        data-testid="beendet"
+        class="flex flex-col gap-3"
+      >
         <p class="text-slate-700">Alle {{ spiel.rundenanzahl }} Runden gespielt.</p>
 
         <p
@@ -224,6 +328,51 @@ onMounted(async () => {
         >
           Zur Auswertung
         </RouterLink>
+
+        <button
+          v-if="kannKorrigieren"
+          type="button"
+          data-testid="korrektur-starten"
+          class="self-start rounded border border-amber-500 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+          @click="korrekturStarten"
+        >
+          Letzte Runde korrigieren
+        </button>
+      </section>
+
+      <section
+        v-else-if="korrekturModus && korrekturRunde"
+        data-testid="korrektur"
+        class="flex flex-col gap-3 rounded border border-amber-300 bg-amber-50 p-3"
+      >
+        <p class="text-sm text-amber-800">
+          Korrektur der letzten Runde
+          (<strong>Runde {{ korrekturRunde.rundennummer }}</strong>,
+          Geber setzt aus: {{ korrekturGeber }}). Nur diese Runde ist editierbar (ADR-015).
+        </p>
+
+        <RundeForm
+          :key="`korrektur-${korrekturRunde.rundennummer}`"
+          :korrektur-modus="true"
+          :vorbelegung="korrekturVorbelegung"
+          :rundennummer="korrekturRunde.rundennummer"
+          :geber="korrekturGeber"
+          :aktive="korrekturAktive"
+          :rundenanzahl="spiel.rundenanzahl"
+          :laedt="rundeLaedt"
+          :fehler="rundeFehler"
+          @absenden="korrekturAbsenden"
+          @tiebreak-stichwerte="tiebreakStichwerteErfassen"
+        />
+
+        <button
+          type="button"
+          data-testid="korrektur-abbrechen"
+          class="self-start rounded border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
+          @click="korrekturAbbrechen"
+        >
+          Abbrechen
+        </button>
       </section>
 
       <Anschreibetabelle v-if="historie && historie.runden.length" :historie="historie" />

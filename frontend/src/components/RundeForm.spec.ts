@@ -300,4 +300,78 @@ describe('RundeForm', () => {
     })
     expect(wrapper.find('[data-testid="tiebreak-block"]').exists()).toBe(false)
   })
+
+  // ── TASK-014 Slice 6: Korrektur der letzten Runde (Vorbelegung) ─────────────
+
+  it('befüllt das Formular im Korrektur-Modus mit den Werten der letzten Runde', () => {
+    const wrapper = mount(RundeForm, {
+      props: {
+        rundennummer: 3,
+        geber: 'Anna',
+        aktive,
+        korrekturModus: true,
+        vorbelegung: {
+          typ: 'normal' as const,
+          reizwert: 180,
+          spielmacher: 'Carla',
+          meldepunkte: { Bernd: 40, Carla: 100, Dirk: 20 },
+          stichwerte: { Bernd: 60, Carla: 130, Dirk: 60 },
+        },
+      },
+    })
+
+    expect((wrapper.find('[data-testid="typ"]').element as HTMLSelectElement).value).toBe('normal')
+    expect((wrapper.find('[data-testid="spielmacher"]').element as HTMLSelectElement).value).toBe(
+      'Carla',
+    )
+    expect((wrapper.find('[data-testid="reizwert"]').element as HTMLInputElement).value).toBe('180')
+    // Carla ist Spielmacher → Gegenspieler Bernd/Dirk.
+    expect((wrapper.find('[data-testid="sm-meldepunkte"]').element as HTMLInputElement).value).toBe(
+      '100',
+    )
+    expect(
+      (wrapper.find('[data-testid="gs-meldepunkte-Bernd"]').element as HTMLInputElement).value,
+    ).toBe('40')
+    expect(
+      (wrapper.find('[data-testid="gs-stichwerte-Dirk"]').element as HTMLInputElement).value,
+    ).toBe('60')
+  })
+
+  it('kennzeichnet den Absenden-Button im Korrektur-Modus und emittiert die korrigierten Werte', async () => {
+    const wrapper = mount(RundeForm, {
+      props: {
+        rundennummer: 2,
+        geber: 'Anna',
+        aktive,
+        korrekturModus: true,
+        vorbelegung: {
+          typ: 'einfaches_abgehen' as const,
+          reizwert: 150,
+          spielmacher: 'Bernd',
+          meldepunkte: { Bernd: 0, Carla: 40, Dirk: 20 },
+          stichwerte: { Bernd: 0, Carla: 0, Dirk: 0 },
+        },
+      },
+    })
+
+    expect(wrapper.find('[data-testid="runde-absenden"]').text()).toContain('Korrektur speichern')
+
+    // Meldepunkte korrigieren und speichern.
+    await wrapper.find('[data-testid="gs-meldepunkte-Carla"]').setValue(60)
+    await wrapper.find('form').trigger('submit')
+
+    const events = wrapper.emitted('absenden')
+    expect(events).toHaveLength(1)
+    expect(events?.[0][0]).toEqual({
+      typ: 'einfaches_abgehen',
+      rundennummer: 2,
+      spielmacher: 'Bernd',
+      geber: 'Anna',
+      reizwert: 150,
+      gegenspieler: [
+        { name: 'Carla', meldepunkte: 60 },
+        { name: 'Dirk', meldepunkte: 20 },
+      ],
+    })
+  })
 })

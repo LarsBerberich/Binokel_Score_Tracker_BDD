@@ -139,6 +139,21 @@ export interface Rundenhistorie {
   runden: RundenhistorieRunde[]
 }
 
+/**
+ * Vorbelegung des Erfassungsformulars für die Korrektur der letzten Runde
+ * (TASK-014 Slice 6). Enthält die editierbaren Ausgangswerte; der Geber und die
+ * Rundennummer werden vom Kontext (SpielView) bzw. serverseitig bestimmt.
+ */
+export interface RundeVorbelegung {
+  typ: Rundentyp
+  reizwert: number
+  spielmacher: string
+  /** Meldepunkte je aktivem Spieler. */
+  meldepunkte: Record<string, number>
+  /** Stichwerte je aktivem Spieler. */
+  stichwerte: Record<string, number>
+}
+
 // ── Slice 6: Auswertung ───────────────────────────────────────────────────────
 
 /** Mapping Spielername → Gesamtpunktestand. */

@@ -11,16 +11,48 @@ vi.mock('../api', async (importOriginal) => {
     spielLaden: vi.fn(),
     punktestaendeLaden: vi.fn(),
     rundenHistorieLaden: vi.fn(),
+    letzteRundeAktualisieren: vi.fn(),
   }
 })
-import { ApiError, punktestaendeLaden, rundenHistorieLaden, spielLaden } from '../api'
+import {
+  ApiError,
+  letzteRundeAktualisieren,
+  punktestaendeLaden,
+  rundenHistorieLaden,
+  spielLaden,
+} from '../api'
 
 const spielLadenMock = vi.mocked(spielLaden)
 const punktestaendeLadenMock = vi.mocked(punktestaendeLaden)
 const rundenHistorieLadenMock = vi.mocked(rundenHistorieLaden)
+const letzteRundeAktualisierenMock = vi.mocked(letzteRundeAktualisieren)
 const beispielSpiel = { id: 3, rundenanzahl: 12, spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'] }
 
 const leereHistorie = { spiel_id: 3, spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'], runden: [] }
+
+/** Historie mit einer normalen Runde (Anna Geber, Bernd Spielmacher). */
+const historieMitRunde = {
+  spiel_id: 3,
+  spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'],
+  runden: [
+    {
+      rundennummer: 1,
+      geber: 'Anna',
+      spielmacher: 'Bernd',
+      reizwert: 150,
+      rundenausgang: 'gewonnenes_spiel',
+      ist_tausender: false,
+      verlustwert: 0,
+      spieler: {
+        Anna: { rolle: 'geber' as const, meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
+        Bernd: { rolle: 'spielmacher' as const, meldepunkte: 100, stichwerte: 100, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+        Carla: { rolle: 'gegenspieler' as const, meldepunkte: 40, stichwerte: 90, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+        Dirk: { rolle: 'gegenspieler' as const, meldepunkte: 0, stichwerte: 60, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+      },
+      stand: { Anna: 0, Bernd: 200, Carla: 130, Dirk: 60 },
+    },
+  ],
+}
 
 describe('SpielView', () => {
   beforeEach(() => {
@@ -28,6 +60,7 @@ describe('SpielView', () => {
     spielLadenMock.mockReset()
     punktestaendeLadenMock.mockReset()
     rundenHistorieLadenMock.mockReset()
+    letzteRundeAktualisierenMock.mockReset()
     rundenHistorieLadenMock.mockResolvedValue(leereHistorie)
     punktestaendeLadenMock.mockResolvedValue({
       spiel_id: 3,
@@ -157,5 +190,49 @@ describe('SpielView', () => {
     expect(rundenHistorieLadenMock).toHaveBeenCalledWith(3)
     expect(wrapper.find('[data-testid="anschreibetabelle"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="stand-1-Bernd"]').text()).toBe('220')
+  })
+
+  it('korrigiert die letzte Runde per PUT und lädt Punktestände + Historie neu', async () => {
+    useSpielStore().setzeSpiel(beispielSpiel)
+    rundenHistorieLadenMock.mockResolvedValue(historieMitRunde)
+    letzteRundeAktualisierenMock.mockResolvedValue({
+      id: 1,
+      rundennummer: 1,
+      rundenausgang: 'gewonnenes_spiel',
+      spielmacher_punkte: 210,
+      verlustwert: 0,
+      mitpunkte_pro_gegenspieler: 0,
+    })
+    const wrapper = mount(SpielView, {
+      props: { spielId: '3' },
+      global: { stubs: { RouterLink: RouterLinkStub } },
+    })
+    await flushPromises()
+
+    // Korrektur starten → Formular im Korrektur-Modus mit den Werten der letzten Runde.
+    expect(wrapper.find('[data-testid="korrektur-starten"]').exists()).toBe(true)
+    await wrapper.find('[data-testid="korrektur-starten"]').trigger('click')
+    expect(wrapper.find('[data-testid="korrektur"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="runde-absenden"]').text()).toContain('Korrektur speichern')
+    // Vorbelegung: Bernd Spielmacher, Meldepunkte 100 aus der letzten Runde.
+    expect((wrapper.find('[data-testid="sm-meldepunkte"]').element as HTMLInputElement).value).toBe(
+      '100',
+    )
+
+    // Korrigierten Meldewert setzen und speichern.
+    await wrapper.find('[data-testid="sm-meldepunkte"]').setValue(110)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(letzteRundeAktualisierenMock).toHaveBeenCalledTimes(1)
+    const [spielId, rundennummer, payload] = letzteRundeAktualisierenMock.mock.calls[0]
+    expect(spielId).toBe(3)
+    expect(rundennummer).toBe(1)
+    expect(payload).toMatchObject({ typ: 'normal', spielmacher: 'Bernd', meldepunkte: 110 })
+
+    // Nach Erfolg: Korrektur-Modus verlassen, Punktestände + Historie neu geladen.
+    expect(wrapper.find('[data-testid="korrektur"]').exists()).toBe(false)
+    expect(punktestaendeLadenMock).toHaveBeenCalledTimes(2)
+    expect(rundenHistorieLadenMock).toHaveBeenCalledTimes(2)
   })
 })

@@ -84,6 +84,22 @@ export function rundenHistorieLaden(spielId: number): Promise<Rundenhistorie> {
   return request<Rundenhistorie>(`${API_BASE}/spiele/${spielId}/runden/`)
 }
 
+/**
+ * Korrektur der LETZTEN Runde – PUT /runden/{nr}/ (TASK-014, ADR-015).
+ * Nur die höchste Rundennummer ist editierbar; der Geber wird serverseitig aus
+ * der Rundennummer abgeleitet (ein im Body übergebener `geber` wird ignoriert).
+ */
+export function letzteRundeAktualisieren(
+  spielId: number,
+  rundennummer: number,
+  body: RundeRequest,
+): Promise<RundeErgebnis> {
+  return request<RundeErgebnis>(
+    `${API_BASE}/spiele/${spielId}/runden/${rundennummer}/`,
+    { method: 'PUT', body: JSON.stringify(body) },
+  )
+}
+
 // ── Slice 6: Auswertung ───────────────────────────────────────────────────────
 
 export function punktestaendeLaden(spielId: number): Promise<Punktestaende> {

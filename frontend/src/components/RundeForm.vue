@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import type { Gegenspieler, RundeRequest, Rundentyp } from '../api'
+import type { Gegenspieler, RundeRequest, Rundentyp, RundeVorbelegung } from '../api'
 import { gegenspielerNamen } from '../domain/rotation'
 import { REIZWERT_MINIMUM, STICHWERT_KONTROLLSUMME, ZEHNER_SCHRITT, MELDEPUNKTE_MAXIMUM } from '../domain/regeln'
 
@@ -16,6 +16,11 @@ import { REIZWERT_MINIMUM, STICHWERT_KONTROLLSUMME, ZEHNER_SCHRITT, MELDEPUNKTE_
  * automatisch abgeleitet, wenn M+S < Reizwert (§16.1), und ist daher kein
  * eigener Auswahlpunkt. Sterne ergeben sich ausschließlich aus dem
  * Tausender-Ausgang und werden vom Backend gesetzt (§15.3/§15.5).
+ *
+ * Im Korrektur-Modus (`korrekturModus`, TASK-014 Slice 6) wird das Formular aus
+ * `vorbelegung` mit den Werten der letzten Runde befüllt; der Absenden-Button
+ * kennzeichnet die Korrektur. Der Parent (SpielView) entscheidet anhand des
+ * Handlers, ob POST (neu) oder PUT (Korrektur) gesendet wird.
  */
 const props = withDefaults(
   defineProps<{
@@ -25,8 +30,10 @@ const props = withDefaults(
     rundenanzahl?: number
     laedt?: boolean
     fehler?: string | null
+    korrekturModus?: boolean
+    vorbelegung?: RundeVorbelegung | null
   }>(),
-  { rundenanzahl: 0, laedt: false, fehler: null },
+  { rundenanzahl: 0, laedt: false, fehler: null, korrekturModus: false, vorbelegung: null },
 )
 
 const emit = defineEmits<{
@@ -92,6 +99,20 @@ function resetEingaben(): void {
   }
 }
 
+/** Befüllt das Formular mit den Werten der zu korrigierenden Runde (Slice 6). */
+function vorbelegungAnwenden(v: RundeVorbelegung): void {
+  synchronisiereDetails(props.aktive)
+  typ.value = v.typ
+  reizwert.value = v.reizwert
+  spielmacher.value = props.aktive.includes(v.spielmacher) ? v.spielmacher : props.aktive[0] ?? ''
+  stichwertReihenfolge.value = []
+  for (const name of props.aktive) {
+    if (!details[name]) details[name] = { meldepunkte: 0, stichwerte: 0 }
+    details[name].meldepunkte = v.meldepunkte[name] ?? 0
+    details[name].stichwerte = v.stichwerte[name] ?? 0
+  }
+}
+
 // Spielmacher + Detaileinträge an die aktiven Spieler koppeln (Runden-/Geberwechsel).
 watch(
   () => props.aktive,
@@ -99,15 +120,20 @@ watch(
     synchronisiereDetails(neu)
     stichwertReihenfolge.value = []
     if (!neu.includes(spielmacher.value)) spielmacher.value = neu[0] ?? ''
+    // Im Korrektur-Modus die Werte der letzten Runde übernehmen (Slice 6).
+    if (props.korrekturModus && props.vorbelegung) vorbelegungAnwenden(props.vorbelegung)
   },
   { immediate: true },
 )
 
 // Nach erfolgreicher Wertung erhöht der Parent die Rundennummer → Formular zurücksetzen.
 // Der Reset kommt bewusst aus dem Parent, da RundeForm den POST-Erfolg nicht kennt (012.6).
+// Im Korrektur-Modus greift der Reset nicht: die Vorbelegung darf nicht überschrieben werden.
 watch(
   () => props.rundennummer,
-  () => resetEingaben(),
+  () => {
+    if (!props.korrekturModus) resetEingaben()
+  },
 )
 
 const gegenspieler = computed(() => gegenspielerNamen(props.aktive, spielmacher.value))
@@ -314,7 +340,9 @@ function absenden(): void {
 <template>
   <form class="flex flex-col gap-4" novalidate @submit.prevent="absenden">
     <fieldset class="flex flex-col gap-3 border-0 p-0" :disabled="laedt">
-      <legend class="text-lg font-semibold">Runde {{ rundennummer }} erfassen</legend>
+      <legend class="text-lg font-semibold">
+        Runde {{ rundennummer }} {{ korrekturModus ? 'korrigieren' : 'erfassen' }}
+      </legend>
 
       <label class="flex flex-col gap-1">
         <span class="text-sm text-slate-600">Rundentyp</span>
@@ -535,7 +563,8 @@ function absenden(): void {
       :disabled="!istGueltig || laedt"
       class="rounded bg-emerald-600 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {{ laedt ? 'Wird gewertet …' : 'Runde werten' }}
+      <template v-if="korrekturModus">{{ laedt ? 'Wird korrigiert …' : 'Korrektur speichern' }}</template>
+      <template v-else>{{ laedt ? 'Wird gewertet …' : 'Runde werten' }}</template>
     </button>
   </form>
 </template>

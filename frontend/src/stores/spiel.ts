@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Spiel } from '../api'
+import type { RundenhistorieRunde, Spiel } from '../api'
 
 /**
  * Hält das aktuell aktive Spiel (nach dem Anlegen bzw. Laden).
@@ -13,6 +13,11 @@ export const useSpielStore = defineStore('spiel', () => {
   /** 1-basierte Nummer der aktuell zu erfassenden Runde. */
   const aktuelleRundennummer = ref(1)
   /**
+   * Zuletzt erfasste Runde der Anschreibetabelle (für die Korrektur der letzten
+   * Runde, TASK-014 Slice 6). `null`, solange keine Runde gespielt wurde.
+   */
+  const letzteRunde = ref<RundenhistorieRunde | null>(null)
+  /**
    * Exakte 1er-Stichwerte der aktiven Spieler aus der letzten Runde (§9.4).
    * Fließen NICHT in den STAND ein, sondern dienen ausschließlich dem
    * Gleichstand-Tiebreak in `SpielendeView` (§9.3). `null`, solange keine
@@ -23,11 +28,16 @@ export const useSpielStore = defineStore('spiel', () => {
   function setzeSpiel(spiel: Spiel): void {
     aktuellesSpiel.value = spiel
     aktuelleRundennummer.value = 1
+    letzteRunde.value = null
     endrundenStichwerte.value = null
   }
 
   function naechsteRunde(): void {
     aktuelleRundennummer.value += 1
+  }
+
+  function setzeLetzteRunde(runde: RundenhistorieRunde | null): void {
+    letzteRunde.value = runde
   }
 
   function setzeEndrundenStichwerte(werte: Record<string, number> | null): void {
@@ -37,9 +47,11 @@ export const useSpielStore = defineStore('spiel', () => {
   return {
     aktuellesSpiel,
     aktuelleRundennummer,
+    letzteRunde,
     endrundenStichwerte,
     setzeSpiel,
     naechsteRunde,
+    setzeLetzteRunde,
     setzeEndrundenStichwerte,
   }
 })
