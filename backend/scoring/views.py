@@ -30,7 +30,9 @@ from scoring.domain import (
     UngueltigerZehnerwert,
 )
 from scoring.repositories import (
+    letzte_rundennummer,
     punktestaende_laden,
+    runde_aktualisieren,
     runde_persistieren,
     rundenhistorie_laden,
     spiel_laden,
@@ -130,6 +132,185 @@ def _pflichtfeld(body: dict, *felder: str) -> str | None:
         if feld not in body:
             return feld
     return None
+
+
+class _RundeEingabeFehler(Exception):
+    """Fachlicher Eingabefehler mit HTTP-Status – POST und PUT teilen ihn (HOCH-2)."""
+
+    def __init__(self, nachricht: str, status: int = 400) -> None:
+        super().__init__(nachricht)
+        self.nachricht = nachricht
+        self.status = status
+
+
+def _runde_wertung_berechnen(body: dict) -> dict:
+    """Dispatch + Validierung einer Runde nach Typ – gemeinsam für POST und PUT (HOCH-2).
+
+    Führt Meldepunkte-Plausibilität (§7.1), Zehner-/Kontrollsummen-Prüfung
+    (§9.1/§9.4), den Typ-Dispatch inkl. Stern- und Gegenspieler-Zeilen-Logik
+    (HOCH-3) sowie die Spielmacher-M|S-Invariante (HOCH-1:
+    ``spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte``)
+    an EINER Stelle aus. Dadurch durchläuft die Korrektur (PUT) exakt dieselbe
+    Wertung wie das Anlegen (POST) – keine Duplikation.
+
+    Returns:
+        dict mit allen Wertungsfeldern (rundenausgang, spielmacher_punkte,
+        verlustwert, mitpunkte_pro_gegenspieler, spielmacher_stern,
+        gegenspieler_stern, spielmacher_meldepunkte, spielmacher_stichwerte,
+        gegenspieler) – direkt als ``**kwargs`` für runde_persistieren /
+        runde_aktualisieren nutzbar.
+
+    Raises:
+        _RundeEingabeFehler: Bei fehlenden Pflichtfeldern, unbekanntem Typ oder
+            verletzter Validierung (modulo-10, 250-Kontrollsumme, 1800-Maximum).
+    """
+    typ: str = body["typ"]
+    spielmacher_stern: bool = body.get("spielmacher_stern", False)
+    gegenspieler_stern: bool = body.get("gegenspieler_stern", False)
+
+    # Spielmacher-M/S für die getrennte Anschreibetabelle (§5); Invariante
+    # spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte.
+    # Bei Verlust/Tausender bleiben beide 0 (siehe Defaults hier).
+    spielmacher_meldepunkte = 0
+    spielmacher_stichwerte = 0
+
+    # Plausibilitätsgrenze der Meldepunkte prüfen (normativ: rule-set-v1.md §7.1).
+    try:
+        _meldepunkte_pruefen(body)
+    except UngueltigeMeldepunkte as exc:
+        raise _RundeEingabeFehler(_validierungsfehler_nachricht(exc)) from exc
+
+    # ── Dispatch nach Rundentyp ────────────────────────────────────────────────
+
+    if typ == "normal":
+        fehlendes = _pflichtfeld(body, "reizwert", "meldepunkte", "stichwerte",
+                                 "hat_eigenen_stich", "gegenspieler")
+        if fehlendes:
+            raise _RundeEingabeFehler(f"Pflichtfeld fehlt für typ 'normal': '{fehlendes}'.")
+
+        # Zehner-Eingabe + 250-Kontrollsumme erzwingen (normativ: §9.1/§9.4).
+        try:
+            _zehner_und_kontrollsumme_pruefen(body, mit_spielmacher_stichwert=True)
+        except (UngueltigeStichwerte, UngueltigerZehnerwert) as exc:
+            raise _RundeEingabeFehler(_validierungsfehler_nachricht(exc)) from exc
+
+        sm_melde = meldepunkte_mit_stich_zwang(
+            body["meldepunkte"], body["hat_eigenen_stich"]
+        )
+        ausgang, gesamtpunkte = normales_spiel_auswerten(
+            body["reizwert"], sm_melde, body["stichwerte"]
+        )
+
+        if ausgang == Rundenausgang.GEWONNENES_SPIEL:
+            spielmacher_punkte = gesamtpunkte
+            verlustwert = 0
+            mitpunkte = 0
+            # Getrennte M|S nur bei gewonnenem Spiel; Invariante M+S == Punkte (§5).
+            spielmacher_meldepunkte = sm_melde
+            spielmacher_stichwerte = body["stichwerte"]
+        else:  # doppeltes Abgehen
+            spielmacher_punkte = 0
+            verlustwert, _ = doppeltes_abgehen_auswerten(body["reizwert"])
+            mitpunkte = 30
+
+        gegenspieler_daten = [
+            {
+                "name": gs["name"],
+                "meldepunkte": meldepunkte_mit_stich_zwang(
+                    gs["meldepunkte"], gs["hat_eigenen_stich"]
+                ),
+                "stichwerte": gs["stichwerte"],
+                "hat_eigenen_stich": gs["hat_eigenen_stich"],
+            }
+            for gs in body["gegenspieler"]
+        ]
+
+    elif typ == "einfaches_abgehen":
+        fehlendes = _pflichtfeld(body, "reizwert", "gegenspieler")
+        if fehlendes:
+            raise _RundeEingabeFehler(
+                f"Pflichtfeld fehlt für typ 'einfaches_abgehen': '{fehlendes}'."
+            )
+
+        ausgang = Rundenausgang.EINFACHES_ABGEHEN
+        spielmacher_punkte = 0
+        verlustwert, _ = einfaches_abgehen_auswerten(body["reizwert"])
+        mitpunkte = 30
+
+        # Kein Stich-Zwang für Gegenspieler (normativ: rule-set-v1.md §13.4)
+        gegenspieler_daten = [
+            {
+                "name": gs["name"],
+                "meldepunkte": gs["meldepunkte"],
+                "stichwerte": 0,
+                "hat_eigenen_stich": gs.get("hat_eigenen_stich", False),
+            }
+            for gs in body["gegenspieler"]
+        ]
+
+    elif typ == "doppeltes_abgehen":
+        fehlendes = _pflichtfeld(body, "reizwert", "gegenspieler")
+        if fehlendes:
+            raise _RundeEingabeFehler(
+                f"Pflichtfeld fehlt für typ 'doppeltes_abgehen': '{fehlendes}'."
+            )
+
+        # Zehner-Eingabe + 250-Kontrollsumme erzwingen; Spielmacher-Stichwert verfällt (§9.1/§9.4).
+        try:
+            _zehner_und_kontrollsumme_pruefen(body, mit_spielmacher_stichwert=False)
+        except (UngueltigeStichwerte, UngueltigerZehnerwert) as exc:
+            raise _RundeEingabeFehler(_validierungsfehler_nachricht(exc)) from exc
+
+        ausgang = Rundenausgang.DOPPELTES_ABGEHEN
+        spielmacher_punkte = 0
+        verlustwert, _ = doppeltes_abgehen_auswerten(body["reizwert"])
+        mitpunkte = 30
+
+        # Normaler Stich-Zwang gilt (normativ: rule-set-v1.md §14.4)
+        gegenspieler_daten = [
+            {
+                "name": gs["name"],
+                "meldepunkte": meldepunkte_mit_stich_zwang(
+                    gs["meldepunkte"], gs["hat_eigenen_stich"]
+                ),
+                "stichwerte": gs["stichwerte"],
+                "hat_eigenen_stich": gs["hat_eigenen_stich"],
+            }
+            for gs in body["gegenspieler"]
+        ]
+
+    elif typ in ("tausender_gewonnen", "tausender_verloren"):
+        # Kein numerischer Einfluss auf Punktestand (normativ: rule-set-v1.md §15)
+        ausgang = (
+            Rundenausgang.TAUSENDER_GEWONNEN
+            if typ == "tausender_gewonnen"
+            else Rundenausgang.TAUSENDER_VERLOREN
+        )
+        spielmacher_punkte = 0
+        verlustwert = 0
+        mitpunkte = 0
+        spielmacher_stern = ausgang == Rundenausgang.TAUSENDER_GEWONNEN
+        gegenspieler_stern = ausgang == Rundenausgang.TAUSENDER_VERLOREN
+        gegenspieler_daten = []
+
+    else:
+        raise _RundeEingabeFehler(
+            f"Unbekannter Rundentyp: '{typ}'. "
+            "Erlaubt: normal, einfaches_abgehen, doppeltes_abgehen, "
+            "tausender_gewonnen, tausender_verloren."
+        )
+
+    return {
+        "rundenausgang": ausgang,
+        "spielmacher_punkte": spielmacher_punkte,
+        "verlustwert": verlustwert,
+        "mitpunkte_pro_gegenspieler": mitpunkte,
+        "spielmacher_stern": spielmacher_stern,
+        "gegenspieler_stern": gegenspieler_stern,
+        "spielmacher_meldepunkte": spielmacher_meldepunkte,
+        "spielmacher_stichwerte": spielmacher_stichwerte,
+        "gegenspieler": gegenspieler_daten,
+    }
 
 
 # ── Slice 1: Spiel anlegen / laden ────────────────────────────────────────────
@@ -236,157 +417,19 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
     if fehlendes:
         return _fehler(f"Pflichtfeld fehlt: '{fehlendes}'.")
 
-    typ: str = body["typ"]
-    rundennummer: int = body["rundennummer"]
-    spielmacher_name: str = body["spielmacher"]
-    geber_name: str = body["geber"]
-    spielmacher_stern: bool = body.get("spielmacher_stern", False)
-    gegenspieler_stern: bool = body.get("gegenspieler_stern", False)
-
-    # Spielmacher-M/S für die getrennte Anschreibetabelle (§5). Invariante:
-    # spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte.
-    # Bei Verlust/Tausender bleiben beide 0 (siehe Default hier).
-    spielmacher_meldepunkte = 0
-    spielmacher_stichwerte = 0
-
-    # Plausibilitätsgrenze der Meldepunkte prüfen (normativ: rule-set-v1.md §7.1).
     try:
-        _meldepunkte_pruefen(body)
-    except UngueltigeMeldepunkte as exc:
-        return _fehler(_validierungsfehler_nachricht(exc))
-
-    # ── Dispatch nach Rundentyp ────────────────────────────────────────────────
-
-    if typ == "normal":
-        fehlendes = _pflichtfeld(body, "reizwert", "meldepunkte", "stichwerte",
-                                 "hat_eigenen_stich", "gegenspieler")
-        if fehlendes:
-            return _fehler(f"Pflichtfeld fehlt für typ 'normal': '{fehlendes}'.")
-
-        # Zehner-Eingabe + 250-Kontrollsumme erzwingen (normativ: §9.1/§9.4).
-        try:
-            _zehner_und_kontrollsumme_pruefen(body, mit_spielmacher_stichwert=True)
-        except (UngueltigeStichwerte, UngueltigerZehnerwert) as exc:
-            return _fehler(_validierungsfehler_nachricht(exc))
-
-        sm_melde = meldepunkte_mit_stich_zwang(
-            body["meldepunkte"], body["hat_eigenen_stich"]
-        )
-        ausgang, gesamtpunkte = normales_spiel_auswerten(
-            body["reizwert"], sm_melde, body["stichwerte"]
-        )
-
-        if ausgang == Rundenausgang.GEWONNENES_SPIEL:
-            spielmacher_punkte = gesamtpunkte
-            verlustwert = 0
-            mitpunkte = 0
-            # Getrennte M|S nur bei gewonnenem Spiel; Invariante M+S == Punkte (§5).
-            spielmacher_meldepunkte = sm_melde
-            spielmacher_stichwerte = body["stichwerte"]
-        else:  # doppeltes Abgehen
-            spielmacher_punkte = 0
-            verlustwert, _ = doppeltes_abgehen_auswerten(body["reizwert"])
-            mitpunkte = 30
-
-        gegenspieler_daten = [
-            {
-                "name": gs["name"],
-                "meldepunkte": meldepunkte_mit_stich_zwang(
-                    gs["meldepunkte"], gs["hat_eigenen_stich"]
-                ),
-                "stichwerte": gs["stichwerte"],
-                "hat_eigenen_stich": gs["hat_eigenen_stich"],
-            }
-            for gs in body["gegenspieler"]
-        ]
-
-    elif typ == "einfaches_abgehen":
-        fehlendes = _pflichtfeld(body, "reizwert", "gegenspieler")
-        if fehlendes:
-            return _fehler(f"Pflichtfeld fehlt für typ 'einfaches_abgehen': '{fehlendes}'.")
-
-        ausgang = Rundenausgang.EINFACHES_ABGEHEN
-        spielmacher_punkte = 0
-        verlustwert, _ = einfaches_abgehen_auswerten(body["reizwert"])
-        mitpunkte = 30
-
-        # Kein Stich-Zwang für Gegenspieler (normativ: rule-set-v1.md §13.4)
-        gegenspieler_daten = [
-            {
-                "name": gs["name"],
-                "meldepunkte": gs["meldepunkte"],
-                "stichwerte": 0,
-                "hat_eigenen_stich": gs.get("hat_eigenen_stich", False),
-            }
-            for gs in body["gegenspieler"]
-        ]
-
-    elif typ == "doppeltes_abgehen":
-        fehlendes = _pflichtfeld(body, "reizwert", "gegenspieler")
-        if fehlendes:
-            return _fehler(f"Pflichtfeld fehlt für typ 'doppeltes_abgehen': '{fehlendes}'.")
-
-        # Zehner-Eingabe + 250-Kontrollsumme erzwingen; Spielmacher-Stichwert verfällt (§9.1/§9.4).
-        try:
-            _zehner_und_kontrollsumme_pruefen(body, mit_spielmacher_stichwert=False)
-        except (UngueltigeStichwerte, UngueltigerZehnerwert) as exc:
-            return _fehler(_validierungsfehler_nachricht(exc))
-
-        ausgang = Rundenausgang.DOPPELTES_ABGEHEN
-        spielmacher_punkte = 0
-        verlustwert, _ = doppeltes_abgehen_auswerten(body["reizwert"])
-        mitpunkte = 30
-
-        # Normaler Stich-Zwang gilt (normativ: rule-set-v1.md §14.4)
-        gegenspieler_daten = [
-            {
-                "name": gs["name"],
-                "meldepunkte": meldepunkte_mit_stich_zwang(
-                    gs["meldepunkte"], gs["hat_eigenen_stich"]
-                ),
-                "stichwerte": gs["stichwerte"],
-                "hat_eigenen_stich": gs["hat_eigenen_stich"],
-            }
-            for gs in body["gegenspieler"]
-        ]
-
-    elif typ in ("tausender_gewonnen", "tausender_verloren"):
-        # Kein numerischer Einfluss auf Punktestand (normativ: rule-set-v1.md §15)
-        ausgang = (
-            Rundenausgang.TAUSENDER_GEWONNEN
-            if typ == "tausender_gewonnen"
-            else Rundenausgang.TAUSENDER_VERLOREN
-        )
-        spielmacher_punkte = 0
-        verlustwert = 0
-        mitpunkte = 0
-        spielmacher_stern = ausgang == Rundenausgang.TAUSENDER_GEWONNEN
-        gegenspieler_stern = ausgang == Rundenausgang.TAUSENDER_VERLOREN
-        gegenspieler_daten = []
-
-    else:
-        return _fehler(
-            f"Unbekannter Rundentyp: '{typ}'. "
-            "Erlaubt: normal, einfaches_abgehen, doppeltes_abgehen, "
-            "tausender_gewonnen, tausender_verloren."
-        )
+        wertung = _runde_wertung_berechnen(body)
+    except _RundeEingabeFehler as exc:
+        return _fehler(exc.nachricht, status=exc.status)
 
     try:
         runde = runde_persistieren(
             spiel_id=spiel_id,
-            rundennummer=rundennummer,
-            spielmacher_name=spielmacher_name,
-            geber_name=geber_name,
-            spielmacher_meldepunkte=spielmacher_meldepunkte,
-            spielmacher_stichwerte=spielmacher_stichwerte,
+            rundennummer=body["rundennummer"],
+            spielmacher_name=body["spielmacher"],
+            geber_name=body["geber"],
             reizwert=body.get("reizwert", 0),
-            rundenausgang=ausgang,
-            spielmacher_punkte=spielmacher_punkte,
-            verlustwert=verlustwert,
-            mitpunkte_pro_gegenspieler=mitpunkte,
-            spielmacher_stern=spielmacher_stern,
-            gegenspieler_stern=gegenspieler_stern,
-            gegenspieler=gegenspieler_daten,
+            **wertung,
         )
     except ObjectDoesNotExist:
         return _fehler(f"Spiel {spiel_id} nicht gefunden.", status=404)
@@ -404,6 +447,98 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
         },
         status=201,
     )
+
+
+@csrf_exempt
+def runde_detail_view(request, spiel_id: int, rundennummer: int) -> JsonResponse:
+    """PUT /api/spiele/{id}/runden/{nr}/ — Korrektur der LETZTEN Runde (TASK-014, ADR-015).
+
+    Nur die höchste gespeicherte Rundennummer ist editierbar:
+    - Nicht-letzte Runde        → 409 Conflict
+    - Runde/Spiel nicht vorhanden → 404 Not Found
+    - Validierungsfehler        → 400 (gemeinsames _fehler-Schema)
+
+    Body-Felder wie bei POST, jedoch OHNE ``geber``: der Geber wird deterministisch
+    aus der Rundennummer abgeleitet (HOCH-5, Geberrotation §3), nicht vom Client
+    übernommen. Der Dispatch ist mit POST geteilt (HOCH-2), sodass Typ-Übergänge
+    tausender↔normal die Gegenspieler-Zeilen und Sterne korrekt umschalten (HOCH-3)
+    und die Spielmacher-M|S-Invariante (HOCH-1) erhalten bleibt.
+    """
+    if request.method != "PUT":
+        return _fehler("Nur PUT erlaubt.", status=405)
+
+    try:
+        body = _json_body(request)
+    except ValueError:
+        return _fehler("Ungültiger JSON-Body.")
+
+    fehlendes = _pflichtfeld(body, "typ", "spielmacher")
+    if fehlendes:
+        return _fehler(f"Pflichtfeld fehlt: '{fehlendes}'.")
+
+    try:
+        spiel = spiel_laden(spiel_id)
+    except ObjectDoesNotExist:
+        return _fehler(f"Spiel {spiel_id} nicht gefunden.", status=404)
+
+    # Korrektur-Regel: nur die letzte Runde ist editierbar (ADR-015).
+    letzte = letzte_rundennummer(spiel_id)
+    if letzte is None:
+        return _fehler(f"Spiel {spiel_id} hat noch keine Runden.", status=404)
+    if rundennummer < 1 or rundennummer > letzte:
+        return _fehler(
+            f"Runde {rundennummer} in Spiel {spiel_id} existiert nicht.", status=404
+        )
+    if rundennummer != letzte:
+        return _fehler(
+            f"Nur die letzte Runde ({letzte}) ist korrigierbar, nicht Runde {rundennummer}.",
+            status=409,
+        )
+
+    # Geber deterministisch aus der Rundennummer ableiten (HOCH-5, nicht vom Client).
+    geber_name = spiel.geber_in_runde(rundennummer)
+    spielmacher_name: str = body["spielmacher"]
+    if spielmacher_name not in spiel.spieler_reihenfolge:
+        return _fehler(
+            f"Spielmacher '{spielmacher_name}' ist nicht im Spiel #{spiel_id} registriert."
+        )
+    if spielmacher_name == geber_name:
+        return _fehler(
+            f"Der Spielmacher darf nicht der Geber sein (Geber in Runde {rundennummer}: "
+            f"'{geber_name}')."
+        )
+
+    try:
+        wertung = _runde_wertung_berechnen(body)
+    except _RundeEingabeFehler as exc:
+        return _fehler(exc.nachricht, status=exc.status)
+
+    try:
+        runde = runde_aktualisieren(
+            spiel_id=spiel_id,
+            rundennummer=rundennummer,
+            spielmacher_name=spielmacher_name,
+            geber_name=geber_name,
+            reizwert=body.get("reizwert", 0),
+            **wertung,
+        )
+    except ObjectDoesNotExist:
+        return _fehler(f"Runde {rundennummer} in Spiel {spiel_id} nicht gefunden.", status=404)
+    except (IntegrityError, ValueError, UngueltigeStichwerte) as exc:
+        return _fehler(_validierungsfehler_nachricht(exc), status=400)
+
+    return JsonResponse(
+        {
+            "id": runde.pk,
+            "rundennummer": runde.rundennummer,
+            "rundenausgang": runde.rundenausgang,
+            "spielmacher_punkte": runde.spielmacher_punkte,
+            "verlustwert": runde.verlustwert,
+            "mitpunkte_pro_gegenspieler": runde.mitpunkte_pro_gegenspieler,
+        },
+        status=200,
+    )
+
 
 
 # ── Slice 6: Punktestände und Sieger ──────────────────────────────────────────

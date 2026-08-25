@@ -133,6 +133,51 @@ paths:
         '405':
           $ref: '#/components/responses/Fehler'
 
+  /api/spiele/{spiel_id}/runden/{rundennummer}/:
+    parameters:
+      - $ref: '#/components/parameters/SpielId'
+      - name: rundennummer
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: >-
+          1-basierte Rundennummer. Nur die höchste (zuletzt erfasste) Runde ist
+          editierbar (ADR-015).
+    put:
+      tags: [Runde]
+      operationId: letzteRundeAktualisieren
+      summary: Korrektur der letzten Runde
+      description: >-
+        Überschreibt die zuletzt erfasste Runde in-place (nur die höchste
+        rundennummer, ADR-015). Der Geber wird deterministisch aus der
+        Rundennummer abgeleitet und NICHT aus dem Body übernommen (HOCH-5).
+        Typ-Übergänge (tausender↔normal) schalten Gegenspieler-Zeilen und Sterne
+        korrekt um. Statuscodes: Nicht-letzte Runde → 409, nicht existente
+        Runde/Spiel → 404, Validierungsfehler → 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RundeKorrekturRequest'
+      responses:
+        '200':
+          description: Runde korrigiert.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RundeErgebnis'
+        '400':
+          $ref: '#/components/responses/Fehler'
+        '404':
+          $ref: '#/components/responses/Fehler'
+        '405':
+          $ref: '#/components/responses/Fehler'
+        '409':
+          $ref: '#/components/responses/Fehler'
+
   /api/spiele/{spiel_id}/punktestaende/:
     parameters:
       - $ref: '#/components/parameters/SpielId'
@@ -376,6 +421,95 @@ components:
           doppeltes_abgehen: '#/components/schemas/RundeDoppeltesAbgehen'
           tausender_gewonnen: '#/components/schemas/RundeTausender'
           tausender_verloren: '#/components/schemas/RundeTausender'
+
+    RundeKorrekturBasis:
+      type: object
+      required: [typ, spielmacher]
+      description: >-
+        Wie RundeBasis, aber OHNE `geber` und `rundennummer`: Der Geber wird bei
+        der Korrektur deterministisch aus der Rundennummer abgeleitet (HOCH-5),
+        die Rundennummer stammt aus dem Pfad. Ein im Body übergebener `geber`
+        wird ignoriert.
+      properties:
+        typ:
+          $ref: '#/components/schemas/Rundentyp'
+        spielmacher:
+          type: string
+        spielmacher_stern:
+          type: boolean
+          default: false
+        gegenspieler_stern:
+          type: boolean
+          default: false
+
+    RundeKorrekturNormal:
+      allOf:
+        - $ref: '#/components/schemas/RundeKorrekturBasis'
+        - type: object
+          required: [reizwert, meldepunkte, stichwerte, hat_eigenen_stich, gegenspieler]
+          properties:
+            reizwert:
+              type: integer
+            meldepunkte:
+              type: integer
+              minimum: 0
+              maximum: 1800
+            stichwerte:
+              type: integer
+            hat_eigenen_stich:
+              type: boolean
+            gegenspieler:
+              type: array
+              items:
+                $ref: '#/components/schemas/Gegenspieler'
+
+    RundeKorrekturEinfachesAbgehen:
+      allOf:
+        - $ref: '#/components/schemas/RundeKorrekturBasis'
+        - type: object
+          required: [reizwert, gegenspieler]
+          properties:
+            reizwert:
+              type: integer
+            gegenspieler:
+              type: array
+              items:
+                $ref: '#/components/schemas/GegenspielerEinfach'
+
+    RundeKorrekturDoppeltesAbgehen:
+      allOf:
+        - $ref: '#/components/schemas/RundeKorrekturBasis'
+        - type: object
+          required: [reizwert, gegenspieler]
+          properties:
+            reizwert:
+              type: integer
+            gegenspieler:
+              type: array
+              items:
+                $ref: '#/components/schemas/Gegenspieler'
+
+    RundeKorrekturTausender:
+      description: >-
+        typ tausender_gewonnen / tausender_verloren – nur die Basisfelder werden
+        benötigt (rule-set-v1.md §15).
+      allOf:
+        - $ref: '#/components/schemas/RundeKorrekturBasis'
+
+    RundeKorrekturRequest:
+      oneOf:
+        - $ref: '#/components/schemas/RundeKorrekturNormal'
+        - $ref: '#/components/schemas/RundeKorrekturEinfachesAbgehen'
+        - $ref: '#/components/schemas/RundeKorrekturDoppeltesAbgehen'
+        - $ref: '#/components/schemas/RundeKorrekturTausender'
+      discriminator:
+        propertyName: typ
+        mapping:
+          normal: '#/components/schemas/RundeKorrekturNormal'
+          einfaches_abgehen: '#/components/schemas/RundeKorrekturEinfachesAbgehen'
+          doppeltes_abgehen: '#/components/schemas/RundeKorrekturDoppeltesAbgehen'
+          tausender_gewonnen: '#/components/schemas/RundeKorrekturTausender'
+          tausender_verloren: '#/components/schemas/RundeKorrekturTausender'
 
     RundeErgebnis:
       type: object

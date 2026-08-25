@@ -72,6 +72,53 @@ def spiel_laden(spiel_id: int) -> Spiel:
 
 # ── Slices 2–5: Runde persistieren ────────────────────────────────────────────
 
+def _namen_pruefen(
+    spiel_id: int,
+    spieler_map: dict[str, SpielerModel],
+    spielmacher_name: str,
+    geber_name: str,
+    gegenspieler: list[GegenspielerDaten],
+) -> None:
+    """Stellt sicher, dass alle Namen im Spiel registriert sind (sonst ValueError)."""
+    if spielmacher_name not in spieler_map:
+        raise ValueError(
+            f"Spielmacher '{spielmacher_name}' ist nicht im Spiel #{spiel_id} registriert."
+        )
+    if geber_name not in spieler_map:
+        raise ValueError(
+            f"Geber '{geber_name}' ist nicht im Spiel #{spiel_id} registriert."
+        )
+    for gs in gegenspieler:
+        if gs["name"] not in spieler_map:
+            raise ValueError(
+                f"Gegenspieler '{gs['name']}' ist nicht im Spiel #{spiel_id} registriert."
+            )
+
+
+def _gegenspieler_zeilen_setzen(
+    runde: RundeModel,
+    spieler_map: dict[str, SpielerModel],
+    gegenspieler: list[GegenspielerDaten],
+) -> None:
+    """Ersetzt die GegenspielerRundeModel-Zeilen einer Runde vollständig.
+
+    Beim Anlegen sind noch keine Zeilen vorhanden; bei der Korrektur (PUT) werden
+    die alten gelöscht und neu erzeugt. Für Tausender ist ``gegenspieler`` leer,
+    sodass die Runde ganz ohne Gegenspieler-Zeilen bleibt (HOCH-3).
+    """
+    runde.gegenspieler.all().delete()
+    GegenspielerRundeModel.objects.bulk_create([
+        GegenspielerRundeModel(
+            runde=runde,
+            spieler=spieler_map[gs["name"]],
+            meldepunkte=gs["meldepunkte"],
+            stichwerte=gs["stichwerte"],
+            hat_eigenen_stich=gs["hat_eigenen_stich"],
+        )
+        for gs in gegenspieler
+    ])
+
+
 @transaction.atomic
 def runde_persistieren(
     *,
@@ -119,26 +166,13 @@ def runde_persistieren(
 
     Raises:
         SpielModel.DoesNotExist:   Wenn das Spiel nicht gefunden wird.
-        SpielerModel.DoesNotExist: Wenn ein Spielername nicht im Spiel existiert.
+        ValueError:                Wenn ein Spielername nicht im Spiel existiert.
     """
     spiel_model = SpielModel.objects.get(pk=spiel_id)
     spieler_map: dict[str, SpielerModel] = {
         s.name: s for s in spiel_model.spieler.all()
     }
-
-    if spielmacher_name not in spieler_map:
-        raise ValueError(
-            f"Spielmacher '{spielmacher_name}' ist nicht im Spiel #{spiel_id} registriert."
-        )
-    if geber_name not in spieler_map:
-        raise ValueError(
-            f"Geber '{geber_name}' ist nicht im Spiel #{spiel_id} registriert."
-        )
-    for gs in gegenspieler:
-        if gs["name"] not in spieler_map:
-            raise ValueError(
-                f"Gegenspieler '{gs['name']}' ist nicht im Spiel #{spiel_id} registriert."
-            )
+    _namen_pruefen(spiel_id, spieler_map, spielmacher_name, geber_name, gegenspieler)
 
     runde = RundeModel.objects.create(
         spiel=spiel_model,
@@ -155,19 +189,80 @@ def runde_persistieren(
         spielmacher_stern=spielmacher_stern,
         gegenspieler_stern=gegenspieler_stern,
     )
-
-    GegenspielerRundeModel.objects.bulk_create([
-        GegenspielerRundeModel(
-            runde=runde,
-            spieler=spieler_map[gs["name"]],
-            meldepunkte=gs["meldepunkte"],
-            stichwerte=gs["stichwerte"],
-            hat_eigenen_stich=gs["hat_eigenen_stich"],
-        )
-        for gs in gegenspieler
-    ])
+    _gegenspieler_zeilen_setzen(runde, spieler_map, gegenspieler)
 
     return runde
+
+
+@transaction.atomic
+def runde_aktualisieren(
+    *,
+    spiel_id: int,
+    rundennummer: int,
+    spielmacher_name: str,
+    geber_name: str,
+    reizwert: int,
+    rundenausgang: Rundenausgang,
+    spielmacher_punkte: int,
+    verlustwert: int,
+    mitpunkte_pro_gegenspieler: int,
+    spielmacher_stern: bool,
+    gegenspieler_stern: bool,
+    gegenspieler: list[GegenspielerDaten],
+    spielmacher_meldepunkte: int = 0,
+    spielmacher_stichwerte: int = 0,
+) -> RundeModel:
+    """
+    Überschreibt eine bereits gespeicherte Runde in-place (Korrektur, TASK-014).
+
+    Aktualisiert alle Wertungsfelder und ersetzt die GegenspielerRundeModel-Zeilen
+    vollständig. Dadurch schaltet auch ein Typ-Übergang korrekt um (HOCH-3):
+    tausender→normal legt GS-Zeilen an und löscht die Sterne, normal→tausender
+    löscht die GS-Zeilen und setzt die Sterne. Die Rundennummer bleibt erhalten,
+    sodass Geberrotation und Sequenz unverändert bleiben.
+
+    Raises:
+        SpielModel.DoesNotExist:  Wenn das Spiel nicht gefunden wird.
+        RundeModel.DoesNotExist:  Wenn die Runde (spiel_id, rundennummer) nicht existiert.
+        ValueError:               Wenn ein Spielername nicht im Spiel existiert.
+    """
+    spiel_model = SpielModel.objects.get(pk=spiel_id)
+    spieler_map: dict[str, SpielerModel] = {
+        s.name: s for s in spiel_model.spieler.all()
+    }
+    _namen_pruefen(spiel_id, spieler_map, spielmacher_name, geber_name, gegenspieler)
+
+    runde = RundeModel.objects.get(spiel=spiel_model, rundennummer=rundennummer)
+    runde.reizwert = reizwert
+    runde.rundenausgang = rundenausgang.value
+    runde.spielmacher = spieler_map[spielmacher_name]
+    runde.geber = spieler_map[geber_name]
+    runde.spielmacher_punkte = spielmacher_punkte
+    runde.spielmacher_meldepunkte = spielmacher_meldepunkte
+    runde.spielmacher_stichwerte = spielmacher_stichwerte
+    runde.verlustwert = verlustwert
+    runde.mitpunkte_pro_gegenspieler = mitpunkte_pro_gegenspieler
+    runde.spielmacher_stern = spielmacher_stern
+    runde.gegenspieler_stern = gegenspieler_stern
+    runde.save()
+
+    _gegenspieler_zeilen_setzen(runde, spieler_map, gegenspieler)
+
+    return runde
+
+
+def letzte_rundennummer(spiel_id: int) -> int | None:
+    """Höchste gespeicherte Rundennummer eines Spiels, oder None ohne Runden.
+
+    Grundlage für die Korrektur-Regel „nur die letzte Runde ist editierbar"
+    (TASK-014 / ADR-015).
+    """
+    return (
+        RundeModel.objects.filter(spiel_id=spiel_id)
+        .order_by("-rundennummer")
+        .values_list("rundennummer", flat=True)
+        .first()
+    )
 
 
 # ── Slice 6: Punktestände laden ────────────────────────────────────────────────

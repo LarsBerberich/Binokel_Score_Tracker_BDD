@@ -104,3 +104,12 @@ Normative Quellen:
 
 ## Verlustwert-Darstellung in der Tabelle
 - Dann wird der Verlustwert als "<darstellungswert>" in der Tabelle dargestellt
+
+## Korrektur der letzten Runde
+- Angenommen ein neues Spiel mit einer erfassten Runde für die Korrektur ist angelegt
+- Angenommen ein neues Spiel mit zwei erfassten Runden für die Korrektur ist angelegt
+- Wenn die letzte Runde mit einem höheren Spielmacher-Ergebnis korrigiert wird
+- Wenn versucht wird, die erste Runde zu korrigieren
+- Dann wird die Korrektur übernommen
+- Und der kumulierte STAND des Spielmachers beträgt <punkte>
+- Dann wird die Korrektur abgelehnt

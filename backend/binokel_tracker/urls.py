@@ -19,6 +19,7 @@ from django.urls import path
 
 from scoring.views import (
     punktestaende_view,
+    runde_detail_view,
     runden_view,
     sieger_view,
     spiel_detail_view,
@@ -43,6 +44,8 @@ urlpatterns = [
     path("api/spiele/<int:spiel_id>/", spiel_detail_view, name="spiel-detail"),
     # Slices 2–5: Runde auswerten
     path("api/spiele/<int:spiel_id>/runden/", runden_view, name="runden"),
+    # TASK-014: Korrektur der letzten Runde (nur höchste rundennummer, ADR-015)
+    path("api/spiele/<int:spiel_id>/runden/<int:rundennummer>/", runde_detail_view, name="runde-detail"),
     # Slice 6: Punktestände und Sieger
     path("api/spiele/<int:spiel_id>/punktestaende/", punktestaende_view, name="punktestaende"),
     path("api/spiele/<int:spiel_id>/sieger/", sieger_view, name="sieger"),

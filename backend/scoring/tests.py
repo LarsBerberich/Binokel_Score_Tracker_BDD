@@ -787,3 +787,216 @@ class RundenhistorieApiTest(TestCase):
         self.assertTrue(r2["spieler"]["Clara"]["stern"])
         self.assertTrue(r2["spieler"]["Dieter"]["stern"])
         self.assertFalse(r2["spieler"]["Anna"]["stern"])  # Geber setzt aus
+
+
+# ── TASK-014 Slice 4: Korrektur der letzten Runde (PUT) ───────────────────────
+
+class RundeKorrekturApiTest(TestCase):
+    """
+    PUT /api/spiele/{id}/runden/{nr}/ — Korrektur der letzten Runde (TASK-014, ADR-015).
+
+    Nur die höchste Rundennummer ist editierbar. Der Geber wird deterministisch aus
+    der Rundennummer abgeleitet (HOCH-5), der Dispatch ist mit POST geteilt (HOCH-2),
+    Typ-Übergänge schalten Gegenspieler-Zeilen und Sterne um (HOCH-3), und die
+    Spielmacher-M|S-Invariante bleibt erhalten (HOCH-1).
+
+    Geberrotation (Spieler Anna,Bernd,Clara,Dieter): Runde 1→Anna, 2→Bernd, 3→Clara.
+    """
+
+    def setUp(self):
+        self.spiel_id = _neues_spiel(self.client)
+        self.url = f"/api/spiele/{self.spiel_id}/runden/"
+
+    def _put_json(self, rundennummer: int, payload: dict):
+        return self.client.put(
+            f"/api/spiele/{self.spiel_id}/runden/{rundennummer}/",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+    def _runde(self, rundennummer: int):
+        from scoring.models import RundeModel
+        return RundeModel.objects.get(spiel_id=self.spiel_id, rundennummer=rundennummer)
+
+    def _normale_runde_1(self):
+        """POST Runde 1: gewonnenes Spiel, Geber Anna (= deterministisch), SM Bernd."""
+        return _post_json(self.client, self.url, {
+            "typ": "normal", "rundennummer": 1, "spielmacher": "Bernd", "geber": "Anna",
+            "reizwert": 200, "meldepunkte": 110, "stichwerte": 100, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Dieter", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+
+    def test_put_letzte_runde_aktualisiert_stand(self):
+        """Korrektur der letzten Runde → 200, letzte STAND-Zeile == punktestaende (HOCH-4)."""
+        self._normale_runde_1()
+        antwort = self._put_json(1, {
+            "typ": "normal", "spielmacher": "Bernd",
+            "reizwert": 200, "meldepunkte": 150, "stichwerte": 100, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 20, "stichwerte": 80, "hat_eigenen_stich": True},
+                {"name": "Dieter", "meldepunkte": 0, "stichwerte": 70, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 200)
+        runde = self._runde(1)
+        self.assertEqual(runde.spielmacher_punkte, 250)  # 150 + 100
+
+        historie = self.client.get(self.url).json()
+        letzter_stand = historie["runden"][-1]["stand"]
+        punkte = self.client.get(
+            f"/api/spiele/{self.spiel_id}/punktestaende/"
+        ).json()["punktestaende"]
+        self.assertEqual(letzter_stand, punkte)
+
+    def test_put_invariante_ms(self):
+        """PUT normal gewonnen: Invariante spielmacher_punkte == M + S bleibt erhalten."""
+        self._normale_runde_1()
+        self._put_json(1, {
+            "typ": "normal", "spielmacher": "Bernd",
+            "reizwert": 200, "meldepunkte": 120, "stichwerte": 90, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 20, "stichwerte": 100, "hat_eigenen_stich": True},
+                {"name": "Dieter", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        runde = self._runde(1)
+        self.assertEqual(runde.spielmacher_meldepunkte, 120)
+        self.assertEqual(runde.spielmacher_stichwerte, 90)
+        self.assertEqual(
+            runde.spielmacher_punkte,
+            runde.spielmacher_meldepunkte + runde.spielmacher_stichwerte,
+        )
+
+    def test_put_typ_uebergang_normal_zu_tausender(self):
+        """normal→tausender: GS-Zeilen gelöscht, Sterne gesetzt, SM M|S = 0|0 (HOCH-3)."""
+        self._normale_runde_1()
+        antwort = self._put_json(1, {"typ": "tausender_gewonnen", "spielmacher": "Bernd"})
+        self.assertEqual(antwort.status_code, 200)
+        runde = self._runde(1)
+        self.assertEqual(runde.gegenspieler.count(), 0)
+        self.assertTrue(runde.spielmacher_stern)
+        self.assertFalse(runde.gegenspieler_stern)
+        self.assertEqual(runde.spielmacher_meldepunkte, 0)
+        self.assertEqual(runde.spielmacher_stichwerte, 0)
+        self.assertEqual(runde.spielmacher_punkte, 0)
+
+    def test_put_typ_uebergang_tausender_zu_normal(self):
+        """tausender→normal: GS-Zeilen angelegt, Sterne gelöscht, SM M|S gesetzt (HOCH-3)."""
+        _post_json(self.client, self.url, {
+            "typ": "tausender_verloren", "rundennummer": 1, "spielmacher": "Bernd", "geber": "Anna",
+        })
+        antwort = self._put_json(1, {
+            "typ": "normal", "spielmacher": "Bernd",
+            "reizwert": 200, "meldepunkte": 110, "stichwerte": 100, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Dieter", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 200)
+        runde = self._runde(1)
+        self.assertEqual(runde.gegenspieler.count(), 2)
+        self.assertFalse(runde.spielmacher_stern)
+        self.assertFalse(runde.gegenspieler_stern)
+        self.assertEqual(runde.spielmacher_meldepunkte, 110)
+        self.assertEqual(runde.spielmacher_stichwerte, 100)
+
+    def test_put_geber_deterministisch_ignoriert_client(self):
+        """Geber wird aus rundennummer abgeleitet, ein Body-Geber wird ignoriert (HOCH-5)."""
+        self._normale_runde_1()
+        self._put_json(1, {
+            "typ": "normal", "spielmacher": "Bernd", "geber": "Clara",  # falsch → wird ignoriert
+            "reizwert": 200, "meldepunkte": 110, "stichwerte": 100, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Dieter", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        runde = self._runde(1)
+        self.assertEqual(runde.geber.name, "Anna")  # deterministisch für Runde 1
+
+    def test_put_spielmacher_gleich_geber_abgelehnt(self):
+        """Spielmacher == abgeleiteter Geber → 400."""
+        self._normale_runde_1()
+        antwort = self._put_json(1, {"typ": "tausender_gewonnen", "spielmacher": "Anna"})
+        self.assertEqual(antwort.status_code, 400)
+
+    def test_put_spielmacher_nicht_im_spiel_abgelehnt(self):
+        """Spielmacher ist kein Spieler des Spiels → 400."""
+        self._normale_runde_1()
+        antwort = self._put_json(1, {"typ": "tausender_gewonnen", "spielmacher": "Xaver"})
+        self.assertEqual(antwort.status_code, 400)
+
+    def test_put_validierung_reuse_stichwert_kein_zehner(self):
+        """Geteilte Validierung (modulo-10 Stichwert) greift auch im PUT → 400."""
+        self._normale_runde_1()
+        antwort = self._put_json(1, {
+            "typ": "normal", "spielmacher": "Bernd",
+            "reizwert": 200, "meldepunkte": 100, "stichwerte": 95, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 20, "stichwerte": 60, "hat_eigenen_stich": True},
+                {"name": "Dieter", "meldepunkte": 0, "stichwerte": 40, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 400)
+
+    def test_put_validierung_reuse_reizwert_kein_zehner(self):
+        """Geteilte Validierung (modulo-10 Reizwert) greift auch im PUT → 400."""
+        self._normale_runde_1()
+        antwort = self._put_json(1, {
+            "typ": "normal", "spielmacher": "Bernd",
+            "reizwert": 155, "meldepunkte": 100, "stichwerte": 100, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Dieter", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 400)
+
+    def test_put_validierung_reuse_kontrollsumme(self):
+        """Geteilte Validierung (250-Kontrollsumme) greift auch im PUT → 400."""
+        self._normale_runde_1()
+        antwort = self._put_json(1, {
+            "typ": "normal", "spielmacher": "Bernd",
+            "reizwert": 200, "meldepunkte": 100, "stichwerte": 120, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Dieter", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 400)
+
+    def test_put_nicht_letzte_runde_409(self):
+        """Korrektur einer bestehenden, aber nicht letzten Runde → 409 Conflict."""
+        self._normale_runde_1()
+        _post_json(self.client, self.url, {
+            "typ": "einfaches_abgehen", "rundennummer": 2, "spielmacher": "Clara", "geber": "Bernd",
+            "reizwert": 250,
+            "gegenspieler": [
+                {"name": "Anna", "meldepunkte": 40},
+                {"name": "Dieter", "meldepunkte": 20},
+            ],
+        })
+        antwort = self._put_json(1, {"typ": "tausender_gewonnen", "spielmacher": "Bernd"})
+        self.assertEqual(antwort.status_code, 409)
+
+    def test_put_nicht_existente_runde_404(self):
+        """Korrektur einer nicht existierenden Runde (> letzte) → 404 Not Found."""
+        self._normale_runde_1()
+        antwort = self._put_json(5, {"typ": "tausender_gewonnen", "spielmacher": "Bernd"})
+        self.assertEqual(antwort.status_code, 404)
+
+    def test_put_leeres_spiel_404(self):
+        """Korrektur ohne jede gespeicherte Runde → 404."""
+        antwort = self._put_json(1, {"typ": "tausender_gewonnen", "spielmacher": "Bernd"})
+        self.assertEqual(antwort.status_code, 404)
+
+    def test_put_get_auf_detail_405(self):
+        """GET auf den Detail-Endpunkt → 405 (nur PUT erlaubt)."""
+        self._normale_runde_1()
+        antwort = self.client.get(f"/api/spiele/{self.spiel_id}/runden/1/")
+        self.assertEqual(antwort.status_code, 405)
+
