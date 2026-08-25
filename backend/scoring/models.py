@@ -77,6 +77,12 @@ class RundeModel(models.Model):
     rundenausgang speichert Rundenausgang.value als String (max. 25 Zeichen).
     verlustwert ist bei gewonnenem Spiel 0, bei Abgehen negativ.
     spielmacher_punkte und mitpunkte_pro_gegenspieler sind bei Tausender 0.
+
+    spielmacher_meldepunkte (M) und spielmacher_stichwerte (S) schlüsseln die
+    Spielmacher-Punkte für die zweizeilige Anschreibetabelle getrennt auf
+    (docs/Anschreibetabelle_4_Spieler.md §5). Invariante an jedem Schreibpfad:
+    spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte.
+    Bei Verlust (Abgehen) und Tausender sind alle drei Werte 0.
     """
 
     spiel = models.ForeignKey(
@@ -95,6 +101,8 @@ class RundeModel(models.Model):
         SpielerModel, on_delete=models.CASCADE, related_name="geber_runden"
     )
     spielmacher_punkte = models.IntegerField(default=0)
+    spielmacher_meldepunkte = models.IntegerField(default=0)
+    spielmacher_stichwerte = models.IntegerField(default=0)
     verlustwert = models.IntegerField(default=0)
     mitpunkte_pro_gegenspieler = models.IntegerField(default=0)
     spielmacher_stern = models.BooleanField(default=False)

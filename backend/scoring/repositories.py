@@ -87,6 +87,8 @@ def runde_persistieren(
     spielmacher_stern: bool,
     gegenspieler_stern: bool,
     gegenspieler: list[GegenspielerDaten],
+    spielmacher_meldepunkte: int = 0,
+    spielmacher_stichwerte: int = 0,
 ) -> RundeModel:
     """
     Speichert das vollständige Ergebnis einer ausgewerteten Runde.
@@ -107,6 +109,10 @@ def runde_persistieren(
         spielmacher_stern:         Ob der Spielmacher einen Tausender-Stern trägt.
         gegenspieler_stern:        Ob die Gegenspieler einen Tausender-Stern tragen.
         gegenspieler:              Meldepunkte, Stichwerte und Stich-Zwang je Gegenspieler.
+        spielmacher_meldepunkte:   Stich-zwang-gewertete Meldung (M) des Spielmachers.
+        spielmacher_stichwerte:    Stichwerte (S) des Spielmachers. Es gilt die Invariante
+                                   spielmacher_punkte == spielmacher_meldepunkte
+                                   + spielmacher_stichwerte (0|0 bei Verlust/Tausender).
 
     Returns:
         Das neu angelegte RundeModel.
@@ -138,6 +144,8 @@ def runde_persistieren(
         spiel=spiel_model,
         rundennummer=rundennummer,
         reizwert=reizwert,
+        spielmacher_meldepunkte=spielmacher_meldepunkte,
+        spielmacher_stichwerte=spielmacher_stichwerte,
         rundenausgang=rundenausgang.value,
         spielmacher=spieler_map[spielmacher_name],
         geber=spieler_map[geber_name],

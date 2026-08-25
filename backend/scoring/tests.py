@@ -540,3 +540,133 @@ class ZehnerEingabeApiTest(TestCase):
         })
         self.assertEqual(antwort.status_code, 400)
         self.assertIn("fehler", antwort.json())
+
+
+# ── TASK-014 Slice 1: Spielmacher-M|S getrennt + Invariante (HOCH-1) ───────────
+
+class SpielmacherMSInvarianteApiTest(TestCase):
+    """
+    Sichert die getrennte Aufschlüsselung der Spielmacher-Punkte in M (Meldung)
+    und S (Stichwerte) sowie die Schreibpfad-Invariante ab (HOCH-1):
+
+        spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte
+
+    Bei Verlust (Abgehen) und Tausender sind alle drei Werte 0.
+    Normativ: docs/Anschreibetabelle_4_Spieler.md §5.
+    """
+
+    def setUp(self):
+        self.spiel_id = _neues_spiel(self.client)
+        self.url = f"/api/spiele/{self.spiel_id}/runden/"
+
+    def _runde(self, rundennummer: int):
+        from scoring.models import RundeModel
+        return RundeModel.objects.get(spiel_id=self.spiel_id, rundennummer=rundennummer)
+
+    def _assert_invariante(self, runde):
+        self.assertEqual(
+            runde.spielmacher_punkte,
+            runde.spielmacher_meldepunkte + runde.spielmacher_stichwerte,
+            "Invariante verletzt: spielmacher_punkte != M + S",
+        )
+
+    def test_normal_gewonnen_ms_getrennt(self):
+        """Gewonnenes Spiel: M und S getrennt gespeichert, Summe == spielmacher_punkte."""
+        antwort = _post_json(self.client, self.url, {
+            "typ": "normal",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+            "reizwert": 200,
+            "meldepunkte": 110,
+            "stichwerte": 100,
+            "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Clara", "meldepunkte": 0,  "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 201)
+        runde = self._runde(1)
+        self.assertEqual(runde.spielmacher_meldepunkte, 110)
+        self.assertEqual(runde.spielmacher_stichwerte, 100)
+        self.assertEqual(runde.spielmacher_punkte, 210)
+        self._assert_invariante(runde)
+
+    def test_normal_ohne_stich_meldung_verfaellt(self):
+        """Spielmacher ohne eigenen Stich: M verfällt (Stich-Zwang), Invariante bleibt."""
+        antwort = _post_json(self.client, self.url, {
+            "typ": "normal",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+            "reizwert": 150,
+            "meldepunkte": 100,
+            "stichwerte": 250,
+            "hat_eigenen_stich": False,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20, "stichwerte": 0, "hat_eigenen_stich": False},
+                {"name": "Clara", "meldepunkte": 0,  "stichwerte": 0, "hat_eigenen_stich": False},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 201)
+        runde = self._runde(1)
+        # Meldung verfällt ohne Stich → M = 0, S = 250 → Punkte 250.
+        self.assertEqual(runde.spielmacher_meldepunkte, 0)
+        self.assertEqual(runde.spielmacher_stichwerte, 250)
+        self._assert_invariante(runde)
+
+    def test_doppeltes_abgehen_ms_null(self):
+        """Doppeltes Abgehen (normal, M+S < Reizwert): M|S = 0|0, Punkte 0."""
+        antwort = _post_json(self.client, self.url, {
+            "typ": "normal",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+            "reizwert": 300,
+            "meldepunkte": 100,
+            "stichwerte": 100,
+            "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Clara", "meldepunkte": 0,  "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 201)
+        runde = self._runde(1)
+        self.assertEqual(runde.spielmacher_meldepunkte, 0)
+        self.assertEqual(runde.spielmacher_stichwerte, 0)
+        self.assertEqual(runde.spielmacher_punkte, 0)
+        self._assert_invariante(runde)
+
+    def test_einfaches_abgehen_ms_null(self):
+        """Einfaches Abgehen: M|S = 0|0."""
+        _post_json(self.client, self.url, {
+            "typ": "einfaches_abgehen",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+            "reizwert": 200,
+            "gegenspieler": [
+                {"name": "Bernd", "meldepunkte": 20},
+                {"name": "Clara", "meldepunkte": 0},
+            ],
+        })
+        runde = self._runde(1)
+        self.assertEqual(runde.spielmacher_meldepunkte, 0)
+        self.assertEqual(runde.spielmacher_stichwerte, 0)
+        self._assert_invariante(runde)
+
+    def test_tausender_ms_null(self):
+        """Tausender gewonnen: M|S = 0|0, Punkte 0."""
+        _post_json(self.client, self.url, {
+            "typ": "tausender_gewonnen",
+            "rundennummer": 1,
+            "spielmacher": "Anna",
+            "geber": "Dieter",
+        })
+        runde = self._runde(1)
+        self.assertEqual(runde.spielmacher_meldepunkte, 0)
+        self.assertEqual(runde.spielmacher_stichwerte, 0)
+        self.assertEqual(runde.spielmacher_punkte, 0)
+        self._assert_invariante(runde)

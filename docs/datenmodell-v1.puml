@@ -103,6 +103,9 @@ package "Persistenz  ·  scoring/models.py  [geplant]" {
     + spielmacher : ForeignKey  {FK → SpielerModel}
     + geber : ForeignKey  {FK → SpielerModel}
     + spielmacher_punkte : IntegerField
+    ' Invariante: spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte
+    + spielmacher_meldepunkte : IntegerField
+    + spielmacher_stichwerte : IntegerField
     + verlustwert : IntegerField
     + mitpunkte_pro_gegenspieler : IntegerField
     + spielmacher_stern : BooleanField

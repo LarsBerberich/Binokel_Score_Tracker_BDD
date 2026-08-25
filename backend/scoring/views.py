@@ -228,6 +228,12 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
     spielmacher_stern: bool = body.get("spielmacher_stern", False)
     gegenspieler_stern: bool = body.get("gegenspieler_stern", False)
 
+    # Spielmacher-M/S für die getrennte Anschreibetabelle (§5). Invariante:
+    # spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte.
+    # Bei Verlust/Tausender bleiben beide 0 (siehe Default hier).
+    spielmacher_meldepunkte = 0
+    spielmacher_stichwerte = 0
+
     # Plausibilitätsgrenze der Meldepunkte prüfen (normativ: rule-set-v1.md §7.1).
     try:
         _meldepunkte_pruefen(body)
@@ -259,6 +265,9 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
             spielmacher_punkte = gesamtpunkte
             verlustwert = 0
             mitpunkte = 0
+            # Getrennte M|S nur bei gewonnenem Spiel; Invariante M+S == Punkte (§5).
+            spielmacher_meldepunkte = sm_melde
+            spielmacher_stichwerte = body["stichwerte"]
         else:  # doppeltes Abgehen
             spielmacher_punkte = 0
             verlustwert, _ = doppeltes_abgehen_auswerten(body["reizwert"])
@@ -353,6 +362,8 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
             rundennummer=rundennummer,
             spielmacher_name=spielmacher_name,
             geber_name=geber_name,
+            spielmacher_meldepunkte=spielmacher_meldepunkte,
+            spielmacher_stichwerte=spielmacher_stichwerte,
             reizwert=body.get("reizwert", 0),
             rundenausgang=ausgang,
             spielmacher_punkte=spielmacher_punkte,
