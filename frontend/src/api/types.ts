@@ -14,6 +14,22 @@ export type Rundentyp =
   | 'tausender_gewonnen'
   | 'tausender_verloren'
 
+/**
+ * Rundenausgang: die fachliche Ergebnis-Klassifikation einer gewerteten Runde,
+ * wie sie das Backend in Responses liefert. Diese Werte sind KLARTEXT und
+ * entsprechen 1:1 `domain.Rundenausgang.value` im Backend — NICHT mit
+ * `Rundentyp` (Request-Slugs wie 'einfaches_abgehen') verwechseln.
+ */
+export const RUNDENAUSGANG = {
+  GEWONNENES_SPIEL: 'gewonnenes Spiel',
+  DOPPELTES_ABGEHEN: 'doppeltes Abgehen',
+  EINFACHES_ABGEHEN: 'einfaches Abgehen',
+  TAUSENDER_GEWONNEN: 'Tausender gewonnen',
+  TAUSENDER_VERLOREN: 'Tausender verloren',
+} as const
+
+export type Rundenausgang = (typeof RUNDENAUSGANG)[keyof typeof RUNDENAUSGANG]
+
 export interface Fehler {
   fehler: string
 }
@@ -93,8 +109,8 @@ export type RundeRequest =
 export interface RundeErgebnis {
   id: number
   rundennummer: number
-  /** Interner Ausgangs-Code, z. B. gewonnenes_spiel, doppeltes_abgehen. */
-  rundenausgang: string
+  /** Fachliche Ergebnis-Klassifikation (Klartext), z. B. 'gewonnenes Spiel'. */
+  rundenausgang: Rundenausgang
   spielmacher_punkte: number
   /** Negativer Verlustwert bei Abgehen; sonst 0. */
   verlustwert: number

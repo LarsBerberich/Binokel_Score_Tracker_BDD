@@ -7,7 +7,9 @@ import {
   rundeAuswerten,
   rundenHistorieLaden,
   spielLaden,
+  RUNDENAUSGANG,
   type PunktestandMap,
+  type Rundenausgang,
   type Rundenhistorie,
   type RundeErgebnis,
   type RundeRequest,
@@ -88,16 +90,16 @@ async function historieAktualisieren(): Promise<void> {
 }
 
 /** Interner Rundenausgang → Rundentyp der Erfassung (§16.1: doppeltes Abgehen wird abgeleitet). */
-function ausgangZuTyp(ausgang: string): RundeVorbelegung['typ'] {
+function ausgangZuTyp(ausgang: Rundenausgang): RundeVorbelegung['typ'] {
   switch (ausgang) {
-    case 'einfaches_abgehen':
+    case RUNDENAUSGANG.EINFACHES_ABGEHEN:
       return 'einfaches_abgehen'
-    case 'tausender_gewonnen':
+    case RUNDENAUSGANG.TAUSENDER_GEWONNEN:
       return 'tausender_gewonnen'
-    case 'tausender_verloren':
+    case RUNDENAUSGANG.TAUSENDER_VERLOREN:
       return 'tausender_verloren'
     default:
-      // gewonnenes_spiel und doppeltes_abgehen werden über „normal" erfasst.
+      // 'gewonnenes Spiel' und 'doppeltes Abgehen' werden über „normal" erfasst.
       return 'normal'
   }
 }

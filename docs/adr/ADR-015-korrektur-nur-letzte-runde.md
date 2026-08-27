@@ -61,3 +61,29 @@ umständlich verworfen (kompletter Neu-Eintrag).
 - TASK-014 (Rundenhistorie, Anschreibetabelle, Korrektur)
 - ADR-004 (Repository Pattern, STAND-Aggregation), ADR-006/013 (fachliche Wahrheit auf API-Ebene)
 - `docs/rule-set-v1.md` §3 (Geberrotation), `docs/Anschreibetabelle_4_Spieler.md` §5
+
+## Nachtrag (26.08.2026) – Roh-Persistenz der Spielmacher-M|S bei doppeltem Abgehen (FND-004)
+
+Beim manuellen Durchspielen fiel auf, dass die Korrektur einer als **doppeltes Abgehen** gewerteten
+Runde blockiert war: Im Korrekturformular war der Spielmacher-Stichwert mit 0 vorbelegt, sodass die
+250-Kontrollsumme nicht erfüllt war und „Korrektur speichern“ gesperrt blieb (FND-004,
+`docs/testing/explorative-testprotokoll.md`).
+
+Ursache war die ursprüngliche TASK-014-Invariante `spielmacher_punkte == M + S`, die bei jedem
+Verlust `M | S = 0 | 0` erzwang. Bei doppeltem Abgehen hat der Spielmacher jedoch **real
+ausgespielt** – die Stichwerte existieren fachlich, sie zählen nur nicht (§4 Szenario C: sie
+„verfallen“ = fließen nicht in den STAND, das Tabellenfeld zeigt `(-x) | 0 | 0`).
+
+**Entscheidung:** Bei **doppeltem Abgehen** werden die roh erfassten `M | S` des Spielmachers
+persistiert (als Korrektur-/Nachvollziehbarkeits-Beleg). Die Invariante gilt damit nur noch bei
+**gewonnenem Spiel**; bei **einfachem Abgehen** (SM geht vor dem ersten Stich ab → S=0) und
+**Tausender** bleiben `M | S = 0 | 0`.
+
+- **Regelkonform:** „Verfallen“ ist auf Wertungs-/Darstellungsebene definiert. Anschreibetabelle
+  (Verlustdarstellung `(-x) | 0 | 0`) und STAND (`_runde_beitrag` über `verlustwert`) bleiben
+  wörtlich unverändert – die roh persistierten Werte werden dort nicht gelesen.
+- **Migrationsfrei:** Die Felder `spielmacher_meldepunkte` / `spielmacher_stichwerte` existieren
+  bereits (Default 0). Kein Backfill für Altbestand nötig (nur die letzte Runde ist korrigierbar).
+- Die Korrektur-Vorbelegung (`SpielView.korrekturVorbelegung`) funktioniert dadurch automatisch;
+  kein Frontend-Code-Change nötig.
+

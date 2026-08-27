@@ -80,9 +80,13 @@ class RundeModel(models.Model):
 
     spielmacher_meldepunkte (M) und spielmacher_stichwerte (S) schlüsseln die
     Spielmacher-Punkte für die zweizeilige Anschreibetabelle getrennt auf
-    (docs/Anschreibetabelle_4_Spieler.md §5). Invariante an jedem Schreibpfad:
-    spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte.
-    Bei Verlust (Abgehen) und Tausender sind alle drei Werte 0.
+    (docs/Anschreibetabelle_4_Spieler.md §5). Invariante je Rundenausgang:
+    - Gewonnenes Spiel: spielmacher_punkte == M + S.
+    - Doppeltes Abgehen: spielmacher_punkte == 0; M|S tragen die roh erfassten
+      (fachlich verfallenen) Werte als Korrektur-/Nachvollziehbarkeits-Beleg
+      (FND-004). Die Wertung erfolgt allein über verlustwert; M|S fließen NICHT
+      in den STAND und werden in der Tabelle durch (-x)|0|0 ersetzt.
+    - Einfaches Abgehen und Tausender: M == S == spielmacher_punkte == 0.
     """
 
     spiel = models.ForeignKey(

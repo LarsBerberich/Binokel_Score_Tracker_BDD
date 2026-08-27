@@ -168,9 +168,11 @@ def _runde_wertung_berechnen(body: dict) -> dict:
     spielmacher_stern: bool = body.get("spielmacher_stern", False)
     gegenspieler_stern: bool = body.get("gegenspieler_stern", False)
 
-    # Spielmacher-M/S für die getrennte Anschreibetabelle (§5); Invariante
-    # spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte.
-    # Bei Verlust/Tausender bleiben beide 0 (siehe Defaults hier).
+    # Spielmacher-M/S für die getrennte Anschreibetabelle (§5). Invariante:
+    # bei gewonnenem Spiel gilt spielmacher_punkte == spielmacher_meldepunkte
+    # + spielmacher_stichwerte. Bei einfachem Abgehen und Tausender bleiben beide 0.
+    # Bei doppeltem Abgehen tragen sie die roh erfassten (fachlich verfallenen) Werte
+    # als Korrektur-/Nachvollziehbarkeits-Beleg (FND-004; siehe Zweig unten).
     spielmacher_meldepunkte = 0
     spielmacher_stichwerte = 0
 
@@ -212,6 +214,13 @@ def _runde_wertung_berechnen(body: dict) -> dict:
             spielmacher_punkte = 0
             verlustwert, _ = doppeltes_abgehen_auswerten(body["reizwert"])
             mitpunkte = 30
+            # FND-004: Roh erfasste (fachlich verfallene) M|S des Spielmachers als
+            # Korrektur-/Nachvollziehbarkeits-Beleg persistieren. Sie fließen NICHT in
+            # den STAND (dort zählt allein verlustwert) und werden in der Anschreibetabelle
+            # durch die Verlustdarstellung (-x)|0|0 ersetzt. Deshalb gilt die Summen-
+            # Invariante hier bewusst NICHT (spielmacher_punkte == 0).
+            spielmacher_meldepunkte = sm_melde
+            spielmacher_stichwerte = body["stichwerte"]
 
         gegenspieler_daten = [
             {

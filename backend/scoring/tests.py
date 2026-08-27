@@ -547,11 +547,12 @@ class ZehnerEingabeApiTest(TestCase):
 class SpielmacherMSInvarianteApiTest(TestCase):
     """
     Sichert die getrennte Aufschlüsselung der Spielmacher-Punkte in M (Meldung)
-    und S (Stichwerte) sowie die Schreibpfad-Invariante ab (HOCH-1):
+    und S (Stichwerte) sowie die Schreibpfad-Invariante ab (HOCH-1 / FND-004):
 
-        spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte
-
-    Bei Verlust (Abgehen) und Tausender sind alle drei Werte 0.
+    - Gewonnenes Spiel: spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte.
+    - Doppeltes Abgehen: spielmacher_punkte == 0; M|S tragen die roh erfassten
+      (fachlich verfallenen) Werte als Korrektur-Beleg (FND-004).
+    - Einfaches Abgehen und Tausender: alle drei Werte 0.
     Normativ: docs/Anschreibetabelle_4_Spieler.md §5.
     """
 
@@ -616,8 +617,9 @@ class SpielmacherMSInvarianteApiTest(TestCase):
         self.assertEqual(runde.spielmacher_stichwerte, 250)
         self._assert_invariante(runde)
 
-    def test_doppeltes_abgehen_ms_null(self):
-        """Doppeltes Abgehen (normal, M+S < Reizwert): M|S = 0|0, Punkte 0."""
+    def test_doppeltes_abgehen_ms_roh_persistiert(self):
+        """Doppeltes Abgehen (normal, M+S < Reizwert): Punkte 0, aber M|S tragen die
+        roh erfassten (fachlich verfallenen) Werte als Korrektur-Beleg (FND-004)."""
         antwort = _post_json(self.client, self.url, {
             "typ": "normal",
             "rundennummer": 1,
@@ -634,10 +636,12 @@ class SpielmacherMSInvarianteApiTest(TestCase):
         })
         self.assertEqual(antwort.status_code, 201)
         runde = self._runde(1)
-        self.assertEqual(runde.spielmacher_meldepunkte, 0)
-        self.assertEqual(runde.spielmacher_stichwerte, 0)
+        # Roh erfasste Werte bleiben erhalten (M stich-zwang-gewertet, S roh) – für die Korrektur.
+        self.assertEqual(runde.spielmacher_meldepunkte, 100)
+        self.assertEqual(runde.spielmacher_stichwerte, 100)
+        # Gewertet wird allein der Verlust; die Spielmacher-Punkte sind 0.
         self.assertEqual(runde.spielmacher_punkte, 0)
-        self._assert_invariante(runde)
+        self.assertEqual(runde.verlustwert, -600)
 
     def test_einfaches_abgehen_ms_null(self):
         """Einfaches Abgehen: M|S = 0|0."""
@@ -869,6 +873,32 @@ class RundeKorrekturApiTest(TestCase):
             runde.spielmacher_punkte,
             runde.spielmacher_meldepunkte + runde.spielmacher_stichwerte,
         )
+
+    def test_doppeltes_abgehen_roh_ermoeglicht_korrektur(self):
+        """FND-004: doppeltes Abgehen speichert die SM-Rohwerte, sodass GET sie liefert
+        und die PUT-Korrektur derselben Runde die 250-Kontrollsumme erfüllt (200, kein 400)."""
+        _post_json(self.client, self.url, {
+            "typ": "normal", "rundennummer": 1, "spielmacher": "Bernd", "geber": "Anna",
+            "reizwert": 300, "meldepunkte": 100, "stichwerte": 100, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Dieter", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        # GET liefert die roh erfassten Spielmacher-Stichwerte (Basis der Korrektur-Vorbelegung).
+        historie = self.client.get(self.url).json()
+        sm_zelle = historie["runden"][-1]["spieler"]["Bernd"]
+        self.assertEqual(sm_zelle["stichwerte"], 100)
+        # PUT mit denselben Werten läuft durch (Kontrollsumme 100+90+60 == 250).
+        antwort = self._put_json(1, {
+            "typ": "normal", "spielmacher": "Bernd",
+            "reizwert": 300, "meldepunkte": 100, "stichwerte": 100, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": "Clara", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": "Dieter", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+        self.assertEqual(antwort.status_code, 200)
 
     def test_put_typ_uebergang_normal_zu_tausender(self):
         """normal→tausender: GS-Zeilen gelöscht, Sterne gesetzt, SM M|S = 0|0 (HOCH-3)."""

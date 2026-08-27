@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RUNDENAUSGANG } from '../api'
 import type { Rundenhistorie, RundenhistorieRunde } from '../api'
 
 const props = defineProps<{ historie: Rundenhistorie }>()
@@ -52,6 +53,27 @@ const zeilen = computed(() =>
     })),
   })),
 )
+
+/**
+ * Kurzlabel des Rundenausgangs für die „Gereizt bis"-Spalte (§5-Annotation, FND-005):
+ * macht den Ausgang jeder Runde auf einen Blick sichtbar (gewonnen / abgegangen / Tausender).
+ */
+function ausgangLabel(runde: RundenhistorieRunde): string {
+  switch (runde.rundenausgang) {
+    case RUNDENAUSGANG.GEWONNENES_SPIEL:
+      return 'gewonnen'
+    case RUNDENAUSGANG.EINFACHES_ABGEHEN:
+      return 'einfaches Abgehen'
+    case RUNDENAUSGANG.DOPPELTES_ABGEHEN:
+      return 'doppeltes Abgehen'
+    case RUNDENAUSGANG.TAUSENDER_GEWONNEN:
+      return 'gewonnen'
+    case RUNDENAUSGANG.TAUSENDER_VERLOREN:
+      return 'verloren'
+    default:
+      return ''
+  }
+}
 </script>
 
 <template>
@@ -94,6 +116,10 @@ const zeilen = computed(() =>
               </span>
               <span v-else>{{ zeile.runde.reizwert }}</span>
               <div class="text-xs text-slate-400">/ {{ zeile.runde.spielmacher }}</div>
+              <div
+                class="text-xs italic text-slate-500"
+                :data-testid="`ausgang-${zeile.runde.rundennummer}`"
+              >{{ ausgangLabel(zeile.runde) }}</div>
             </td>
             <td class="px-2 py-1 text-slate-500">Runde</td>
             <td

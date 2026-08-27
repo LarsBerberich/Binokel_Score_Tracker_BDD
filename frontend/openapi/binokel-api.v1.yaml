@@ -527,7 +527,13 @@ components:
           type: integer
         rundenausgang:
           type: string
-          description: Interner Ausgangs-Code (z. B. gewonnenes_spiel, doppeltes_abgehen).
+          description: Fachliche Ergebnis-Klassifikation der Runde (Klartext).
+          enum:
+            - gewonnenes Spiel
+            - doppeltes Abgehen
+            - einfaches Abgehen
+            - Tausender gewonnen
+            - Tausender verloren
         spielmacher_punkte:
           type: integer
         verlustwert:
@@ -635,6 +641,13 @@ components:
           type: integer
         rundenausgang:
           type: string
+          description: Fachliche Ergebnis-Klassifikation der Runde (Klartext).
+          enum:
+            - gewonnenes Spiel
+            - doppeltes Abgehen
+            - einfaches Abgehen
+            - Tausender gewonnen
+            - Tausender verloren
         ist_tausender:
           type: boolean
         verlustwert:

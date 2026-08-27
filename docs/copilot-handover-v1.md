@@ -91,6 +91,33 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
+## Stand 26.08.2026 (TASK-014 Nacharbeit — 3 Findings aus Pairing-Durchspielen behoben)
+
+Beim manuellen Durchspielen der Anschreibetabelle + Korrektur-Flow (Tester-Agent Pairing) wurden
+drei Findings gefunden und behoben (`docs/testing/explorative-testprotokoll.md` FND-003…005):
+
+- **FND-003 (Bug):** `(0 Stiche)`-Schneider-Annotation erschien fälschlich bei einfachem Abgehen.
+  Wurzel: Das Backend liefert `rundenausgang` als **Klartext** (`"einfaches Abgehen"`,
+  `domain.Rundenausgang.value`), Frontend und Frontend-Tests verglichen fälschlich gegen **Slugs**
+  (`'einfaches_abgehen'`). Die falschen Slug-Testdaten maskierten den Bug. Fix: zentrale
+  `RUNDENAUSGANG`-Klartext-Konstanten in `api/types.ts`; `Anschreibetabelle.vue` und
+  `SpielView.vue::ausgangZuTyp` vergleichen gegen Klartext; Tests + OpenAPI-Doku korrigiert. Der
+  latente Nebenbug (Korrektur-Vorbelegung von einfachem Abgehen/Tausender fiel immer auf „normal“)
+  ist damit ebenfalls behoben.
+- **FND-005 (Darstellung):** Der Rundenausgang war in der Anschreibetabelle nicht ausgewiesen.
+  `Anschreibetabelle.vue` zeigt jetzt je Runde ein Ausgangs-Label unter „Gereizt bis“
+  (`ausgangLabel`, `data-testid=ausgang-{nr}`).
+- **FND-004 (Persistenz, Rubber-Duck GO Option A):** Die Korrektur einer als **doppeltes Abgehen**
+  gewerteten Runde war blockiert (SM-Stichwert mit 0 vorbelegt → Kontrollsumme 190/250 → Speichern
+  gesperrt). Fix: Bei doppeltem Abgehen werden die roh erfassten Spielmacher-`M | S` persistiert
+  (Korrektur-Beleg). Die Invariante `spielmacher_punkte == M + S` gilt damit nur bei gewonnenem
+  Spiel; einfaches Abgehen/Tausender bleiben `0 | 0`. Anschreibetabelle (`(-x)|0|0`) und STAND
+  (`verlustwert`) bleiben unberührt — kein Frontend-Code-Change. Doku: `models.py`,
+  `datenmodell-v1.puml`, `ubiquitous-language.md` §4.25, ADR-015-Nachtrag.
+
+Validierung: **55 Django + 31 Behave + 59 Vitest + Build** grün; zusätzlich Live-Browser (FND-003/005)
+und Live-curl (FND-004: GET liefert SM-Stichwert 60 statt 0). Kein neues E2E (ADR-013). Nicht committet.
+
 ## Stand 17.08.2026 (Phase 2b — TASK-013 Tausender-Sterne anzeigen, Backend + Frontend)
 
 Der Wertungsbereich zeigt jetzt die **Tausender-Sterne** je Spieler. Ein Stern entsteht
