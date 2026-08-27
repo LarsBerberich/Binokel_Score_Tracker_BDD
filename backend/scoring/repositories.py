@@ -70,6 +70,53 @@ def spiel_laden(spiel_id: int) -> Spiel:
     return Spiel(spieler_reihenfolge=spieler_namen, rundenanzahl=spiel_model.rundenanzahl)
 
 
+# ── FND-006: gezählte Runden, Sequenz und Geber-Ableitung ──────────────────────
+
+_TAUSENDER_AUSGAENGE: tuple[str, str] = (
+    Rundenausgang.TAUSENDER_GEWONNEN.value,
+    Rundenausgang.TAUSENDER_VERLOREN.value,
+)
+
+
+def _spieler_positionsliste(spiel_model: SpielModel) -> list[str]:
+    """Spielernamen in fester Sitzreihenfolge (position 0..3)."""
+    return list(
+        spiel_model.spieler.order_by("position").values_list("name", flat=True)
+    )
+
+
+def _gezaehlte_runden(spiel_model: SpielModel, *, vor_sequenz: int | None = None) -> int:
+    """Anzahl der ZÄHLENDEN (nicht-Tausender) Runden eines Spiels.
+
+    Ein Tausender läuft außer Konkurrenz und zählt nicht als gespielte Runde
+    (FND-006, normativ: docs/rule-set-v1.md §15). Optional werden nur Runden mit
+    Sequenz (``rundennummer``) < ``vor_sequenz`` gezählt – Grundlage für die
+    Geber-Ableitung einer bestimmten Runde.
+    """
+    runden = spiel_model.runden.exclude(rundenausgang__in=_TAUSENDER_AUSGAENGE)
+    if vor_sequenz is not None:
+        runden = runden.filter(rundennummer__lt=vor_sequenz)
+    return runden.count()
+
+
+def geber_fuer_sequenz(spiel_id: int, sequenz: int) -> str:
+    """Geber der Runde mit gegebener Sequenz (``rundennummer``) – für die Korrektur (PUT).
+
+    = spieler[(Anzahl gezählter Runden mit Sequenz < sequenz) % 4]. Hängt nur von
+    den Runden DAVOR ab, ist damit unabhängig vom (ggf. korrigierten) Typ der Runde
+    selbst. Ohne Tausender identisch zu ``Spiel.geber_in_runde(sequenz)`` – mit
+    Tausender bleibt der Geber über die außer-Konkurrenz-Runden hinweg stehen
+    (FND-006, §15).
+
+    Raises:
+        SpielModel.DoesNotExist: Wenn das Spiel nicht gefunden wird.
+    """
+    spiel_model = SpielModel.objects.prefetch_related("spieler").get(pk=spiel_id)
+    reihenfolge = _spieler_positionsliste(spiel_model)
+    index = _gezaehlte_runden(spiel_model, vor_sequenz=sequenz) % len(reihenfolge)
+    return reihenfolge[index]
+
+
 # ── Slices 2–5: Runde persistieren ────────────────────────────────────────────
 
 def _namen_pruefen(
@@ -123,7 +170,6 @@ def _gegenspieler_zeilen_setzen(
 def runde_persistieren(
     *,
     spiel_id: int,
-    rundennummer: int,
     spielmacher_name: str,
     geber_name: str,
     reizwert: int,
@@ -140,14 +186,18 @@ def runde_persistieren(
     """
     Speichert das vollständige Ergebnis einer ausgewerteten Runde.
 
+    Die ``rundennummer`` (Sequenz/Erfassungsreihenfolge) wird serverseitig als
+    ``max+1`` vergeben – jede erfasste Runde inkl. Tausender ist eindeutig
+    (FND-006). Der ``geber_name`` wird vom Aufrufer bereits serverseitig aus der
+    Historie abgeleitet (``geber_fuer_neue_runde``), nicht vom Client übernommen.
+
     Legt einen RundeModel-Eintrag und je einen GegenspielerRundeModel-Eintrag
     pro Gegenspieler an.  Alle Schreiboperationen erfolgen in einer Transaktion.
 
     Args:
         spiel_id:                  PK des zugehörigen SpielModel.
-        rundennummer:              1-basierte Rundennummer.
         spielmacher_name:          Name des Spielmachers (muss in SpielerModel existieren).
-        geber_name:                Name des Gebers (muss in SpielerModel existieren).
+        geber_name:                Name des Gebers (serverseitig abgeleitet).
         reizwert:                  Gereizte Punktzahl.
         rundenausgang:             Rundenausgang-Enum-Wert.
         spielmacher_punkte:        Erzielte Punkte des Spielmachers (0 bei Verlust).
@@ -157,9 +207,10 @@ def runde_persistieren(
         gegenspieler_stern:        Ob die Gegenspieler einen Tausender-Stern tragen.
         gegenspieler:              Meldepunkte, Stichwerte und Stich-Zwang je Gegenspieler.
         spielmacher_meldepunkte:   Stich-zwang-gewertete Meldung (M) des Spielmachers.
-        spielmacher_stichwerte:    Stichwerte (S) des Spielmachers. Es gilt die Invariante
-                                   spielmacher_punkte == spielmacher_meldepunkte
-                                   + spielmacher_stichwerte (0|0 bei Verlust/Tausender).
+        spielmacher_stichwerte:    Stichwerte (S) des Spielmachers. Invariante je Ausgang:
+                                   gewonnenes Spiel spielmacher_punkte == M + S; doppeltes
+                                   Abgehen punkte == 0, M|S = roh erfasste (verfallene) Werte
+                                   (FND-004); einfaches Abgehen/Tausender M == S == 0.
 
     Returns:
         Das neu angelegte RundeModel.
@@ -173,6 +224,15 @@ def runde_persistieren(
         s.name: s for s in spiel_model.spieler.all()
     }
     _namen_pruefen(spiel_id, spieler_map, spielmacher_name, geber_name, gegenspieler)
+
+    # Fortlaufende Sequenz vergeben (Erfassungsreihenfolge/Identität, FND-006).
+    letzte = (
+        RundeModel.objects.filter(spiel=spiel_model)
+        .order_by("-rundennummer")
+        .values_list("rundennummer", flat=True)
+        .first()
+    )
+    rundennummer = (letzte or 0) + 1
 
     runde = RundeModel.objects.create(
         spiel=spiel_model,
@@ -418,6 +478,8 @@ def rundenhistorie_laden(spiel_id: int) -> dict:
 
     laufender_stand: dict[str, int] = {name: 0 for name in alle_namen}
     historie: list[dict] = []
+    # Fortlaufende gezählte Spielrunde (Tausender zählen nicht, FND-006/§15).
+    gezaehlt = 0
 
     for runde in runden:
         ausgang = Rundenausgang(runde.rundenausgang)
@@ -425,6 +487,13 @@ def rundenhistorie_laden(spiel_id: int) -> dict:
             Rundenausgang.TAUSENDER_GEWONNEN,
             Rundenausgang.TAUSENDER_VERLOREN,
         )
+
+        # Gezählte Spielrunde nur für reguläre Runden; Tausender laufen außer Konkurrenz.
+        if ist_tausender:
+            zaehlrunde: int | None = None
+        else:
+            gezaehlt += 1
+            zaehlrunde = gezaehlt
 
         # STAND fortschreiben – gemeinsamer Beitrag (HOCH-4).
         for name, wert in _runde_beitrag(runde).items():
@@ -466,6 +535,8 @@ def rundenhistorie_laden(spiel_id: int) -> dict:
 
         historie.append({
             "rundennummer": runde.rundennummer,
+            "sequenz": runde.rundennummer,
+            "zaehlrunde": zaehlrunde,
             "geber": runde.geber.name,
             "spielmacher": runde.spielmacher.name,
             "reizwert": runde.reizwert,

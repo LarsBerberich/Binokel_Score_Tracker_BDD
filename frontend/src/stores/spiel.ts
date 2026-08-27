@@ -6,12 +6,12 @@ import type { RundenhistorieRunde, Spiel } from '../api'
  * Hält das aktuell aktive Spiel (nach dem Anlegen bzw. Laden).
  *
  * Bewusst schlank: nur das Nötigste für die Navigation zwischen den Views.
- * Runden-/Punktestand-State kommt in späteren Slices hinzu.
+ * Die gezählte Rundennummer, der Geber und der Spielfortschritt werden NICHT
+ * hier gehalten, sondern in der SpielView aus der autoritativen Rundenhistorie
+ * abgeleitet (FND-006: Tausender laufen außer Konkurrenz und zählen nicht).
  */
 export const useSpielStore = defineStore('spiel', () => {
   const aktuellesSpiel = ref<Spiel | null>(null)
-  /** 1-basierte Nummer der aktuell zu erfassenden Runde. */
-  const aktuelleRundennummer = ref(1)
   /**
    * Zuletzt erfasste Runde der Anschreibetabelle (für die Korrektur der letzten
    * Runde, TASK-014 Slice 6). `null`, solange keine Runde gespielt wurde.
@@ -27,13 +27,8 @@ export const useSpielStore = defineStore('spiel', () => {
 
   function setzeSpiel(spiel: Spiel): void {
     aktuellesSpiel.value = spiel
-    aktuelleRundennummer.value = 1
     letzteRunde.value = null
     endrundenStichwerte.value = null
-  }
-
-  function naechsteRunde(): void {
-    aktuelleRundennummer.value += 1
   }
 
   function setzeLetzteRunde(runde: RundenhistorieRunde | null): void {
@@ -46,11 +41,9 @@ export const useSpielStore = defineStore('spiel', () => {
 
   return {
     aktuellesSpiel,
-    aktuelleRundennummer,
     letzteRunde,
     endrundenStichwerte,
     setzeSpiel,
-    naechsteRunde,
     setzeLetzteRunde,
     setzeEndrundenStichwerte,
   }

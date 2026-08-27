@@ -30,6 +30,7 @@ from scoring.domain import (
     UngueltigerZehnerwert,
 )
 from scoring.repositories import (
+    geber_fuer_sequenz,
     letzte_rundennummer,
     punktestaende_laden,
     runde_aktualisieren,
@@ -422,7 +423,7 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
     except ValueError:
         return _fehler("Ungültiger JSON-Body.")
 
-    fehlendes = _pflichtfeld(body, "typ", "rundennummer", "spielmacher", "geber")
+    fehlendes = _pflichtfeld(body, "typ", "spielmacher", "geber")
     if fehlendes:
         return _fehler(f"Pflichtfeld fehlt: '{fehlendes}'.")
 
@@ -431,10 +432,12 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
     except _RundeEingabeFehler as exc:
         return _fehler(exc.nachricht, status=exc.status)
 
+    # rundennummer (Sequenz) vergibt das Repository selbst (max+1, FND-006); eine im
+    # Body mitgeschickte rundennummer wird bewusst ignoriert. Der geber kommt weiterhin
+    # aus dem Body (das Frontend leitet ihn aus der gezählten Runde/Historie ab).
     try:
         runde = runde_persistieren(
             spiel_id=spiel_id,
-            rundennummer=body["rundennummer"],
             spielmacher_name=body["spielmacher"],
             geber_name=body["geber"],
             reizwert=body.get("reizwert", 0),
@@ -504,8 +507,10 @@ def runde_detail_view(request, spiel_id: int, rundennummer: int) -> JsonResponse
             status=409,
         )
 
-    # Geber deterministisch aus der Rundennummer ableiten (HOCH-5, nicht vom Client).
-    geber_name = spiel.geber_in_runde(rundennummer)
+    # Geber deterministisch aus der gezählten Runde ableiten (HOCH-1/HOCH-2, FND-006):
+    # NICHT aus der rundennummer (= Sequenz inkl. Tausender), sondern aus der Anzahl
+    # zählender Runden vor dieser Sequenz. Ohne Tausender identisch zur alten Rotation.
+    geber_name = geber_fuer_sequenz(spiel_id, rundennummer)
     spielmacher_name: str = body["spielmacher"]
     if spielmacher_name not in spiel.spieler_reihenfolge:
         return _fehler(

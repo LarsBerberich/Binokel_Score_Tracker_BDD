@@ -117,7 +117,14 @@ function ausgangLabel(runde: RundenhistorieRunde): string {
         <template v-for="zeile in zeilen" :key="zeile.runde.rundennummer">
           <!-- Rundenzeile: getrennte M | S | Mit-Erfassung -->
           <tr :data-testid="`runde-${zeile.runde.rundennummer}`" class="border-t border-slate-200">
-            <td :rowspan="2" class="px-2 py-1 font-semibold">{{ zeile.runde.rundennummer }}</td>
+            <td :rowspan="2" class="px-2 py-1 font-semibold">
+              <span v-if="zeile.runde.zaehlrunde !== null">{{ zeile.runde.zaehlrunde }}</span>
+              <span
+                v-else
+                :data-testid="`ausser-konkurrenz-${zeile.runde.rundennummer}`"
+                class="text-xs font-normal italic leading-tight text-slate-400"
+              >außer<br />Konkurrenz</span>
+            </td>
             <td :rowspan="2" class="px-2 py-1">{{ zeile.runde.geber }}</td>
             <td :rowspan="2" class="px-2 py-1">
               <span v-if="zeile.runde.ist_tausender" :data-testid="`tausender-${zeile.runde.rundennummer}`">

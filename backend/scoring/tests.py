@@ -1030,3 +1030,110 @@ class RundeKorrekturApiTest(TestCase):
         antwort = self.client.get(f"/api/spiele/{self.spiel_id}/runden/1/")
         self.assertEqual(antwort.status_code, 405)
 
+
+# ── FND-006: Tausender außer Konkurrenz ───────────────────────────────────────
+
+class TausenderAusserKonkurrenzApiTest(TestCase):
+    """FND-006: Tausender laufen außer Konkurrenz (normativ: docs/rule-set-v1.md §15).
+
+    Jede erfasste Runde – auch ein Tausender – erhält eine eindeutige fortlaufende
+    Sequenz (``rundennummer``). Ein Tausender zählt aber NICHT als gespielte Runde:
+    die gezählte Spielrunde (``zaehlrunde``) und der Geber bleiben stehen, bis eine
+    reguläre Runde folgt. Spieler: Anna(0), Bernd(1), Clara(2), Dieter(3);
+    Geber der gezählten Runde n = spieler[(n-1) % 4].
+    """
+
+    def setUp(self):
+        self.spiel_id = _neues_spiel(self.client)
+        self.url = f"/api/spiele/{self.spiel_id}/runden/"
+
+    def _normal(self, spielmacher, geber, gs1, gs2):
+        return _post_json(self.client, self.url, {
+            "typ": "normal", "spielmacher": spielmacher, "geber": geber,
+            "reizwert": 150, "meldepunkte": 150, "stichwerte": 100, "hat_eigenen_stich": True,
+            "gegenspieler": [
+                {"name": gs1, "meldepunkte": 0, "stichwerte": 90, "hat_eigenen_stich": True},
+                {"name": gs2, "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            ],
+        })
+
+    def _tausender(self, spielmacher, geber, verloren=False):
+        return _post_json(self.client, self.url, {
+            "typ": "tausender_verloren" if verloren else "tausender_gewonnen",
+            "spielmacher": spielmacher, "geber": geber,
+        })
+
+    def test_historie_zaehlrunde_und_sequenz(self):
+        """Tausender erhält eigene Sequenz, aber keine gezählte Rundennummer (zaehlrunde=None)."""
+        self._normal("Bernd", "Anna", "Clara", "Dieter")   # Seq 1, gezählte Runde 1
+        self._tausender("Clara", "Bernd")                  # Seq 2, außer Konkurrenz
+        self._normal("Dieter", "Bernd", "Anna", "Clara")   # Seq 3, gezählte Runde 2
+
+        historie = self.client.get(self.url).json()["runden"]
+        self.assertEqual([r["sequenz"] for r in historie], [1, 2, 3])
+        self.assertEqual([r["rundennummer"] for r in historie], [1, 2, 3])
+        self.assertEqual([r["zaehlrunde"] for r in historie], [1, None, 2])
+        self.assertEqual([r["ist_tausender"] for r in historie], [False, True, False])
+
+    def test_geber_bleibt_ueber_tausender_stehen(self):
+        """geber_fuer_sequenz: Tausender-Sequenzen verschieben den Geber nicht (POST≡PUT)."""
+        from scoring.repositories import geber_fuer_sequenz
+        self._normal("Bernd", "Anna", "Clara", "Dieter")   # Seq 1 (zählt)
+        self._tausender("Clara", "Bernd")                  # Seq 2 (Tausender)
+        self._normal("Dieter", "Bernd", "Anna", "Clara")   # Seq 3 (zählt)
+
+        self.assertEqual(geber_fuer_sequenz(self.spiel_id, 1), "Anna")   # 0 gezählt davor
+        self.assertEqual(geber_fuer_sequenz(self.spiel_id, 2), "Bernd")  # 1 gezählt davor
+        self.assertEqual(geber_fuer_sequenz(self.spiel_id, 3), "Bernd")  # Tausender zählt nicht
+        self.assertEqual(geber_fuer_sequenz(self.spiel_id, 4), "Clara")  # 2 gezählt davor
+
+    def test_mehrere_tausender_hintereinander_persistierbar(self):
+        """Mehrere Tausender in Folge → eindeutige Sequenzen, alle 201; Zähler erst bei regulär."""
+        self.assertEqual(self._tausender("Bernd", "Anna").status_code, 201)                 # Seq 1
+        self.assertEqual(self._tausender("Clara", "Anna", verloren=True).status_code, 201)  # Seq 2
+        self.assertEqual(
+            self._normal("Bernd", "Anna", "Clara", "Dieter").status_code, 201               # Seq 3
+        )
+        historie = self.client.get(self.url).json()["runden"]
+        self.assertEqual([r["sequenz"] for r in historie], [1, 2, 3])
+        self.assertEqual([r["zaehlrunde"] for r in historie], [None, None, 1])
+
+    def test_tausender_friert_stand_ein_und_vergibt_sterne(self):
+        """Tausender: kein numerischer Beitrag (STAND friert), aber Sterne (§15)."""
+        self._normal("Bernd", "Anna", "Clara", "Dieter")  # Bernd gewinnt 250
+        stand_vor = self.client.get(f"/api/spiele/{self.spiel_id}/punktestaende/").json()
+        self._tausender("Clara", "Bernd", verloren=True)  # aktive GS Anna+Dieter je Stern
+        stand_nach = self.client.get(f"/api/spiele/{self.spiel_id}/punktestaende/").json()
+
+        self.assertEqual(stand_vor["punktestaende"], stand_nach["punktestaende"])
+        self.assertEqual(stand_nach["sterne"]["Anna"], 1)
+        self.assertEqual(stand_nach["sterne"]["Dieter"], 1)
+        self.assertEqual(stand_nach["sterne"]["Clara"], 0)  # Spielmacher
+        self.assertEqual(stand_nach["sterne"]["Bernd"], 0)  # Geber (setzt aus)
+
+    def test_put_letzter_tausender_korrigierbar(self):
+        """Letzte Runde = Tausender ist korrigierbar (gewonnen→verloren) → 200."""
+        from scoring.models import RundeModel
+        self._normal("Bernd", "Anna", "Clara", "Dieter")  # Seq 1
+        self._tausender("Clara", "Bernd")                 # Seq 2 (letzte)
+        antwort = self.client.put(
+            f"/api/spiele/{self.spiel_id}/runden/2/",
+            data=json.dumps({"typ": "tausender_verloren", "spielmacher": "Clara"}),
+            content_type="application/json",
+        )
+        self.assertEqual(antwort.status_code, 200)
+        runde = RundeModel.objects.get(spiel_id=self.spiel_id, rundennummer=2)
+        self.assertEqual(runde.rundenausgang, "Tausender verloren")
+
+    def test_put_nicht_letzter_tausender_409(self):
+        """Ein Tausender, der nicht die höchste Sequenz ist, ist nicht korrigierbar → 409."""
+        self._normal("Bernd", "Anna", "Clara", "Dieter")  # Seq 1
+        self._tausender("Clara", "Bernd")                 # Seq 2
+        self._normal("Dieter", "Bernd", "Anna", "Clara")  # Seq 3 (letzte)
+        antwort = self.client.put(
+            f"/api/spiele/{self.spiel_id}/runden/2/",
+            data=json.dumps({"typ": "tausender_verloren", "spielmacher": "Clara"}),
+            content_type="application/json",
+        )
+        self.assertEqual(antwort.status_code, 409)
+

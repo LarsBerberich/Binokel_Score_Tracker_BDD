@@ -97,13 +97,19 @@ package "Persistenz  ·  scoring/models.py  [geplant]" {
     + id : AutoField  {PK}
     + spiel : ForeignKey  {FK → SpielModel}
     + rundennummer : PositiveSmallIntegerField
+    ' rundennummer = Erfassungs-Sequenz (eindeutig je Spiel, serverseitig max+1, inkl.
+    ' Tausender). Die gezählte Spielrunde (Runde X/Y) wird NICHT gespeichert, sondern
+    ' aus der Historie abgeleitet (Anzahl nicht-Tausender-Runden); Tausender laufen
+    ' außer Konkurrenz und zählen nicht (FND-006/ADR-016, §15.6)
     + reizwert : IntegerField
     + rundenausgang : CharField
     ' rundenausgang speichert Rundenausgang.value als String
     + spielmacher : ForeignKey  {FK → SpielerModel}
     + geber : ForeignKey  {FK → SpielerModel}
     + spielmacher_punkte : IntegerField
-    ' Invariante: spielmacher_punkte == spielmacher_meldepunkte + spielmacher_stichwerte
+    ' Invariante: gewonnenes Spiel spielmacher_punkte == M + S; doppeltes Abgehen
+    ' punkte == 0, M|S = roh erfasste (verfallene) Werte als Korrektur-Beleg (FND-004);
+    ' einfaches Abgehen/Tausender M == S == 0
     + spielmacher_meldepunkte : IntegerField
     + spielmacher_stichwerte : IntegerField
     + verlustwert : IntegerField

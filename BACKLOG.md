@@ -7,6 +7,15 @@
 
 ## ▶ Aktueller Fokus
 
+> **Zuletzt (27.08.2026):** Pairing-Durchspielen → **FND-006 behoben** (ADR-016): Tausender
+> laufen **außer Konkurrenz** und zählen nicht als gespielte Runde. Entkopplung
+> Erfassungs-Sequenz (`rundennummer`, backend-vergeben) ↔ gezählte Spielrunde (`zaehlrunde`,
+> aus Historie abgeleitet, Tausender = `null`); Geber/Fortschritt/Spielende aus der Historie;
+> Anschreibetabelle Tausender „außer Konkurrenz" ohne Nummer. **Keine Migration.** Zusätzlich
+> UX-Feinschliff (Pairing): Anschreibetabelle M/S/Mit **vertikal** + Mit nur bei Abgehen;
+> `RundeForm`-Feldreihenfolge **Reizwert → Spielmacher → Meldungen → Spielart → Stichwerte**.
+> Tests: 61 Django / 32 Behave / 61 Vitest / Build grün. **Nicht committet/gepusht.**
+
 **Phase 2 (Frontend, Vue) läuft.** **TASK-007a** (Same-Origin-Infrastruktur, ADR-010/011)
 und **TASK-007** (Vue-Fundament) sind **abgeschlossen**: `frontend/` steht mit Vite + Vue 3
 + TS, Router + Pinia, Tailwind v4, handgeschriebenem OpenAPI 3.1, dünnem fetch-API-Client

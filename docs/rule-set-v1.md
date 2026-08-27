@@ -429,6 +429,29 @@ Stattdessen wird bei angesagtem Tausender der Ausgang explizit ausgewählt:
 - gewonnen
 - verloren
 
+### 15.6 Tausender läuft außer Konkurrenz (Rundenzählung)
+
+Ein Tausender **zählt nicht als gespielte Runde**. Er läuft außer Konkurrenz:
+
+- Die **gezählte Spielrunde** (Runde X von Y) erhöht sich durch einen Tausender **nicht**.
+- Der **Geber wechselt nicht**: die anschließend zu spielende Runde wird mit
+  **demselben Geber** und derselben gezählten Spielrunde erneut gespielt.
+- Es wird so lange erneut gespielt, **bis kein Tausender mehr** angesagt wird. Erst
+  eine reguläre Runde (gewonnenes Spiel, einfaches oder doppeltes Abgehen) rückt
+  Zähler **und** Geber weiter.
+- Das **Spielende** richtet sich ausschließlich nach der Anzahl **gezählter** Runden;
+  Tausender-Runden werden dabei nicht mitgezählt.
+- Die Tausender-Sterne (§15.3) bleiben erhalten und werden weiterhin angezeigt.
+
+Zur Nachvollziehbarkeit wird jede erfasste Runde – auch ein Tausender – als eigene
+Runde mit einer eindeutigen fortlaufenden **Erfassungs-Sequenz** gespeichert und ist
+im Rahmen der Korrektur der letzten Runde (§17 / ADR-015) editierbar. In der
+Anschreibetabelle erscheint eine Tausender-Zeile mit `★` und der Kennzeichnung
+**„außer Konkurrenz"** ohne gezählte Rundennummer (vgl. docs/Anschreibetabelle_4_Spieler.md).
+
+> Herleitung: siehe FND-006 (docs/testing/explorative-testprotokoll.md) und ADR-016.
+
+
 Das System leitet daraus den fachlichen Rundenausgang und die Sternvergabe ab.
 
 ---

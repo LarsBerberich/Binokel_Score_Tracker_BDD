@@ -27,10 +27,12 @@ function zelle(rolle: SpielerRolle, teil: Partial<RundenhistorieZelle> = {}): Ru
  */
 const runde1: RundenhistorieRunde = {
   rundennummer: 1,
+  sequenz: 1,
+  zaehlrunde: 1,
   geber: 'A',
   spielmacher: 'B',
   reizwert: 180,
-  rundenausgang: 'gewonnenes_spiel',
+  rundenausgang: 'gewonnenes Spiel',
   ist_tausender: false,
   verlustwert: 0,
   spieler: {
@@ -44,10 +46,12 @@ const runde1: RundenhistorieRunde = {
 
 const runde2: RundenhistorieRunde = {
   rundennummer: 2,
+  sequenz: 2,
+  zaehlrunde: 2,
   geber: 'B',
   spielmacher: 'C',
   reizwert: 250,
-  rundenausgang: 'einfaches_abgehen',
+  rundenausgang: 'einfaches Abgehen',
   ist_tausender: false,
   verlustwert: -250,
   spieler: {
@@ -61,10 +65,12 @@ const runde2: RundenhistorieRunde = {
 
 const runde3: RundenhistorieRunde = {
   rundennummer: 3,
+  sequenz: 3,
+  zaehlrunde: null,
   geber: 'C',
   spielmacher: 'D',
   reizwert: 0,
-  rundenausgang: 'tausender_gewonnen',
+  rundenausgang: 'Tausender gewonnen',
   ist_tausender: true,
   verlustwert: 0,
   spieler: {
@@ -124,10 +130,26 @@ describe('Anschreibetabelle', () => {
     expect(wrapper.find('[data-testid="schneider-2-D"]').exists()).toBe(false)
   })
 
+  it('weist den Rundenausgang je Runde aus (§5-Annotation)', () => {
+    const wrapper = mounten(historie)
+    expect(wrapper.find('[data-testid="ausgang-1"]').text()).toBe('gewonnen')
+    expect(wrapper.find('[data-testid="ausgang-2"]').text()).toBe('einfaches Abgehen')
+    expect(wrapper.find('[data-testid="ausgang-3"]').text()).toBe('gewonnen')
+  })
+
   it('zeigt bei Tausender den Stern und keine Schneider-Annotation', () => {
     const wrapper = mounten(historie)
     expect(wrapper.find('[data-testid="stern-3-D"]').text()).toContain('★')
     expect(wrapper.find('[data-testid="schneider-3-A"]').exists()).toBe(false)
+  })
+
+  it('kennzeichnet die Tausender-Zeile als „außer Konkurrenz" ohne gezählte Nummer (FND-006)', () => {
+    const wrapper = mounten(historie)
+    // Tausender (Sequenz 3, zaehlrunde=null): außer-Konkurrenz-Markierung statt Rundennummer.
+    expect(wrapper.find('[data-testid="ausser-konkurrenz-3"]').exists()).toBe(true)
+    // Reguläre Runden (Sequenz 1/2) tragen keine solche Markierung.
+    expect(wrapper.find('[data-testid="ausser-konkurrenz-1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ausser-konkurrenz-2"]').exists()).toBe(false)
   })
 
   it('friert den STAND bei Tausender ein (identisch zur Vorrunde)', () => {

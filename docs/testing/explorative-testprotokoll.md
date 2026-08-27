@@ -131,4 +131,122 @@ gewählt: **Option 1 — Zehner-Rundung an der EINGABE** (nicht bei der Aggregat
 - **Bündelung:** TASK-015 + TASK-016 gemeinsam (gleicher Code in RundeForm), getrennte Commits (015 zuerst).
 - Volltext des Reviews: siehe Session-/Chat-Ergebnis (Coding-Agent-Brief enthält Testliste + 5-Schritte-Plan).
 
+---
+
+## FND-003 — Schneider-Annotation „(0 Stiche)" erscheint fälschlich bei einfachem Abgehen
+
+- **Status:** ✅ BEHOBEN (2026-08-26) — Wurzel war ein Format-Mismatch: Backend liefert `rundenausgang` als Klartext (`"einfaches Abgehen"`), Frontend verglich gegen den Slug `'einfaches_abgehen'`. Fix: zentrale `RUNDENAUSGANG`-Klartext-Konstanten in `api/types.ts`; `Anschreibetabelle.vue` vergleicht gegen `RUNDENAUSGANG.EINFACHES_ABGEHEN`; Frontend-Tests von Slug auf Klartext korrigiert (der bestehende „KEINE Schneider-Annotation"-Test ist damit erst aussagekräftig). Vitest 58 grün + Live-Browser bestätigt (Carla `40 | 0 | 30`, kein `(0 Stiche)`).
+- **Datum:** 2026-08-26
+- **Modus:** Pairing
+- **Bereich:** Anschreibetabelle (`frontend/src/components/Anschreibetabelle.vue`, §2 Stich-Zwang / §5 Darstellung)
+- **Schwere:** MITTEL (fachlich irreführende Darstellung; Regelwidrigkeit in der Anzeige, keine Fehlberechnung des STAND)
+- **Repro-Test:** noch keiner (Vitest-Repro empfohlen)
+
+**Repro-Schritte:**
+1. Neues Spiel anlegen. Erste Runde als normales Spiel werten (damit der Geber rotiert).
+2. Nächste Runde als **einfaches Abgehen** werten; die Gegenspieler behalten Meldepunkte, haben aber **keine eigenen Stiche** (Stichwerte 0).
+3. Anschreibetabelle ansehen: Rundenzeile der Gegenspieler.
+
+**Erwartet (Regelbezug §2 / §5):**
+Bei einfachem Abgehen entfällt der Stich-Zwang für die Gegner — sie behalten ihre Meldepunkte **ohne** Schneider-Hinweis. Die normative §5-Vorlage (Szenario B, Beispielrunde 2) zeigt `40 | 0 | 30` bzw. `20 | 0 | 30` **ohne** „(0 Stiche)".
+
+**Ist:**
+Die Gegenspielerzellen zeigen `40 | 0 | 30 (0 Stiche)` bzw. `20 | 0 | 30 (0 Stiche)` — die Schneider-Annotation erscheint, obwohl bei einfachem Abgehen kein Schneider vorliegt.
+
+**Ursache (Codeanalyse, per API bestätigt):**
+`Anschreibetabelle.vue::zellDarstellung` schließt die Schneider-Annotation über `runde.rundenausgang !== 'einfaches_abgehen'` aus. Die API (`GET /api/spiele/{id}/runden/`) liefert `rundenausgang` aber als **`"einfaches Abgehen"`** (Klartext mit Leerzeichen, Groß-A) — nicht als `'einfaches_abgehen'`. Der Vergleich greift daher nie, die Annotation wird fälschlich angezeigt.
+
+**Vorschlag (Fix beim Coding-Agenten):**
+Frontend und Backend auf einen **konsistenten Ausgangs-Bezeichner** bringen (entweder Backend liefert einen stabilen Slug/Enum-Wert, oder Frontend vergleicht gegen den tatsächlichen Klartext). Bevorzugt: stabiler maschinenlesbarer Wert in der API (siehe auch FND-005). Vitest-Repro: einfaches Abgehen mit Gegenspieler ohne Stich → keine `(0 Stiche)`-Annotation.
+
+---
+
+## FND-004 — Korrektur einer verlorenen Runde (doppeltes Abgehen) blockiert: Spielmacher-Stichwert nicht vorbelegt
+
+- **Status:** ✅ BEHOBEN (2026-08-26, Rubber-Duck GO Option A) — Bei doppeltem Abgehen werden die roh erfassten Spielmacher-`M | S` jetzt persistiert (Backend `views.py`, else-Zweig „doppeltes Abgehen“). Die Invariante `spielmacher_punkte == M + S` gilt damit nur bei gewonnenem Spiel; einfaches Abgehen/Tausender bleiben `0 | 0`. Anschreibetabelle (`(-x)|0|0`) und STAND (`verlustwert`) unberührt. Korrektur-Vorbelegung erfüllt automatisch die 250-Kontrollsumme (kein Frontend-Code-Change). Doku: models.py-Docstring + datenmodell-v1.puml (Invariante neu formuliert), ubiquitous-language §4.25, ADR-015-Nachtrag. Tests: `test_doppeltes_abgehen_ms_roh_persistiert` + `test_doppeltes_abgehen_roh_ermoeglicht_korrektur` (Django) + Vitest-Reprotest (SpielView Vorbelegung 250 / Button aktiv). Verifiziert: 55 Django + 31 Behave + 59 Vitest + Build grün; Live-curl (GET SM-Stichwert 60 statt 0).
+- **Datum:** 2026-08-26
+- **Modus:** Pairing
+- **Bereich:** Korrektur der letzten Runde (`frontend/src/components/RundeForm.vue` Vorbelegung + Backend-Persistenz `spielmacher_stichwerte`, ADR-015 / §16.1)
+- **Schwere:** MITTEL–HOCH (Korrektur einer als doppeltes Abgehen gewerteten Runde ist ohne erneute Eingabe des SM-Stichwerts nicht speicherbar)
+- **Repro-Test:** noch keiner (Vitest- + Django-Repro empfohlen)
+
+**Repro-Schritte:**
+1. Spiel anlegen. Als letzte (höchste) Runde ein **normales Spiel** erfassen, bei dem der Spielmacher den Reizwert verfehlt (z. B. Reizwert 200, SM S=60, Gegner S=100/90 → Summe 250) → wird als **doppeltes Abgehen** gewertet (-400).
+2. „Letzte Runde korrigieren" klicken.
+3. Vorbelegung der Form ansehen.
+
+**Erwartet:**
+Die Form ist mit den ursprünglich erfassten Stichwerten vorbelegt, sodass die Kontrollsumme **250/250** ergibt und die Runde ohne erneute Eingabe wieder speicherbar ist (bzw. gezielt einzelne Werte änderbar sind).
+
+**Ist:**
+Der **Spielmacher-Stichwert ist mit 0 vorbelegt** (statt 60). Die Kontrollsumme steht auf **190/250**, „Korrektur speichern" bleibt gesperrt. Erst nach manueller Neueingabe des SM-Stichwerts (60) wird die Runde wieder speicherbar.
+
+**Ursache (Hypothese, Codeanalyse):**
+Bei doppeltem Abgehen verfallen die Spielmacher-Stiche fachlich; `spielmacher_stichwerte` wird offenbar als **0** persistiert. Die Korrektur-Vorbelegung liest die persistierten (gestrichenen) Werte → der Roh-Stichwert für die 250-Kontrollsumme fehlt.
+
+**Vorschlag (Fix beim Coding-Agenten — Rubber-Duck-Review zuerst):**
+Roh-Stichwert des Spielmachers **auch bei doppeltem Abgehen persistieren** (verfallen betrifft nur die STAND-Wertung, nicht die Rohdaten für die Korrektur) — analog zur getrennten M|S-Persistenz aus TASK-014. Alternativ die Korrektur-Vorbelegung so gestalten, dass eine verlorene Runde wieder editierbar ist. Regel-/Modell-Auswirkung prüfen (`datenmodell-v1.puml`, ADR-015). Repro-Tests: Vitest (Vorbelegung Summe 250 nach doppeltem Abgehen) + Django (PUT-Korrektur einer verlorenen Runde).
+
+---
+
+## FND-005 — Rundenausgang fehlt in der Anschreibetabelle (Spalte „Gereizt bis")
+
+- **Status:** ✅ BEHOBEN (2026-08-26) — `Anschreibetabelle.vue` zeigt jetzt je Runde ein Ausgangs-Label unter „Gereizt bis" (`ausgangLabel`, `data-testid=ausgang-{nr}`): „gewonnen" / „einfaches Abgehen" / „doppeltes Abgehen" / bei Tausender „gewonnen"|„verloren". Basiert auf denselben `RUNDENAUSGANG`-Klartext-Konstanten wie FND-003. Vitest-Regressionstest ergänzt; Live-Browser bestätigt.
+- **Datum:** 2026-08-26
+- **Modus:** Pairing
+- **Bereich:** Anschreibetabelle (`frontend/src/components/Anschreibetabelle.vue`, §5 Darstellung)
+- **Schwere:** NIEDRIG (Norm-/Lesbarkeitsabweichung; STAND und Werte sind korrekt)
+- **Repro-Test:** noch keiner
+
+**Repro-Schritte:**
+1. Mehrere Runden unterschiedlicher Ausgänge werten (gewonnen, einfaches/doppeltes Abgehen, Tausender).
+2. Anschreibetabelle ansehen, Spalte „Gereizt bis".
+
+**Erwartet (Regelbezug §5):**
+Die normative §5-Vorlage annotiert in der „Gereizt bis"-Spalte zusätzlich den **Rundenausgang**, z. B. `180 / B (Gewonnen)`, `250 / C (A) - Einfach`, `200 / A (V) - Doppelt`, `Tausender / D (Gewonnen)`. So ist auf einen Blick erkennbar, wie eine Runde ausging.
+
+**Ist:**
+Die Zelle zeigt nur `<Reizwert> / <Spielmacher>` (z. B. `150 / Bernd`) bzw. `Tausender / <Spielmacher>`. Der Rundenausgang ist nicht ausgewiesen; bei Verlust erkennt man ihn nur indirekt am eingeklammerten `(-x)`-Wert, gewonnene Runden sind nicht gekennzeichnet.
+
+**Vorschlag (Fix beim Coding-Agenten):**
+Ausgangs-Annotation in der „Gereizt bis"-Spalte ergänzen (gewonnen / einfaches Abgehen / doppeltes Abgehen / Tausender gewonnen/verloren), analog §5. Voraussetzung: stabiler maschinenlesbarer `rundenausgang`-Wert in der API (Synergie mit FND-003).
+
+---
+
+## FND-006 — Tausender-Runden zählen fälschlich als reguläre Runde (Rundenzähler + Geberrotation)
+
+- **Status:** ✅ BEHOBEN (2026-08-27, ADR-016) — Entkopplung Erfassungs-Sequenz (`rundennummer`, backend-vergeben) von der gezählten Spielrunde (`zaehlrunde`, aus der Historie abgeleitet, Tausender = `null`). Geber der Korrektur via `geber_fuer_sequenz`; Frontend leitet Fortschritt/Geber/Spielende aus der Historie ab; Anschreibetabelle zeigt Tausender „außer Konkurrenz" ohne Nummer. **Keine Migration.** Verifiziert: 61 Django (+6) / 32 Behave (+1) / 61 Vitest (+2) grün, Build/TSC grün, Live-Browser (Spiel 23: „Runde 4 / 4", Geber Volker bleibt, Tausender-Zeile außer Konkurrenz).
+- **Datum:** 2026-08-27
+- **Modus:** Pairing
+- **Bereich:** Rundenzählung / Geberrotation / Persistenz / Spielende — `stores/spiel.ts` (`naechsteRunde`), `views/SpielView.vue` (`rundennummer`/`geber`/`istBeendet`), `domain/rotation.ts` (`geberFuerRunde`), `backend/scoring/models.py` (`RundeModel` `UniqueConstraint(spiel, rundennummer)`), `views.py`/`repositories.py` (Persistenz + Historie + Korrektur).
+- **Schwere:** HOCH (verfälscht Rundenzahl, Geberrotation und Spielende; ganzes Spiel läuft aus dem Takt)
+- **Repro-Test:** noch keiner (Django + Vitest + ggf. Behave nach Design-Entscheidung)
+
+**Repro-Schritte:**
+1. Spiel mit fester Rundenanzahl anlegen (z. B. 4).
+2. Runden regulär spielen; in Runde 4 (letzte Runde) einen **Tausender** erfassen (gewonnen oder verloren).
+3. Rundenfortschritt und Spielstatus beobachten.
+
+**Erwartet (Regelbezug — USER-Präzisierung 2026-08-27):**
+Ein Tausender läuft **außer Konkurrenz** und zählt **nicht** als gespielte Runde:
+- Der Rundenzähler (`Runde X / Y`) erhöht sich durch einen Tausender **nicht**.
+- Der **Geber wechselt nicht** — die (dann folgende) Runde wird mit **demselben Geber** und derselben Rundennummer erneut gespielt.
+- Es wird so lange erneut gespielt, **bis kein Tausender mehr** angesagt wird; erst eine reguläre Runde (gewonnen / einfaches / doppeltes Abgehen) zählt und rückt Zähler + Geber weiter.
+- Die Tausender-Sterne (§15) bleiben erhalten und müssen weiterhin sichtbar sein.
+
+**Ist:**
+Ein Tausender wird wie eine reguläre Runde behandelt: `naechsteRunde()` erhöht den Rundenzähler, der Geber rotiert, und bei einem Tausender in der letzten Runde gilt das Spiel als **beendet** — obwohl die außer-Konkurrenz-Runde nicht zählen dürfte.
+
+**Ursache (Codeanalyse):**
+- Frontend koppelt Rundennummer → Geber → Spielende deterministisch: `geberFuerRunde(spieler, rn) = spieler[(rn-1) % 4]`, `istBeendet = rn > rundenanzahl`. `rundeAbsenden` ruft nach **jedem** Rundentyp `spielStore.naechsteRunde()` (auch bei Tausender).
+- Backend `RundeModel` erzwingt `UniqueConstraint(spiel, rundennummer)` — mehrere Ereignisse (Tausender + Wiederholung) mit gleicher Rundennummer sind aktuell **nicht** persistierbar. Rundenzählung ist strukturell an die Persistenz gekoppelt.
+
+**Offene Design-Fragen (vor Fix mit USER zu klären):**
+1. Anschreibetabelle: Tausender-Runde weiterhin als eigene Zeile (mit ★) zeigen, als „außer Konkurrenz" markiert? Nummerierung (keine fortlaufende Nummer / Kennzeichnung)?
+2. Persistenz-Modell: separates fortlaufendes Sequenzfeld (DB-Identität) entkoppelt von der „gezählten" Rundennummer (Geber/Fortschritt)? Oder `UniqueConstraint` lockern?
+3. Korrektur (PUT letzte Runde): Ist ein Tausender korrigierbar? Was ist „die letzte Runde", wenn zuletzt Tausender → dann reguläre Runde gespielt wurde?
+
+**Nächster Schritt:**
+Design-Entscheidung mit USER → Rubber-Duck-Design-Review (Datenmodell/Migration/Korrektur) → dann Umsetzung Backend+Frontend + vollständige Doku (rule-set §15, ADR-016, datenmodell-v1.puml, ubiquitous-language, ggf. Behave-Szenario).
+
 

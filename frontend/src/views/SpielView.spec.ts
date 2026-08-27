@@ -20,6 +20,7 @@ import {
   punktestaendeLaden,
   rundenHistorieLaden,
   spielLaden,
+  type Rundenhistorie,
 } from '../api'
 
 const spielLadenMock = vi.mocked(spielLaden)
@@ -30,17 +31,45 @@ const beispielSpiel = { id: 3, rundenanzahl: 12, spieler: ['Anna', 'Bernd', 'Car
 
 const leereHistorie = { spiel_id: 3, spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'], runden: [] }
 
+/** Minimale valide Historie-Runde (FND-006: sequenz + zaehlrunde). */
+function macheRunde(
+  sequenz: number,
+  zaehlrunde: number | null,
+  istTausender = false,
+): Rundenhistorie['runden'][number] {
+  return {
+    rundennummer: sequenz,
+    sequenz,
+    zaehlrunde,
+    geber: 'Anna',
+    spielmacher: 'Bernd',
+    reizwert: 150,
+    rundenausgang: istTausender ? 'Tausender gewonnen' : 'gewonnenes Spiel',
+    ist_tausender: istTausender,
+    verlustwert: 0,
+    spieler: {
+      Anna: { rolle: 'geber', meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
+      Bernd: { rolle: 'spielmacher', meldepunkte: 100, stichwerte: 100, mitpunkte: 0, hat_eigenen_stich: true, stern: istTausender },
+      Carla: { rolle: 'gegenspieler', meldepunkte: 40, stichwerte: 90, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+      Dirk: { rolle: 'gegenspieler', meldepunkte: 0, stichwerte: 60, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+    },
+    stand: { Anna: 0, Bernd: 200, Carla: 130, Dirk: 60 },
+  }
+}
+
 /** Historie mit einer normalen Runde (Anna Geber, Bernd Spielmacher). */
-const historieMitRunde = {
+const historieMitRunde: Rundenhistorie = {
   spiel_id: 3,
   spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'],
   runden: [
     {
       rundennummer: 1,
+      sequenz: 1,
+      zaehlrunde: 1,
       geber: 'Anna',
       spielmacher: 'Bernd',
       reizwert: 150,
-      rundenausgang: 'gewonnenes_spiel',
+      rundenausgang: 'gewonnenes Spiel',
       ist_tausender: false,
       verlustwert: 0,
       spieler: {
@@ -141,20 +170,45 @@ describe('SpielView', () => {
     expect(wrapper.find('[data-testid="sterne-Dirk"]').exists()).toBe(false)
   })
 
-  it('zeigt nach der letzten Runde den Beendet-Bereich mit Link zur Auswertung', () => {
+  it('zeigt nach der letzten Runde den Beendet-Bereich mit Link zur Auswertung', async () => {
     const store = useSpielStore()
     store.setzeSpiel({ id: 3, rundenanzahl: 4, spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'] })
-    // Vier Runden weiterschalten → Rundennummer 5 > 4 → Spiel beendet
-    for (let i = 0; i < 4; i++) store.naechsteRunde()
+    // Vier gezählte (nicht-Tausender) Runden in der Historie → Spiel beendet (FND-006).
+    rundenHistorieLadenMock.mockResolvedValue({
+      spiel_id: 3,
+      spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'],
+      runden: [1, 2, 3, 4].map((n) => macheRunde(n, n)),
+    })
 
     const wrapper = mount(SpielView, {
       props: { spielId: '3' },
       global: { stubs: { RouterLink: RouterLinkStub } },
     })
+    await flushPromises()
 
     expect(wrapper.find('[data-testid="beendet"]').exists()).toBe(true)
     const link = wrapper.findComponent(RouterLinkStub)
     expect(link.props().to).toEqual({ name: 'spielende', params: { spielId: '3' } })
+  })
+
+  it('zählt Tausender nicht als Runde: Fortschritt und Geber bleiben stehen (FND-006)', async () => {
+    useSpielStore().setzeSpiel(beispielSpiel)
+    rundenHistorieLadenMock.mockResolvedValue({
+      spiel_id: 3,
+      spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'],
+      runden: [macheRunde(1, 1), macheRunde(2, null, true)],
+    })
+    const wrapper = mount(SpielView, {
+      props: { spielId: '3' },
+      global: { stubs: { RouterLink: RouterLinkStub } },
+    })
+    await flushPromises()
+
+    // Eine gezählte Runde gespielt, der Tausender zählt nicht → nächste zu spielende
+    // ist weiterhin die gezählte Runde 2 mit Geber Bernd (spieler[(2-1)%4]).
+    expect(wrapper.find('[data-testid="rundenfortschritt"]').text()).toContain('Runde 2 / 12')
+    expect(wrapper.find('[data-testid="geber"]').text()).toBe('Bernd')
+    expect(wrapper.find('[data-testid="beendet"]').exists()).toBe(false)
   })
 
   it('zeigt die Anschreibetabelle, sobald Runden in der Historie vorliegen', async () => {
@@ -165,10 +219,12 @@ describe('SpielView', () => {
       runden: [
         {
           rundennummer: 1,
+          sequenz: 1,
+          zaehlrunde: 1,
           geber: 'Anna',
           spielmacher: 'Bernd',
           reizwert: 150,
-          rundenausgang: 'gewonnenes_spiel',
+          rundenausgang: 'gewonnenes Spiel',
           ist_tausender: false,
           verlustwert: 0,
           spieler: {
@@ -198,7 +254,7 @@ describe('SpielView', () => {
     letzteRundeAktualisierenMock.mockResolvedValue({
       id: 1,
       rundennummer: 1,
-      rundenausgang: 'gewonnenes_spiel',
+      rundenausgang: 'gewonnenes Spiel',
       spielmacher_punkte: 210,
       verlustwert: 0,
       mitpunkte_pro_gegenspieler: 0,
@@ -234,5 +290,47 @@ describe('SpielView', () => {
     expect(wrapper.find('[data-testid="korrektur"]').exists()).toBe(false)
     expect(punktestaendeLadenMock).toHaveBeenCalledTimes(2)
     expect(rundenHistorieLadenMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('belegt bei Korrektur einer doppelt-abgegangenen Runde den SM-Stichwert vor (Kontrollsumme 250, FND-004)', async () => {
+    useSpielStore().setzeSpiel(beispielSpiel)
+    const historieDoppelt: Rundenhistorie = {
+      spiel_id: 3,
+      spieler: ['Anna', 'Bernd', 'Carla', 'Dirk'],
+      runden: [
+        {
+          rundennummer: 1,
+          sequenz: 1,
+          zaehlrunde: 1,
+          geber: 'Anna',
+          spielmacher: 'Bernd',
+          reizwert: 300,
+          rundenausgang: 'doppeltes Abgehen',
+          ist_tausender: false,
+          verlustwert: -600,
+          spieler: {
+            Anna: { rolle: 'geber', meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
+            Bernd: { rolle: 'spielmacher', meldepunkte: 0, stichwerte: 60, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+            Carla: { rolle: 'gegenspieler', meldepunkte: 0, stichwerte: 130, mitpunkte: 30, hat_eigenen_stich: true, stern: false },
+            Dirk: { rolle: 'gegenspieler', meldepunkte: 0, stichwerte: 60, mitpunkte: 30, hat_eigenen_stich: true, stern: false },
+          },
+          stand: { Anna: 0, Bernd: -600, Carla: 160, Dirk: 90 },
+        },
+      ],
+    }
+    rundenHistorieLadenMock.mockResolvedValue(historieDoppelt)
+    const wrapper = mount(SpielView, {
+      props: { spielId: '3' },
+      global: { stubs: { RouterLink: RouterLinkStub } },
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-testid="korrektur-starten"]').trigger('click')
+    // FND-004: SM-Stichwert ist mit dem roh erfassten Wert vorbelegt.
+    expect((wrapper.find('[data-testid="sm-stichwerte"]').element as HTMLInputElement).value).toBe(
+      '60',
+    )
+    // „Korrektur speichern" ist nicht gesperrt (Summe 60 + 130 + 60 == 250).
+    expect(wrapper.find('[data-testid="runde-absenden"]').attributes('disabled')).toBeUndefined()
   })
 })

@@ -134,12 +134,20 @@ export interface RundenhistorieZelle {
 
 /** Eine Runde der Anschreibetabelle inkl. kumuliertem STAND je Spieler. */
 export interface RundenhistorieRunde {
+  /** Fortlaufende Erfassungs-Sequenz (Identität, eindeutig, inkl. Tausender). */
   rundennummer: number
+  /** Alias von `rundennummer` – die eindeutige Erfassungs-Sequenz. */
+  sequenz: number
+  /**
+   * Gezählte Spielrunde (Runde X / Y). `null` bei Tausender, da diese außer
+   * Konkurrenz laufen und nicht als gespielte Runde zählen (FND-006, §15).
+   */
+  zaehlrunde: number | null
   geber: string
   spielmacher: string
   reizwert: number
-  /** Interner Ausgangs-Code (z. B. gewonnenes_spiel). */
-  rundenausgang: string
+  /** Fachliche Ergebnis-Klassifikation (Klartext), z. B. 'gewonnenes Spiel'. */
+  rundenausgang: Rundenausgang
   ist_tausender: boolean
   /** Negativer Verlustwert bei Abgehen; sonst 0. */
   verlustwert: number

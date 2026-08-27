@@ -324,13 +324,16 @@ components:
 
     RundeBasis:
       type: object
-      required: [typ, rundennummer, spielmacher, geber]
+      required: [typ, spielmacher, geber]
       properties:
         typ:
           $ref: '#/components/schemas/Rundentyp'
         rundennummer:
           type: integer
-          description: 1-basierte Rundennummer.
+          description: >-
+            Optional/ignoriert. Die Erfassungs-Sequenz (rundennummer) wird serverseitig
+            als max+1 vergeben (FND-006/ADR-016); ein im Body übergebener Wert wird
+            NICHT verwendet.
           minimum: 1
         spielmacher:
           type: string
@@ -622,6 +625,8 @@ components:
       type: object
       required:
         - rundennummer
+        - sequenz
+        - zaehlrunde
         - geber
         - spielmacher
         - reizwert
@@ -633,6 +638,16 @@ components:
       properties:
         rundennummer:
           type: integer
+          description: Erfassungs-Sequenz (Identität, eindeutig, inkl. Tausender). Alias von `sequenz`.
+        sequenz:
+          type: integer
+          description: Fortlaufende Erfassungs-Sequenz (max+1, ADR-016).
+        zaehlrunde:
+          type: integer
+          nullable: true
+          description: >-
+            Gezählte Spielrunde (Runde X/Y). `null` bei Tausender, da diese außer
+            Konkurrenz laufen und nicht als gespielte Runde zählen (§15.6/FND-006).
         geber:
           type: string
         spielmacher:

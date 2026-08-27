@@ -39,7 +39,20 @@ const historie = ref<Rundenhistorie | null>(null)
 /** Korrektur-Modus für die letzte Runde (TASK-014 Slice 6, ADR-015). */
 const korrekturModus = ref(false)
 
-const rundennummer = computed(() => spielStore.aktuelleRundennummer)
+/**
+ * Anzahl bereits GEZÄHLTER (nicht-Tausender) Runden aus der autoritativen
+ * Rundenhistorie. Tausender laufen außer Konkurrenz und zählen nicht als
+ * gespielte Runde (FND-006, §15). Grundlage für gezählte Rundennummer, Geber
+ * und Spielende – bewusst kein lokaler Zähler, damit Korrekturen (auch
+ * Typwechsel normal↔Tausender) automatisch korrekt wirken.
+ */
+const gezaehlteRunden = computed(() =>
+  historie.value ? historie.value.runden.filter((r) => !r.ist_tausender).length : 0,
+)
+/** Gezählte Spielrunde, die als Nächstes zu erfassen ist. */
+const rundennummer = computed(() => gezaehlteRunden.value + 1)
+/** Erfassungs-Schlüssel: wechselt bei jeder gespeicherten Runde (auch Tausender) → Formular-Reset. */
+const erfassungsschluessel = computed(() => historie.value?.runden.length ?? 0)
 const geber = computed(() =>
   spiel.value ? geberFuerRunde(spiel.value.spieler, rundennummer.value) : '',
 )
@@ -47,7 +60,7 @@ const aktive = computed(() =>
   spiel.value ? aktiveSpieler(spiel.value.spieler, geber.value) : [],
 )
 const istBeendet = computed(() =>
-  spiel.value ? rundennummer.value > spiel.value.rundenanzahl : false,
+  spiel.value ? gezaehlteRunden.value >= spiel.value.rundenanzahl : false,
 )
 
 /** Punktestände absteigend (höchster zuerst – führt zur Siegerermittlung). */
@@ -152,7 +165,8 @@ async function rundeAbsenden(payload: RundeRequest): Promise<void> {
   rundeFehler.value = null
   try {
     letztesErgebnis.value = await rundeAuswerten(spiel.value.id, payload)
-    spielStore.naechsteRunde()
+    // Kein lokaler Rundenzähler mehr: gezählte Runde/Geber/Spielende ergeben sich
+    // aus der neu geladenen Historie (FND-006 – Tausender zählen nicht).
     await punktestaendeAktualisieren()
     await historieAktualisieren()
   } catch (error) {
@@ -285,6 +299,7 @@ onMounted(async () => {
         </p>
 
         <RundeForm
+          :key="erfassungsschluessel"
           :rundennummer="rundennummer"
           :geber="geber"
           :aktive="aktive"

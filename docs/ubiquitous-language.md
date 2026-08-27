@@ -403,7 +403,37 @@ Runde (höchste Rundennummer), ohne das Spiel neu anzulegen. Nur diese eine Rund
 Rundennummer und Geber bleiben dabei fix (ADR-015). Alle übrigen Werte inklusive Spielmacher und
 Ausgangstyp dürfen geändert werden; der STAND wird automatisch neu aggregiert.
 
+Damit auch eine als **doppeltes Abgehen** gewertete Runde korrigierbar ist, werden dort die roh
+erfassten Spielmacher-Werte `M | S` persistiert (obwohl sie fachlich verfallen und nicht in den
+STAND einfließen). Sie dienen ausschließlich als Vorbelegung/Nachvollziehbarkeits-Beleg, sodass die
+250-Kontrollsumme im Korrekturformular erfüllt ist (FND-004). Bei einfachem Abgehen und Tausender
+bleiben `M | S` bei 0.
+
 **Bevorzugte Verwendung im Code:** `letzteRundeAktualisieren` / `runde_aktualisieren`
+
+---
+
+### 4.26 Gezählte Spielrunde
+
+Die **gezählte Spielrunde** ist die reguläre Runde X von Y (Fortschritt „Runde X / Y"). Sie treibt
+die **Geberrotation** (`spieler[(n-1) % 4]`) und das **Spielende** (Anzahl gezählter Runden erreicht
+die Rundenanzahl). Ein **Tausender zählt nicht** als gespielte Runde (§15.6): er lässt die gezählte
+Spielrunde und den Geber stehen. Die gezählte Spielrunde wird nicht gespeichert, sondern aus der
+Rundenhistorie abgeleitet (Anzahl nicht-Tausender-Runden); Tausender-Runden tragen `zaehlrunde = null`.
+
+**Bevorzugte Verwendung im Code:** `zaehlrunde`, `gezaehlteRunden`
+
+---
+
+### 4.27 Erfassungs-Sequenz
+
+Die **Erfassungs-Sequenz** (`rundennummer` / `sequenz`) ist die fortlaufende, eindeutige
+Reihenfolge und Identität **jeder** erfassten Runde – auch eines Tausenders. Sie wird serverseitig
+als `max+1` vergeben und ist Grundlage der Korrektur der letzten Runde (höchste Sequenz, ADR-015).
+Sie ist bewusst **getrennt** von der gezählten Spielrunde (§4.26): mehrere außer-Konkurrenz-
+Tausender können dieselbe gezählte Runde teilen, haben aber je eine eigene Sequenz (ADR-016).
+
+**Bevorzugte Verwendung im Code:** `rundennummer` / `sequenz`
 
 ---
 
