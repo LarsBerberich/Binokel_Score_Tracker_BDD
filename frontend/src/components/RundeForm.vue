@@ -344,13 +344,20 @@ function absenden(): void {
         Runde {{ rundennummer }} {{ korrekturModus ? 'korrigieren' : 'erfassen' }}
       </legend>
 
-      <label class="flex flex-col gap-1">
-        <span class="text-sm text-slate-600">Rundentyp</span>
-        <select v-model="typ" data-testid="typ" class="rounded border border-slate-300 px-3 py-2">
-          <option v-for="rt in RUNDENTYPEN" :key="rt.wert" :value="rt.wert">{{ rt.label }}</option>
-        </select>
+      <!-- 1. Reizwert (Ergebnis der Reizphase). -->
+      <label v-if="brauchtReizwert" class="flex flex-col gap-1">
+        <span class="text-sm text-slate-600">Reizwert</span>
+        <input
+          v-model.number="reizwert"
+          type="number"
+          :min="REIZWERT_MINIMUM"
+          :step="ZEHNER_SCHRITT"
+          data-testid="reizwert"
+          class="rounded border border-slate-300 px-3 py-2"
+        />
       </label>
 
+      <!-- 2. Spielmacher -->
       <label class="flex flex-col gap-1">
         <span class="text-sm text-slate-600">Spielmacher</span>
         <select
@@ -366,20 +373,10 @@ function absenden(): void {
         Gegenspieler: <strong data-testid="gegenspieler">{{ gegenspieler.join(', ') }}</strong>
       </p>
 
-      <label v-if="brauchtReizwert" class="flex flex-col gap-1">
-        <span class="text-sm text-slate-600">Reizwert</span>
-        <input
-          v-model.number="reizwert"
-          type="number"
-          :min="REIZWERT_MINIMUM"
-          :step="ZEHNER_SCHRITT"
-          data-testid="reizwert"
-          class="rounded border border-slate-300 px-3 py-2"
-        />
-      </label>
+      <!-- 3. Meldungen aller aktiven Spieler (Meldephase – vor der Spielansage). -->
+      <div v-if="!istTausender && spielmacherDetail" class="flex flex-col gap-3">
+        <p class="text-sm font-semibold text-slate-700">Meldungen</p>
 
-      <!-- Detailfelder: normale Runde (009.3) -->
-      <div v-if="istNormal && spielmacherDetail" class="flex flex-col gap-3">
         <fieldset class="flex flex-col gap-2 rounded border border-slate-200 p-3">
           <legend class="px-1 text-sm font-semibold text-emerald-700">
             Spielmacher: {{ spielmacher }}
@@ -396,6 +393,55 @@ function absenden(): void {
               class="rounded border border-slate-300 px-3 py-2"
             />
           </label>
+        </fieldset>
+
+        <fieldset
+          v-for="name in gegenspieler"
+          :key="name"
+          class="flex flex-col gap-2 rounded border border-slate-200 p-3"
+        >
+          <legend class="px-1 text-sm font-semibold text-slate-700">Gegenspieler: {{ name }}</legend>
+          <label class="flex flex-col gap-1">
+            <span class="text-sm text-slate-600">Meldepunkte</span>
+            <input
+              v-model.number="details[name].meldepunkte"
+              type="number"
+              min="0"
+              :max="MELDEPUNKTE_MAXIMUM"
+              :step="ZEHNER_SCHRITT"
+              :data-testid="`gs-meldepunkte-${name}`"
+              class="rounded border border-slate-300 px-3 py-2"
+            />
+          </label>
+        </fieldset>
+
+        <p v-if="meldepunkteZuHoch" data-testid="meldepunkte-fehler" class="text-sm text-red-700">
+          Meldepunkte eines Spielers können höchstens {{ MELDEPUNKTE_MAXIMUM }} betragen – bitte
+          korrigieren.
+        </p>
+      </div>
+
+      <!-- 4. Spielart (wird erst nach der Meldephase angesagt). -->
+      <label class="flex flex-col gap-1">
+        <span class="text-sm text-slate-600">Spielart</span>
+        <select v-model="typ" data-testid="typ" class="rounded border border-slate-300 px-3 py-2">
+          <option v-for="rt in RUNDENTYPEN" :key="rt.wert" :value="rt.wert">{{ rt.label }}</option>
+        </select>
+      </label>
+
+      <!-- Einfaches Abgehen: kein Stich; nur Hinweis (Meldungen bereits oben erfasst). -->
+      <p v-if="istEinfachesAbgehen" data-testid="abgehen-hinweis" class="text-sm text-slate-600">
+        {{ spielmacher }} geht ab – einfacher Verlust. Die Gegenspieler erhalten je 30 Mitpunkte.
+      </p>
+
+      <!-- 5. Stichwerte der normalen Runde (Stichphase – nach der Spielansage). -->
+      <div v-if="istNormal && spielmacherDetail" class="flex flex-col gap-3">
+        <p class="text-sm font-semibold text-slate-700">Stichwerte</p>
+
+        <fieldset class="flex flex-col gap-2 rounded border border-slate-200 p-3">
+          <legend class="px-1 text-sm font-semibold text-emerald-700">
+            Spielmacher: {{ spielmacher }}
+          </legend>
           <label class="flex flex-col gap-1">
             <span class="text-sm text-slate-600">
               Stichwerte (inkl. gedrückter Karten)
@@ -422,18 +468,6 @@ function absenden(): void {
           class="flex flex-col gap-2 rounded border border-slate-200 p-3"
         >
           <legend class="px-1 text-sm font-semibold text-slate-700">Gegenspieler: {{ name }}</legend>
-          <label class="flex flex-col gap-1">
-            <span class="text-sm text-slate-600">Meldepunkte</span>
-            <input
-              v-model.number="details[name].meldepunkte"
-              type="number"
-              min="0"
-              :max="MELDEPUNKTE_MAXIMUM"
-              :step="ZEHNER_SCHRITT"
-              :data-testid="`gs-meldepunkte-${name}`"
-              class="rounded border border-slate-300 px-3 py-2"
-            />
-          </label>
           <label class="flex flex-col gap-1">
             <span class="text-sm text-slate-600">
               Stichwerte
@@ -470,11 +504,6 @@ function absenden(): void {
           Die erfassten Stichwerte übersteigen {{ STICHWERT_KONTROLLSUMME }} – bitte korrigieren.
         </p>
 
-        <p v-if="meldepunkteZuHoch" data-testid="meldepunkte-fehler" class="text-sm text-red-700">
-          Meldepunkte eines Spielers können höchstens {{ MELDEPUNKTE_MAXIMUM }} betragen – bitte
-          korrigieren.
-        </p>
-
         <p
           v-if="wirdDoppeltesAbgehen"
           data-testid="doppeltes-abgehen-hinweis"
@@ -482,38 +511,6 @@ function absenden(): void {
         >
           {{ spielmacher }} erreicht den Reizwert nicht (M+S {{ spielmacherGesamt }} &lt;
           {{ reizwert }}) – die Runde wird als doppeltes Abgehen gewertet.
-        </p>
-      </div>
-
-      <!-- Detailfelder: Einfaches Abgehen (009.4) -->
-      <div v-if="istEinfachesAbgehen" class="flex flex-col gap-3">
-        <p data-testid="abgehen-hinweis" class="text-sm text-slate-600">
-          {{ spielmacher }} geht ab – einfacher Verlust. Die Gegenspieler erhalten je 30 Mitpunkte.
-        </p>
-
-        <fieldset
-          v-for="name in gegenspieler"
-          :key="name"
-          class="flex flex-col gap-2 rounded border border-slate-200 p-3"
-        >
-          <legend class="px-1 text-sm font-semibold text-slate-700">Gegenspieler: {{ name }}</legend>
-          <label class="flex flex-col gap-1">
-            <span class="text-sm text-slate-600">Meldepunkte</span>
-            <input
-              v-model.number="details[name].meldepunkte"
-              type="number"
-              min="0"
-              :max="MELDEPUNKTE_MAXIMUM"
-              :step="ZEHNER_SCHRITT"
-              :data-testid="`gs-meldepunkte-${name}`"
-              class="rounded border border-slate-300 px-3 py-2"
-            />
-          </label>
-        </fieldset>
-
-        <p v-if="meldepunkteZuHoch" data-testid="meldepunkte-fehler" class="text-sm text-red-700">
-          Meldepunkte eines Spielers können höchstens {{ MELDEPUNKTE_MAXIMUM }} betragen – bitte
-          korrigieren.
         </p>
       </div>
 

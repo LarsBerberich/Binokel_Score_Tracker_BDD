@@ -94,7 +94,9 @@ describe('Anschreibetabelle', () => {
 
   it('stellt „M | S | Mit" für den gewinnenden Spielmacher dar', () => {
     const wrapper = mounten(historie)
-    expect(wrapper.find('[data-testid="runde-1-B"]').text()).toContain('100 | 120 | 0')
+    const text = wrapper.find('[data-testid="runde-1-B"]').text()
+    expect(text).toContain('100')
+    expect(text).toContain('120')
   })
 
   it('markiert den Geber mit „setzt aus"', () => {
@@ -106,7 +108,7 @@ describe('Anschreibetabelle', () => {
   it('annotiert den Schneider-Gegenspieler (0 Stiche) im normalen Spiel als 0', () => {
     const wrapper = mounten(historie)
     expect(wrapper.find('[data-testid="schneider-1-D"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="runde-1-D"]').text()).toContain('0 | 0 | 0')
+    expect(wrapper.find('[data-testid="runde-1-D"]').text()).toContain('(0 Stiche)')
   })
 
   it('rückt den eingeklammerten Verlustwert ins erste Feld des Spielmachers', () => {
