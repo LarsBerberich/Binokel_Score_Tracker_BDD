@@ -193,8 +193,12 @@ jobs:
           echo "→ /health/ liefert 200 (End-to-End über TLS)"
           check "/health/" 200 "$BASE/health/"
 
-          echo "→ /admin/ liefert 404 (Django-Admin bewusst entfernt, RD-6)"
-          check "/admin/" 404 "$BASE/admin/"
+          # Hinweis: Seit die SPA per nginx-Catch-all (try_files … /index.html) ausgeliefert
+          # wird, liefern unbekannte Pfade (auch /admin/) die statische index.html mit HTTP 200 —
+          # NICHT die Django-Admin (urls.py hat keine /admin/-Route, RD-6). Daher kein /admin/-404-
+          # Check mehr; stattdessen prüfen wir, dass die SPA-Wurzel tatsächlich ausgeliefert wird.
+          echo "→ SPA-Wurzel liefert 200 (Vue-App wird ausgeliefert)"
+          check "SPA /" 200 "$BASE/"
 
           echo "→ HTTP wird auf HTTPS umgeleitet"
           check "HTTP→HTTPS-Redirect" 301 "http://${{ vars.VM_HOST }}/"
@@ -206,10 +210,6 @@ jobs:
             echo "  ❌ Strict-Transport-Security fehlt"
             fail=1
           fi
-
-          echo "→ SPA-Wurzel erreichbar (informativ — 200, sobald das Frontend aktiv ist)"
-          spa=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$BASE/" || echo "000")
-          echo "  ℹ️  GET / → HTTP $spa (erwartet 200 nach setup-server.sh + Frontend-Deploy)"
 
           if [ "$fail" -eq 0 ]; then
             echo "✅ Smoke-Test bestanden"
