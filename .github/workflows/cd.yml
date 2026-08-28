@@ -35,6 +35,21 @@ jobs:
       - name: Repository auschecken
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Node einrichten (Version aus .node-version)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: frontend/.node-version
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend-Abhängigkeiten installieren
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend bauen (Vue-SPA → frontend/dist/)
+        working-directory: frontend
+        run: npm run build
+
       - name: SSH-Schlüssel einrichten
         uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
@@ -87,6 +102,22 @@ jobs:
             --exclude='backend/.venv/' \
             ./ \
             "${{ vars.VM_USER }}@${{ vars.VM_HOST }}:/opt/binokel/app/"
+
+      - name: Frontend-SPA auf VM ausliefern
+        run: |
+          # Die gebaute Vue-SPA wird nach /opt/binokel/frontend gelegt (nginx-Root, ADR-010).
+          # Guard: Beim allerersten frontend-fähigen Deploy existiert das Verzeichnis noch nicht
+          # (setup-server.sh muss einmalig auf der VM laufen). Dann nur warnen — Pipeline bleibt
+          # grün, der Backend-Deploy hat gerade das aktualisierte setup-server.sh auf die VM gelegt.
+          if ssh "${{ vars.VM_USER }}@${{ vars.VM_HOST }}" 'test -d /opt/binokel/frontend'; then
+            rsync -az --delete \
+              frontend/dist/ \
+              "${{ vars.VM_USER }}@${{ vars.VM_HOST }}:/opt/binokel/frontend/"
+            echo "✅ Frontend-SPA ausgeliefert (/opt/binokel/frontend)"
+          else
+            echo "⚠️  /opt/binokel/frontend fehlt — bitte einmalig 'sudo bash /opt/binokel/app/deploy/setup-server.sh api.bebe-soft.de <repo-url>' auf der VM ausführen,"
+            echo "    danach den Deploy erneut auslösen. (Legt Verzeichnis + www-data-ACL an und aktiviert das SPA-Nginx.)"
+          fi
 
       - name: Abhängigkeiten installieren, Migrationen anwenden, Static Files sammeln
         run: |
@@ -175,6 +206,10 @@ jobs:
             echo "  ❌ Strict-Transport-Security fehlt"
             fail=1
           fi
+
+          echo "→ SPA-Wurzel erreichbar (informativ — 200, sobald das Frontend aktiv ist)"
+          spa=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$BASE/" || echo "000")
+          echo "  ℹ️  GET / → HTTP $spa (erwartet 200 nach setup-server.sh + Frontend-Deploy)"
 
           if [ "$fail" -eq 0 ]; then
             echo "✅ Smoke-Test bestanden"

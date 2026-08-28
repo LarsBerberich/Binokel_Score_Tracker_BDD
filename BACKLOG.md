@@ -300,6 +300,35 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
 > sind bewusst hinter Phase 2 (Frontend) eingeordnet und größtenteils USER-/Betreiber-Aktionen
 > in der GitHub- bzw. IONOS-Oberfläche.
 
+- [ ] **TASK-CI-011** Frontend-Go-Live (Vue-SPA live stellen) — Same-Origin auf bestehender Domain `api.bebe-soft.de`
+  > **Ziel (28.08.2026):** Die spielbare Vue-App unter `https://api.bebe-soft.de/` bereitstellen.
+  > **Domain-Entscheidung (Effizienz):** Die SPA wird auf der **bestehenden** Domain
+  > `api.bebe-soft.de` serviert (Same-Origin: nginx liefert die SPA aus `/opt/binokel/frontend`
+  > und proxied `/api`+`/health` nach Django). Damit entfallen **neue DNS-Einträge und die
+  > SAN-Cert-Migration** komplett. Das dedizierte `binokel.bebe-soft.de` (ADR-010-Zielbild) bleibt
+  > als spätere Politur offen (dann Zwei-Domain-Modus + Redirect-Block, ist im Template/Skript
+  > bereits vorbereitet). Bewusste, dokumentierte Abweichung von ADR-010 für den ersten Go-Live.
+  >
+  > **Voraussetzungen (bereits erfüllt):** `nginx.conf.template` serviert im Single-Domain-Modus
+  > die SPA + proxied /api; `setup-server.sh` legt `/opt/binokel/frontend` + `www-data`-ACL an;
+  > `/etc/binokel/env` wird bei erneutem Lauf NICHT überschrieben (SECRET_KEY bleibt); Prod-`env`
+  > hat bereits `DJANGO_ALLOWED_HOSTS=api.bebe-soft.de` und `DJANGO_CSRF_TRUSTED_ORIGINS=https://api.bebe-soft.de`.
+  > → **Keine `settings.py`- oder `env`-Änderung nötig.**
+
+  - **Agent-Automatisierung (Repo/Code):**
+    - [ ] **011.1** `cd.yml`: Node einrichten (`actions/setup-node@49933ea…` # v4, `node-version-file frontend/.node-version`, npm-Cache) + `npm ci` + `npm run build` (Vue-SPA → `frontend/dist/`) auf dem Runner.
+    - [ ] **011.2** `cd.yml`: neuen Schritt „Frontend-SPA auf VM ausliefern" — `rsync -az --delete frontend/dist/ → VM:/opt/binokel/frontend/` (als `binokel-deploy`, Eigentümer). **Guard:** wenn `/opt/binokel/frontend` fehlt (erster Lauf vor `setup-server.sh`), nur Warnung, Pipeline bleibt grün.
+    - [ ] **011.3** `cd.yml`: Smoke-Test um informativen `GET /` → 200 ergänzen (weich, kein Fail während der Umstellung).
+    - [ ] **011.4** Tests weiterhin grün halten (61 Django / 32 Behave / 61 Vitest / Build); Doku-Sync (Handover, ggf. ADR-010-Nachtrag zur Interim-Domain).
+  - **Manuelle Hosting-Schritte (USER, auf der Prod-VM / GitHub):**
+    - [ ] **M1** VM online + DNS `api.bebe-soft.de` → VM-IP (bereits so). GitHub-Secrets/Variables bereits gesetzt (aus TASK-CI-006): `VM_SSH_KEY`, `VM_HOST`, `VM_USER`, `VM_SSH_KNOWN_HOSTS`.
+    - [ ] **M2** Nach dem ersten Push (Backend-Deploy liefert das aktualisierte `deploy/setup-server.sh` + `nginx.conf.template` in `/opt/binokel/app`): auf der VM **einmalig** als root ausführen:
+      `sudo bash /opt/binokel/app/deploy/setup-server.sh api.bebe-soft.de https://github.com/LarsBerberich/Binokel_Score_Tracker_BDD.git`
+      → legt `/opt/binokel/frontend` + `www-data`-ACL an, aktiviert das SPA-Nginx, Certbot idempotent (bestehendes Cert bleibt), `env` unverändert. **Kein API_DOMAIN-Argument** → Single-Domain-Modus (Redirect-Block wird automatisch entfernt).
+    - [ ] **M3** Deploy erneut auslösen (GitHub → Actions → „CD" → Run workflow, `confirm=yes`) **oder** kleinen Commit pushen → CD baut die SPA und liefert `dist/` nach `/opt/binokel/frontend` → App live unter `https://api.bebe-soft.de/`.
+    - [ ] **M4** Optional/später: dediziertes `binokel.bebe-soft.de` (DNS + `setup-server.sh … api.bebe-soft.de <repo> binokel.bebe-soft.de` für Zwei-Domain-Modus + SAN-Cert), Reviewer-Gate (TASK-CI-007), Branch Protection (TASK-CI-008), IONOS-Ports (TASK-CI-009).
+  - **Go-Live-Reihenfolge (Kurz):** 011.1–011.3 umsetzen → **push** (Backend live + Skripte auf VM) → **M2** (`setup-server.sh` auf VM) → **M3** (Deploy erneut) → SPA live.
+
 - [ ] **TASK-CI-007** Reviewer-Gate für Environment `production` erzwingen (USER, GitHub-UI)
   - Settings → Environments → `production` → Required reviewers (sich selbst eintragen)
   - Aktuell NICHT aktiv — Deploy lief ohne Approval-Dialog durch (Deploy-Start ~6 s nach CI-Ende). Offene MITTEL-Auflage aus Rubber-Duck-CD-Review.
