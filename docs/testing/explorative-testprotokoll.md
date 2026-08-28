@@ -250,3 +250,29 @@ Ein Tausender wird wie eine reguläre Runde behandelt: `naechsteRunde()` erhöht
 Design-Entscheidung mit USER → Rubber-Duck-Design-Review (Datenmodell/Migration/Korrektur) → dann Umsetzung Backend+Frontend + vollständige Doku (rule-set §15, ADR-016, datenmodell-v1.puml, ubiquitous-language, ggf. Behave-Szenario).
 
 
+
+---
+
+## FND-006-Nachprüfung + 3 kleine Darstellungs-Findings (2026-08-28, Pairing)
+
+- **Modus:** Pairing (Durchspielen im geteilten Browser, Spiel 24: Anna/Bernd/Carla/Dirk, 4 Runden).
+- **Ergebnis FND-006:** ✅ In allen drei Edge-Cases korrekt:
+  1. **Mehrere Tausender hintereinander:** Zähler bleibt „1 / 4", Geber bleibt Anna;
+     Sterne korrekt (SM bei „gewonnen", aktive Gegenspieler bei „verloren", nie der Geber);
+     Sidebar-Aggregation korrekt (Bernd ★★, Dirk ★). STAND unverändert.
+  2. **Korrektur eines Tausenders (PUT):** „Letzte Runde korrigieren" belegt korrekt vor;
+     Ausgang „verloren"→„gewonnen" berechnet Sterne neu; Zähler bleibt 1 / 4.
+  3. **Endrunde mit Tausender:** Tausender in Runde 4 / 4 beendet das Spiel NICHT;
+     erst die 4. gezählte Normalrunde beendet es; Sieger rein nach Punkten (Anna 600).
+
+**Drei kleine Findings (alle NIEDRIG, keine Blocker) → BACKLOG TASK-017/018/019:**
+
+- **FND-007 (Kosmetik, aus TASK-014):** `Anschreibetabelle.vue` — Spaltenkopf „Wert" steht
+  über der Zeilen-Label-Spalte, deren Zellen aber „Runde"/„STAND" enthalten → semantisch
+  unpassend. → TASK-017.
+- **FND-008 (UX, NIEDRIG/MITTEL):** Korrektur-Dialog-Kopf zeigt „Runde 2" (= Erfassungs-Sequenz
+  `rundennummer`) für einen Tausender, der überall sonst als „außer Konkurrenz" ohne Nummer
+  erscheint → potenziell verwirrend. → TASK-018.
+- **FND-009 (UX, NIEDRIG):** Nach allen gezählten Runden zeigt die Überschrift „Runde 5 / 4"
+  (abgeleitet `gezählteRunden + 1`), begleitet von „Alle 4 Runden gespielt." → Zähler wirkt
+  falsch; auf „4 / 4 – beendet" o. ä. kappen. → TASK-019.

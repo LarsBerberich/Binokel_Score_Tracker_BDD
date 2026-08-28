@@ -273,6 +273,27 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
   - Wird ein manuell erfasstes Stichwert-Feld geleert, muss das read-only auf dem dritten (Auto-)Feld aufgehoben werden, damit eine Fehleingabe korrigiert werden kann (§8.2, offener Punkt S2 aus TASK-012).
   - **Umsetzung:** in `RundeForm.vue` beim Leeren eines Stichwerts den Spieler aus `stichwertReihenfolge` entfernen (statt nach vorn zu holen); optional „Stichwerte zurücksetzen"-Button. Vitest-Repro: A+B setzen → C read-only; B leeren → C wieder editierbar.
 
+### Phase 2b – Findings aus Pairing-Durchspielen FND-006 (28.08.2026)
+
+> Quelle: `docs/testing/explorative-testprotokoll.md`. Beim Durchspielen der drei
+> Tausender-außer-Konkurrenz-Edge-Cases (mehrere Tausender hintereinander, Korrektur eines
+> Tausenders, Endrunde mit Tausender) bestätigt: **FND-006 funktioniert in allen Fällen
+> korrekt** (Zähler/Geber/Sterne/Spielende). Dabei fielen drei **kleine, nicht-blockierende**
+> Darstellungspunkte auf (alle NIEDRIG):
+
+- [ ] **TASK-017** Anschreibetabelle: Spaltenkopf „Wert" korrigieren (NIEDRIG, Kosmetik) — Frontend
+  - `Anschreibetabelle.vue`: Der Spaltenkopf „Wert" steht über der Zeilen-Label-Spalte, deren
+    Zellen aber „Runde"/„STAND" enthalten → semantisch unpassend. Herkunft: TASK-014 (nicht FND-006).
+  - Vorschlag: Kopf leeren oder in „Zeile" umbenennen; Vitest-Header-Test anpassen.
+- [ ] **TASK-018** Korrektur-Dialog: „Runde N" bei außer-Konkurrenz-Tausendern klären (NIEDRIG/MITTEL, UX) — Frontend
+  - Der Korrektur-Kopf zeigt „Runde 2" (= Erfassungs-Sequenz `rundennummer`) für einen Tausender,
+    der überall sonst als „außer Konkurrenz" **ohne Nummer** dargestellt wird → potenziell verwirrend.
+  - Vorschlag: bei Tausendern „außer Konkurrenz" statt Sequenznummer anzeigen (analog Tabelle).
+- [ ] **TASK-019** Rundenzähler-Anzeige nach Spielende (NIEDRIG, UX) — Frontend
+  - Nach allen gezählten Runden zeigt die Überschrift „Runde 5 / 4" (abgeleitet `gezählteRunden + 1`),
+    begleitet von „Alle 4 Runden gespielt." → der Zähler wirkt falsch.
+  - Vorschlag: bei beendetem Spiel auf „4 / 4 – beendet" o. ä. kappen; `SpielView`-Vitest ergänzen.
+
 ### Nach Phase 2 – Go-Live-Nacharbeiten (Restaufgaben aus TASK-CI-006)
 
 > Der Prod-Deploy selbst ist abgeschlossen (TASK-CI-006 ✅). Diese betrieblichen Nacharbeiten
