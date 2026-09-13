@@ -8,7 +8,7 @@
 
 - Repo: `LarsBerberich/Binokel_Score_Tracker_BDD`
 - Branch: `main`
-- letzter gepuschter Commit: `103d8af` (`docs: add continue-from-here handover plan and ssh prod checklist`)
+- letzter gepuschter Commit: `277cafa` (`docs: add new developer machine setup and handover notes`)
 - GitHub-Remote: `origin/main` aktuell
 - Produktiv-SSH-Verbindung zu `api.bebe-soft.de` ist durch den Deploy-/Admin-Key validiert
 - letzte dokumentierte Handover-Phase: Domain-/-Frontend-Fortsetzung + Governance-/Ops-Aufgaben
