@@ -74,6 +74,54 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
 
 ## Offen / Priorisiert
 
+### Weiter von hier – Start am 13.09.2026
+
+> Dieser Abschnitt ist der direkte Handover für die nächste Session. Ziel: von diesem Rechner
+> ohne Chat-Historie sofort am gleichen Punkt weiterarbeiten können, inklusive SSH-Prod-Zugriff,
+> GitHub-Cloud-Stand und der nächsten operativen Schritte.
+
+- [ ] **S1** SSH-/Prod-Zugriff verifizieren und für die tägliche Arbeit vorbereiten
+  - `~/.ssh/binokel_admin` und `~/.ssh/binokel_deploy` prüfen
+  - `ssh-agent` für den passphrase-geschützten Admin-Key aktivieren
+  - `~/.ssh/config`-Aliases `binokel-admin` und `binokel-deploy` einrichten
+  - `ssh -T` bzw. `ssh -A` gegen `api.bebe-soft.de` prüfen
+  - `VM_SSH_KNOWN_HOSTS` / `known_hosts` auf den aktuellen Host-String validieren
+
+- [ ] **S2** GitHub-Cloud-Stand und Secrets prüfen
+  - GitHub Repo `LarsBerberich/Binokel_Score_Tracker_BDD` auf `main` synchron
+  - Secrets/Variables `VM_SSH_KEY`, `VM_HOST`, `VM_USER`, `VM_SSH_KNOWN_HOSTS` auf aktuelle Werte prüfen
+  - `cd.yml`-Smoke-Base gegen den aktiven Host/Primärdomain verifizieren
+
+- [ ] **S3** Domain-/Frontend-Cutover nach ADR-010 abschließen
+  - DNS `binokel.bebe-soft.de` auf VM-IP setzen
+  - `DJANGO_ALLOWED_HOSTS` und `DJANGO_CSRF_TRUSTED_ORIGINS` auf beide Domains anpassen
+  - SAN-Cert/Certbot-Lineage mit `binokel` als Primärdomain sicherstellen
+  - `setup-server.sh` für Zwei-Domain-Modus ausführen
+  - `api.bebe-soft.de` als 301 auf `https://binokel.bebe-soft.de` verifizieren
+
+- [ ] **S4** Vue-SPA live auf primärer Domain ausliefern
+  - `npm run build` grün
+  - `frontend/dist/` nach `/opt/binokel/frontend` auf VM rsyncen
+  - `/`-Smoke gegen `https://binokel.bebe-soft.de` prüfen
+  - `/health/` + API-Hintergrund auf der neuen Domain validieren
+
+- [ ] **S5** Governance-/Ops-Blocker abschließen
+  - `TASK-CI-007` Reviewer-Gate `production`
+  - `TASK-CI-008` Branch Protection `main`
+  - `TASK-CI-009` IONOS-Ports schließen
+  - `TASK-CI-010` Backup-/Restore-Probe automatisieren
+
+- [ ] **S6** UX-Feinheiten und Handover finalisieren
+  - `TASK-017` Anschreibetabelle-Header klären
+  - `TASK-018` Korrektur-Dialog bei Tausendern korrigieren
+  - `TASK-019` Rundenzähler-Status nach Spielende vereinheitlichen
+  - Handover-Doku, Session-Memory und Git-Stand synchronisieren
+
+- [ ] **S7** Abschlusssicherung und Weiterführung auf anderem Rechner
+  - Repo-Status sauber, Commit erstellt, Push auf GitHub
+  - Session-Memory / Handover-Notiz in der Cloud/Sitzung sichern
+  - Von einem anderen Rechner aus dieselbe Arbeit mit derselben Git- und SSH-Konfiguration fortsetzen
+
 ### Phase 1 – Backend (Outside-In, Slice für Slice)
 
 - [x] **TASK-001** `models.py` — Django ORM-Modelle angelegt (18.07.2026)
