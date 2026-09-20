@@ -20,8 +20,12 @@ git log origin/main -1 --format='%h %s (%ad)' --date=short   # letzter gepushter
 git log origin/main..main --oneline                          # lokal, noch nicht gepusht
 ```
 
-> **Hinweis:** Ein Push auf `main` löst nach grüner CI den Produktions-Deploy aus
-> (`.github/workflows/cd.yml`). Lokale Commits bewusst sammeln und gezielt pushen.
+> **Hinweis:** Ein Push auf `main` startet nach grüner CI den CD-Lauf, **deployt aber nicht von
+> selbst**: Das Environment `production` verlangt eine manuelle Freigabe (TASK-CI-007, aktiv seit
+> 22.07.2026). Der Lauf bleibt auf `waiting`, bis du ihn unter *Actions → CD-Lauf → „Review
+> deployments" → `production` → Approve* freigibst. Ohne Freigabe bleibt Produktion auf dem alten
+> Stand; GitHub verwirft ausstehende Genehmigungen nach 30 Tagen. Stehen mehrere Läufe gleichzeitig
+> auf `waiting`, nur den neuesten freigeben — ältere Stände sind darin enthalten.
 
 Erwartete Testlage nach vollständigem Setup (Abschnitte 5 und 6):
 **61 Django · 32 Behave · 61 Vitest · 1 Playwright-Smoke** — alle grün.
@@ -354,7 +358,7 @@ Wichtig:
 2. Git-Status + GitHub-Remote prüfen
 3. `git pull --ff-only origin main`
 4. Domain-/Frontend-Cutover im Sinne von ADR-010 prüfen
-5. `TASK-CI-007` bis `TASK-CI-010` abschließen
+5. `TASK-CI-008` bis `TASK-CI-010` abschließen (`TASK-CI-007` ist erledigt)
 6. kleine UX-Fixes `TASK-017`, `TASK-018`, `TASK-019` laden
 7. danach produktiven Handover erneut dokumentieren
 
@@ -369,7 +373,7 @@ Wichtig:
 
 ### 9.2 Governance-/Ops-Nacharbeiten
 
-- `TASK-CI-007` Reviewer-Gate `production`
+- ~~`TASK-CI-007` Reviewer-Gate `production`~~ — erledigt, aktiv seit 22.07.2026
 - `TASK-CI-008` Branch Protection `main`
 - `TASK-CI-009` IONOS-Ports schließen
 - `TASK-CI-010` Backup-/Restore-Probe automatisieren

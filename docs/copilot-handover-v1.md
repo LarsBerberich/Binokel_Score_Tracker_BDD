@@ -93,6 +93,42 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
+## Stand 20.09.2026 — Neuer Entwicklungsrechner (macOS) eingerichtet; Reviewer-Gate ist aktiv
+
+**Korrektur einer bislang falschen Annahme:** Das Environment `production` trägt die Schutzregel
+`required_reviewers` (`LarsBerberich`) — erstellt und zuletzt geändert am **22.07.2026**, also
+bereits am Tag des ersten Produktions-Deploys. `TASK-CI-007` ist damit **erledigt**; die
+gegenteilige Notiz im Eintrag vom 22.07.2026 war eine Momentaufnahme von kurz davor.
+
+**Betrieblich wichtig:** Ein Push auf `main` deployt **nicht** von selbst. Nach grüner CI bleibt
+der CD-Lauf auf `waiting`, bis die Freigabe erteilt wird (Actions → CD-Lauf → „Review deployments"
+→ `production` → Approve). Ohne Freigabe bleibt Produktion auf dem alten Stand; GitHub verwirft
+ausstehende Genehmigungen nach 30 Tagen. Beim Push dieser Session standen dadurch zwei CD-Läufe
+gleichzeitig auf `waiting` (`7c52b3c` vom Vormittag, `089adf0` neu) — der ältere wurde bewusst
+verworfen, da sein Stand im neueren enthalten ist.
+
+**Neuer Entwicklungsrechner (macOS, Apple Silicon)** vollständig eingerichtet und verifiziert:
+**61 Django · 32 Behave · 61 Vitest · 1 Playwright-Smoke**, Build grün. Toolchain: `uv` 0.12.17 +
+Python 3.14.7, `fnm` 1.39.0 + Node 22.23.2 (ADR-012-Weg mit SHA256-Abgleich; macOS-Nachtrag im
+ADR ergänzt). SSH-Zugang wiederhergestellt: beide Schlüssel funktionsfähig, `known_hosts` gegen
+die GitHub-Variable `VM_SSH_KNOWN_HOSTS` verifiziert statt blind akzeptiert (ADR-009).
+
+**Dokumentation nachgezogen** — die Einrichtung deckte mehrere überholte Stellen auf:
+`neuer-entwicklungsrechner-setup.md` (Python 3.12 statt der geforderten 3.14, `pip` statt `uv`,
+fehlendes `PYTHONPATH`, fehlender Playwright-Schritt, SSH-Wiederherstellung), ADR-012
+(macOS-Nachtrag), Git-Identität, sowie eine Aufräumrunde über `docs/` (verwaistes Duplikat
+entfernt, Chronologie im Handover wiederhergestellt, falsche Paragraphenverweise korrigiert).
+
+**Frontend-Abhängigkeiten:** `npm audit` meldete 6 Schwachstellen; 3 davon ohne `package.json`-
+Änderung behoben (undici 7.29.1, postcss 8.5.28, nanoid 3.3.19 — Bundle-Hash unverändert).
+Offen bleiben bewusst: `@vitest/mocker` (Pfad-Traversal, behoben erst in **vitest 5.x** → Major-
+Upgrade als eigene Entscheidung) und `brace-expansion` (DoS über `@vue/test-utils`; die passende
+Version wäre kompatibel, aber `npm update` scheitert an einem npm-10.9.8-Bug). Beide sind reine
+Test-Werkzeuge und landen nicht in `dist/`.
+
+**Nächster Schritt:** Domain-Cutover `binokel.bebe-soft.de` (`TASK-CI-011` M4) — beginnt mit dem
+DNS-A-Record durch den Betreiber.
+
 ## Stand 27.08.2026 — FND-006 (Tausender außer Konkurrenz) behoben + UX-Feinschliff
 
 Aus einem Pairing-Durchspielen (Tester-Agent) entstanden:
@@ -446,6 +482,8 @@ Actions auf Full-Commit-SHA gepinnt (`cd.yml` + `ci.yml`).
 **Offen → jetzt als `FUTURE-006` gesichert (Go-Live-Governance/Ops-Nacharbeiten):**
 - **Reviewer-Gate erzwingen** (USER, GitHub-UI): Settings → Environments → `production` →
   Required reviewers. Aktuell **nicht** aktiv (Deploy lief ohne Approval-Dialog).
+  > **Nachtrag 20.09.2026:** Diese Momentaufnahme war schon kurz darauf überholt — das Gate
+  > wurde noch am 22.07.2026 eingerichtet und ist seitdem aktiv. Siehe „Stand 20.09.2026".
 - **Branch Protection `main`** (Phase 5, USER): beide Checks „BDD Akzeptanztests" +
   „Deploy-Skripte prüfen (shellcheck + bash -n)" als Required.
 - **IONOS-Ports 8000/8443/8447 schließen** (Blocker #9, USER/Betreiber).

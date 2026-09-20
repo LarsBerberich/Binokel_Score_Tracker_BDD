@@ -106,7 +106,7 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
   - `/health/` + API-Hintergrund auf der neuen Domain validieren
 
 - [ ] **S5** Governance-/Ops-Blocker abschließen
-  - `TASK-CI-007` Reviewer-Gate `production`
+  - ~~`TASK-CI-007` Reviewer-Gate `production`~~ — **erledigt** (aktiv seit 22.07.2026, verifiziert 20.09.2026)
   - `TASK-CI-008` Branch Protection `main`
   - `TASK-CI-009` IONOS-Ports schließen
   - `TASK-CI-010` Backup-/Restore-Probe automatisieren
@@ -374,12 +374,20 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
       `sudo bash /opt/binokel/app/deploy/setup-server.sh api.bebe-soft.de https://github.com/LarsBerberich/Binokel_Score_Tracker_BDD.git`
       → legt `/opt/binokel/frontend` + `www-data`-ACL an, aktiviert das SPA-Nginx, Certbot idempotent (bestehendes Cert bleibt), `env` unverändert. **Kein API_DOMAIN-Argument** → Single-Domain-Modus (Redirect-Block wird automatisch entfernt).
     - [ ] **M3** Deploy erneut auslösen (GitHub → Actions → „CD" → Run workflow, `confirm=yes`) **oder** kleinen Commit pushen → CD baut die SPA und liefert `dist/` nach `/opt/binokel/frontend` → App live unter `https://api.bebe-soft.de/`.
-    - [ ] **M4** Optional/später: dediziertes `binokel.bebe-soft.de` (DNS + `setup-server.sh … api.bebe-soft.de <repo> binokel.bebe-soft.de` für Zwei-Domain-Modus + SAN-Cert), Reviewer-Gate (TASK-CI-007), Branch Protection (TASK-CI-008), IONOS-Ports (TASK-CI-009).
+    - [ ] **M4** Optional/später: dediziertes `binokel.bebe-soft.de` (DNS + `setup-server.sh … api.bebe-soft.de <repo> binokel.bebe-soft.de` für Zwei-Domain-Modus + SAN-Cert), Branch Protection (TASK-CI-008), IONOS-Ports (TASK-CI-009). (Reviewer-Gate/TASK-CI-007 ist bereits aktiv.)
   - **Go-Live-Reihenfolge (Kurz):** 011.1–011.3 umsetzen → **push** (Backend live + Skripte auf VM) → **M2** (`setup-server.sh` auf VM) → **M3** (Deploy erneut) → SPA live.
 
-- [ ] **TASK-CI-007** Reviewer-Gate für Environment `production` erzwingen (USER, GitHub-UI)
-  - Settings → Environments → `production` → Required reviewers (sich selbst eintragen)
-  - Aktuell NICHT aktiv — Deploy lief ohne Approval-Dialog durch (Deploy-Start ~6 s nach CI-Ende). Offene MITTEL-Auflage aus Rubber-Duck-CD-Review.
+- [x] **TASK-CI-007** Reviewer-Gate für Environment `production` erzwingen (USER, GitHub-UI) — **AKTIV**
+  - Settings → Environments → `production` → Required reviewers: `LarsBerberich`
+  - Verifiziert am 20.09.2026 über die GitHub-API: Environment `production` trägt die
+    Schutzregel `required_reviewers`; erstellt und zuletzt geändert am **22.07.2026**, also
+    bereits am Tag des ersten Produktions-Deploys. Die frühere Notiz „NICHT aktiv — Deploy lief
+    ohne Approval-Dialog durch" stammt aus dem Zeitraum davor und war seitdem überholt.
+  - **Betriebliche Konsequenz:** Ein Push auf `main` deployt **nicht** von selbst. Nach grüner CI
+    bleibt der CD-Lauf auf `waiting` stehen, bis die Freigabe erteilt wird
+    (Actions → CD-Lauf → „Review deployments" → `production` → Approve). Ohne Freigabe bleibt
+    Produktion auf dem alten Stand; GitHub verwirft ausstehende Genehmigungen nach 30 Tagen.
+  - Damit ist die MITTEL-Auflage aus dem Rubber-Duck-CD-Review erfüllt.
 
 - [ ] **TASK-CI-008** Branch Protection für `main` aktivieren (frühere Phase 5, USER, GitHub-UI)
   - Beide Checks als Required setzen: „BDD Akzeptanztests" + „Deploy-Skripte prüfen (shellcheck + bash -n)" (nach 1. erfolgreichem Lauf im BP-UI wählbar)

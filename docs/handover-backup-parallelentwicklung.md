@@ -23,6 +23,10 @@
   (Deploy auf VM: Backend `uv sync`/`migrate`/`collectstatic`/Restart **und** Frontend
   `npm run build` + rsync `dist/` → `/opt/binokel/frontend`). CD triggert bei Push auf `main`
   (nach grüner CI) oder manuell (Actions → „CD" → Run workflow → `confirm=yes`).
+  **Der Deploy läuft nicht durch, bis er freigegeben ist:** Das Environment `production` verlangt
+  eine manuelle Genehmigung (TASK-CI-007, aktiv seit 22.07.2026). Der CD-Lauf bleibt auf `waiting`
+  stehen → Actions → CD-Lauf → „Review deployments" → `production` → Approve. Ohne Freigabe bleibt
+  Produktion auf dem alten Stand; ausstehende Genehmigungen verfallen nach 30 Tagen.
 - **Wichtige Konventionen:** siehe `docs/project-foundation.md` §18 (PFLICHT-KONVENTION:
   jede Änderung Doku-synchron); Regelwerk `docs/rule-set-v1.md`; ADRs `docs/adr/`;
   Fallstricke `docs/engineering-notes/`; Backlog `BACKLOG.md`.
@@ -211,7 +215,8 @@ Die Infrastruktur (Zwei-Domain-Modus + Redirect-Block) ist in `nginx.conf.templa
   > Hinweis: `www`- oder CNAME-Varianten brauchst du nicht; ein reiner A-Record auf dieselbe VM-IP genügt, weil dieselbe nginx-Instanz beide Domains bedient.
  
 
-- `TASK-CI-007` Reviewer-Gate `production`, `TASK-CI-008` Branch Protection `main`,
+- ~~`TASK-CI-007` Reviewer-Gate `production`~~ (erledigt, aktiv seit 22.07.2026),
+  `TASK-CI-008` Branch Protection `main`,
   `TASK-CI-009` IONOS-Ports 8000/8443/8447 schließen, `TASK-CI-010`/`FUTURE-003` Offsite-Backup.
 - `TASK-017/018/019`: kleine Frontend-Kosmetik/UX aus dem FND-006-Durchspielen.
 - Kleinigkeit: Seitentitel ist noch Vite-Default `frontend` (`frontend/index.html` `<title>` +
