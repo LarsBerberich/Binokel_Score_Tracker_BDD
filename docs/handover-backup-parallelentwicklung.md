@@ -174,6 +174,37 @@ Die Infrastruktur (Zwei-Domain-Modus + Redirect-Block) ist in `nginx.conf.templa
 
 ## 5. Offene Punkte / Governance (BACKLOG)
 - `TASK-CI-011` M4: Domain-Umstellung (Abschnitt 4).
+  
+### Dokumentierter nächste Schritte für mich als Nutzer:
+
+  **Ist-Zustand S3:**
+  - `api.bebe-soft.de` → `212.132.119.150`, liefert SPA (200) und `/health/` (200) — **live**.
+  - `binokel.bebe-soft.de` → **existiert noch nicht** (NXDOMAIN), nicht erreichbar.
+
+  Damit ist die Reihenfolge klar. Der Cutover nach ADR-010 / Handover-Doc Abschnitt 4:
+
+  | Schritt | Aktion | Wer |
+  |---|---|---|
+  | **1. DNS** | A-Record `binokel.bebe-soft.de` → `212.132.119.150` bei IONOS anlegen | **du (manuell)** |
+  | 2. env | Auf VM `DJANGO_ALLOWED_HOSTS` + `DJANGO_CSRF_TRUSTED_ORIGINS` um beide Domains ergänzen, Dienst neu starten | ich per SSH (nach deinem OK) |
+  | 3. Backup | Vor Cert-/nginx-Umbau: env + `/etc/letsencrypt` + DB sichern | ich per SSH |
+  | 4. Cert+nginx | `setup-server.sh` im Zwei-Domain-Modus (SAN-Cert Primär `binokel`, 301 api→binokel) | ich per SSH |
+  | 5. CD-Smoke | `cd.yml` Smoke-Base auf Primärdomain (`SMOKE_BASE=https://binokel.bebe-soft.de`) | ich per Commit/PR |
+  | 6. Verify | `curl`: binokel 200, api 301, health 200 | ich |
+  | 7. Doku-Sync | BACKLOG, Handover-Docs, ADR-010-Nachtrag, Memory | ich |
+
+  **Jetzt Schritt 1 — bitte bei IONOS anlegen** (der Rest hängt daran):
+
+  - **Typ:** A
+  - **Host/Name:** `binokel` (Zone `bebe-soft.de`)
+  - **Wert/Ziel:** `212.132.119.150`
+  - **TTL:** niedrig (z. B. 300 s), damit spätere Änderungen schnell greifen
+
+  Sag mir Bescheid, sobald der Record gesetzt ist — ich prüfe dann die Auflösung (`nslookup`/`curl`) und wir gehen mit den VM-Schritten weiter. 
+
+  > Hinweis: `www`- oder CNAME-Varianten brauchst du nicht; ein reiner A-Record auf dieselbe VM-IP genügt, weil dieselbe nginx-Instanz beide Domains bedient.
+ 
+
 - `TASK-CI-007` Reviewer-Gate `production`, `TASK-CI-008` Branch Protection `main`,
   `TASK-CI-009` IONOS-Ports 8000/8443/8447 schließen, `TASK-CI-010`/`FUTURE-003` Offsite-Backup.
 - `TASK-017/018/019`: kleine Frontend-Kosmetik/UX aus dem FND-006-Durchspielen.
