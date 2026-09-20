@@ -115,15 +115,34 @@ npm --version    # 10.x
 
 ## 3. SSH-Zugang zur Produktiv-VM vorbereiten
 
-Wichtige Dateien aus dem alten Rechner mitnehmen:
+Nur für Deploy und Server-Zugriff nötig — die lokale Entwicklung (Abschnitte 5 und 6)
+funktioniert ohne SSH.
 
-- `~/.ssh/binokel_admin`
-- `~/.ssh/binokel_admin.pub`
-- `~/.ssh/binokel_deploy`
-- `~/.ssh/binokel_deploy.pub`
-- `~/.ssh/known_hosts`
+| Datei | Zweck | Quelle, falls nicht vorhanden |
+|---|---|---|
+| `binokel_admin` | Admin-Login (sudo), **passphrase-geschützt** | **nicht reproduzierbar** — nur aus dem Backup |
+| `binokel_deploy` | Deploy-/CD-User, ohne Passphrase | **nicht reproduzierbar** — identisch mit GitHub-Secret `VM_SSH_KEY` |
+| `binokel_admin.pub`, `binokel_deploy.pub` | öffentliche Schlüssel | aus dem privaten ableitbar (§3.2) |
+| `known_hosts` | Server-Identität, verhindert MITM | neu erzeugbar **mit Verifikation** (§3.3) |
+| `config` | Host-Kürzel `binokel-admin` / `binokel-deploy` | aus §3.1 übernehmen |
 
-Optional: vorhandene SSH-Konfiguration in `~/.ssh/config` ebenfalls kopieren.
+Die beiden **privaten** Schlüssel sind der einzig kritische Teil: Ohne sie ist nur noch
+der Weg über die IONOS-Cloud-Console möglich (siehe
+`docs/handover-backup-parallelentwicklung.md` §3.1). Die übrigen Dateien lassen sich
+jederzeit wiederherstellen — ein Schlüssel-Archiv aus dem Backup enthält sie
+erfahrungsgemäß nicht zwangsläufig.
+
+Verzeichnis und Rechte (SSH verweigert den Dienst bei zu offenen Rechten):
+
+```bash
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+# privates Schluesselmaterial nach ~/.ssh entpacken, dann:
+chmod 600 ~/.ssh/binokel_admin ~/.ssh/binokel_deploy ~/.ssh/config
+chmod 644 ~/.ssh/*.pub ~/.ssh/known_hosts
+```
+
+> `~/.ssh` ist ein verstecktes Verzeichnis. Im Finder mit `Cmd`+`Shift`+`.` einblenden
+> oder mit `Cmd`+`Shift`+`G` gezielt öffnen; im Terminal `ls -la ~`.
 
 ### 3.1 SSH-Config (empfohlen)
 
@@ -147,18 +166,69 @@ Host binokel-deploy
     UserKnownHostsFile ~/.ssh/known_hosts
 ```
 
-### 3.2 Verifikation
+### 3.2 Fehlenden öffentlichen Schlüssel wiederherstellen
+
+Ein `.pub` steckt im privaten Schlüssel und lässt sich jederzeit daraus ableiten:
 
 ```bash
-ssh -T binokel-admin 'echo OK'
-ssh -T binokel-deploy 'echo SSH_OK'
+ssh-keygen -y -f ~/.ssh/binokel_deploy > ~/.ssh/binokel_deploy.pub
+chmod 644 ~/.ssh/binokel_deploy.pub
 ```
 
-Erwartung:
+Prüfen, dass Schlüsselpaar und Fingerabdruck stimmen:
 
-- Admin-Key für `binokel-admin` funktioniert
-- Deploy-Key für CI/CD-/Remote-Deploy funktioniert
-- Host-Checks sind in `known_hosts` gesetzt
+```bash
+ssh-keygen -l -f ~/.ssh/binokel_deploy      # erwartet: ED25519, Kommentar binokel-deploy@ci
+ssh-keygen -l -f ~/.ssh/binokel_admin       # erwartet: ED25519, passphrase-geschützt
+```
+
+### 3.3 known_hosts erzeugen und verifizieren
+
+Die `config` (§3.1) setzt `StrictHostKeyChecking yes`. Ohne passenden Eintrag in
+`known_hosts` verweigert SSH die Verbindung — das ist beabsichtigt. Die Host-Schlüssel
+einfach beim ersten Verbinden zu bestätigen wäre blindes *trust-on-first-use*, das
+ADR-009 (Nachtrag, Punkt 1) als MITM-Risiko ausdrücklich verworfen hat.
+
+Deshalb: scannen **und** gegen eine zweite, unabhängige Quelle abgleichen. Die beste
+verfügbare ist die GitHub-Variable **`VM_SSH_KNOWN_HOSTS`** (*Repo → Settings → Secrets
+and variables → Actions → Variables*); sie wurde beim ersten Produktions-Deploy
+sorgfältig erstellt und ist kein Geheimnis, sondern öffentliches Host-Material.
+
+```bash
+# 1. Host-Schluessel holen (noch nicht uebernehmen)
+ssh-keyscan -t rsa,ecdsa,ed25519 api.bebe-soft.de > /tmp/scanned
+
+# 2. Wert der GitHub-Variable in /tmp/from-github speichern, dann vergleichen
+awk '!/^#/ && NF{print $2, $3}' /tmp/scanned     | sort > /tmp/a
+awk '!/^#/ && NF{print $2, $3}' /tmp/from-github | sort > /tmp/b
+diff /tmp/a /tmp/b && echo "IDENTISCH"
+
+# 3. erst bei Uebereinstimmung uebernehmen
+cp /tmp/from-github ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+```
+
+Alternative Quelle, falls der alte Rechner noch verfügbar ist: dort
+`ssh-keygen -lf ~/.ssh/known_hosts` ausführen und die Fingerabdrücke vergleichen.
+
+> Beim Domain-Cutover auf `binokel.bebe-soft.de` muss `VM_SSH_KNOWN_HOSTS` neu erzeugt
+> werden, falls sich das SSH-Ziel ändert (siehe `handover-backup-parallelentwicklung.md` §4).
+
+### 3.4 Verifikation
+
+```bash
+ssh -T binokel-admin 'echo OK; id -un'        # fragt nach der Passphrase
+ssh -T binokel-deploy 'echo SSH_OK; id -un'   # ohne Passphrase
+```
+
+Erwartung: Beide Befehle geben den jeweiligen Benutzernamen auf der VM zurück. Erscheint
+stattdessen `Host key verification failed`, stimmt `known_hosts` nicht (§3.3); bei
+`Permission denied (publickey)` passt der Schlüssel nicht oder die Rechte sind zu offen.
+
+Optional, damit die Passphrase des Admin-Keys nur einmal abgefragt wird (macOS-Schlüsselbund):
+
+```bash
+ssh-add --apple-use-keychain ~/.ssh/binokel_admin
+```
 
 ## 4. Repository klonen
 
