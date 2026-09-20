@@ -4,14 +4,27 @@
 > Es fasst zusammen, was du brauchst, damit du am selben Punkt wie jetzt weiterarbeiten kannst,
 > inklusive GitHub-Repo, SSH-Zugang zur VM und lokaler Projekt-Setup.
 
-## 1. Aktueller Stand (Stand 13.09.2026)
+## 1. Aktueller Stand
 
 - Repo: `LarsBerberich/Binokel_Score_Tracker_BDD`
 - Branch: `main`
-- letzter gepuschter Commit: `277cafa` (`docs: add new developer machine setup and handover notes`)
-- GitHub-Remote: `origin/main` aktuell
-- Produktiv-SSH-Verbindung zu `api.bebe-soft.de` ist durch den Deploy-/Admin-Key validiert
-- letzte dokumentierte Handover-Phase: Domain-/-Frontend-Fortsetzung + Governance-/Ops-Aufgaben
+- Produktiv-SSH-Verbindung zu `api.bebe-soft.de` über Deploy-/Admin-Key
+- letzte dokumentierte Handover-Phase: Domain-/Frontend-Fortsetzung + Governance-/Ops-Aufgaben
+
+Den tatsächlichen Stand nicht aus diesem Dokument ablesen, sondern ermitteln — eine
+hier eingetragene Commit-ID ist erfahrungsgemäß bereits beim nächsten Push veraltet:
+
+```bash
+git fetch origin
+git log origin/main -1 --format='%h %s (%ad)' --date=short   # letzter gepushter Stand
+git log origin/main..main --oneline                          # lokal, noch nicht gepusht
+```
+
+> **Hinweis:** Ein Push auf `main` löst nach grüner CI den Produktions-Deploy aus
+> (`.github/workflows/cd.yml`). Lokale Commits bewusst sammeln und gezielt pushen.
+
+Erwartete Testlage nach vollständigem Setup (Abschnitte 5 und 6):
+**61 Django · 32 Behave · 61 Vitest · 1 Playwright-Smoke** — alle grün.
 
 ## 2. Voraussetzungen auf dem neuen Rechner
 
@@ -19,30 +32,85 @@
 
 - Git
 - VS Code + GitHub Copilot
-- Python 3.12+ (für Backend)
-- Node 22 (für Frontend; ideal über `fnm` oder `nvm`)
 - OpenSSH-Client
+- Auf macOS: Xcode Command Line Tools (`xcode-select --install`)
 
-### 2.2 Python / Node-Versionen
+**Weder Python noch Node müssen vorab installiert werden.** Beide Laufzeiten werden
+projekt-lokal und versionsgenau von Werkzeugen bereitgestellt, die in Abschnitt 2.2
+eingerichtet werden:
 
-Backend:
+| Laufzeit | Version | Gepinnt in | Bereitgestellt durch |
+|---|---|---|---|
+| Python | **3.14** | `backend/.python-version`, `requires-python` in `backend/pyproject.toml` | `uv` |
+| Node | **22** | `frontend/.node-version`, `engines.node` in `frontend/package.json` | `fnm` (ADR-012) |
+
+> Ein System-Python (z. B. die macOS-Version 3.9) ist für dieses Projekt **nicht**
+> verwendbar: `pyproject.toml` verlangt `>=3.14`. `uv` lädt den passenden Interpreter
+> selbst — genau wie auf der Produktions-VM (`deploy/setup-server.sh`, ENG-004).
+
+### 2.2 uv und fnm einrichten
+
+**uv** (Python-Paket- und Interpreter-Manager) — derselbe offizielle Installer, den auch
+`deploy/setup-server.sh` auf der VM verwendet. Installiert nach `~/.local/bin`, ohne `sudo`,
+und ergänzt den PATH-Eintrag in der Shell-Startdatei:
 
 ```bash
-python --version
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Frontend:
+**fnm** (Node-Versionsmanager) — gemäß **ADR-012** bewusst **nicht** per `curl | bash`,
+sondern als Release-Binary mit Prüfsummenabgleich. Für macOS ist `fnm-macos.zip` das
+richtige Asset (Universal Binary, enthält arm64 und x86_64); unter Linux `fnm-linux.zip`:
 
 ```bash
-node --version
-npm --version
+cd "$(mktemp -d)"
+curl -sSL https://api.github.com/repos/Schniz/fnm/releases/latest -o fnm-release.json
+
+# Download-URL und erwarteten SHA256 aus den Release-Metadaten lesen
+read -r URL EXPECTED <<<"$(python3 -c '
+import json, pathlib
+d = json.loads(pathlib.Path("fnm-release.json").read_text())
+a = next(x for x in d["assets"] if x["name"] == "fnm-macos.zip")
+print(a["browser_download_url"], a["digest"].split(":", 1)[1])
+')"
+
+curl -sSL -o fnm-macos.zip "$URL"
+ACTUAL=$(shasum -a 256 fnm-macos.zip | cut -d' ' -f1)
+[ "$EXPECTED" = "$ACTUAL" ] || { echo "ABBRUCH: Pruefsumme weicht ab"; exit 1; }
+
+unzip -q fnm-macos.zip
+install -m 0755 fnm "$HOME/.local/bin/fnm"
 ```
 
-Empfohlen:
+Anschließend die Shell-Integration verankern, damit beim Betreten eines Verzeichnisses
+automatisch die in `.node-version` gepinnte Version aktiv wird. Auf macOS ist die
+Login-Shell `zsh`, also `~/.zshrc` (unter Linux analog `~/.bashrc`):
 
 ```bash
+cat >> ~/.zshrc <<'EOF'
+
+# fnm (Node-Versionsmanager, ADR-012)
+if command -v fnm >/dev/null 2>&1; then
+  eval "$(fnm env --use-on-cd --shell zsh)"
+fi
+EOF
+```
+
+Danach Node installieren und als Standard setzen:
+
+```bash
+exec zsh -l          # Shell neu laden, damit PATH und fnm greifen
 fnm install 22
-fnm use 22
+fnm default 22
+```
+
+### 2.3 Verifikation der Toolchain
+
+```bash
+uv --version     # z. B. uv 0.12.17
+fnm --version    # z. B. fnm 1.39.0
+node --version   # v22.x   (beim Betreten von frontend/ automatisch)
+npm --version    # 10.x
 ```
 
 ## 3. SSH-Zugang zur Produktiv-VM vorbereiten
@@ -133,44 +201,68 @@ git commit --amend --reset-author --no-edit
 
 ## 5. Backend einrichten
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install -e .
-python manage.py migrate
-python manage.py test scoring
-```
-
-Alternative mit `uv`:
+`uv` liest `backend/.python-version`, lädt den passenden Interpreter und erzeugt
+`backend/.venv` aus `uv.lock` — identisch zum CI-Job in `.github/workflows/ci.yml`.
+`--dev` ist nötig, sonst fehlen `pytest` und `pytest-django` aus der `dependency-groups`.
 
 ```bash
 cd backend
-uv sync
+uv python install        # installiert Python 3.14 (Version aus .python-version)
+uv sync --dev            # erzeugt .venv und installiert alle Abhängigkeiten
 ```
 
-Behave-Tests aus dem Repo-Root:
+Verifikation — dieselben Gates wie in der CI:
+
+```bash
+uv run python manage.py check
+uv run python manage.py makemigrations --check   # "No changes detected"
+uv run python manage.py migrate                  # lokale Dev-SQLite anlegen
+uv run python manage.py test scoring             # erwartet: 61 Tests OK
+```
+
+Behave-Akzeptanztests aus dem **Repo-Root** (nicht aus `backend/`). `PYTHONPATH=backend`
+ist erforderlich, damit das Settings-Modul aus `behave.ini` gefunden wird:
 
 ```bash
 cd ..
-backend/.venv/bin/python -m behave
+PYTHONPATH=backend backend/.venv/bin/python -m behave   # erwartet: 32 Szenarien passed
 ```
+
+> Es wird bewusst **kein** `pip install -e .` in einem selbst angelegten venv verwendet:
+> Das umgeht `uv.lock` (keine reproduzierbaren Versionen), erfordert einen bereits
+> installierten Python 3.14 und weicht von CI und Produktion ab.
 
 ## 6. Frontend einrichten
 
 ```bash
 cd frontend
-npm ci
-npm test
-npm run build
-npm run dev
+npm ci                   # reproduzierbar aus package-lock.json
+npm run build            # Vite-Build inkl. vue-tsc Typecheck
+npm test                 # Vitest, erwartet: 61 Tests in 7 Dateien
 ```
 
-Dev-Proxy erwartet nach Vite-Config:
+Für den Playwright-E2E-Smoke wird zusätzlich der an die Playwright-Version gepinnte
+Browser benötigt (ca. 150 MB nach `~/Library/Caches/ms-playwright`, nicht im Repo).
+Bewusst **nicht** der lokal installierte Chrome: Nur die gepinnte Build stellt sicher,
+dass lokal derselbe Browser läuft wie im CI-Job `frontend-e2e`. Auf macOS ohne
+`--with-deps` (das installiert Linux-Systembibliotheken):
 
-- `/api` -> Django
-- `/health` -> Django
+```bash
+npx playwright install chromium
+npm run test:e2e         # 1 Szenario (ADR-013); startet den Dev-Server selbst
+```
+
+Entwicklung mit laufendem Backend — zwei Terminals, Dev-Proxy laut `vite.config.ts`
+(`/api` und `/health` → `127.0.0.1:8000`), damit lokal dieselbe Same-Origin-Situation
+herrscht wie in Produktion (ADR-010):
+
+```bash
+# Terminal 1 — Backend
+cd backend && uv run python manage.py runserver 127.0.0.1:8000
+
+# Terminal 2 — Frontend
+cd frontend && npm run dev          # http://localhost:5173
+```
 
 ## 7. GitHub-Secrets und Variablen prüfen
 
@@ -231,24 +323,29 @@ Wichtig:
 
 ## 11. Schnellstart (wenn du sofort loslegen willst)
 
+Setzt voraus, dass `uv` und `fnm` nach Abschnitt 2.2 eingerichtet sind.
+
 ```bash
 git clone https://github.com/LarsBerberich/Binokel_Score_Tracker_BDD.git
 cd Binokel_Score_Tracker_BDD
 
-# SSH-Keys und known_hosts vor dem ersten Remote-Deploy sicherstellen
-ssh -T binokel-deploy 'echo SSH_OK'
-
-# Backend
+# Backend: Interpreter, venv, DB, Tests
 cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
-python manage.py migrate
+uv python install && uv sync --dev
+uv run python manage.py migrate
+uv run python manage.py test scoring
+
+# Akzeptanztests aus dem Repo-Root
+cd ..
+PYTHONPATH=backend backend/.venv/bin/python -m behave
 
 # Frontend
-cd ../frontend
-npm ci
-npm run dev
+cd frontend
+npm ci && npm run build && npm test
+npm run dev                       # http://localhost:5173
+
+# Nur für Deploy/Remote-Zugriff nötig (Abschnitt 3)
+ssh -T binokel-deploy 'echo SSH_OK'
 ```
 
 ## 12. Handover-Regel

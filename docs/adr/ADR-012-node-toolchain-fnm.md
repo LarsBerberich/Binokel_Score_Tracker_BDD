@@ -88,3 +88,26 @@ Commit-SHA gepinnte Action `actions/setup-node` bereitgestellt (liest dieselbe
 ## Verweise
 - ADR-010 (Same-Origin-Deployment), ADR-011 (Vue-Stack + BDD-Toolchain),
   `docs/development-approach-v1.md`, `docs/glossar.md`.
+
+## Nachtrag (20.09.2026) — Umsetzung auf einem macOS-Entwicklungsrechner
+
+Die Entscheidung gilt unverändert; bei der Einrichtung eines Macs (Apple Silicon)
+unterscheiden sich lediglich drei Details vom oben beschriebenen Linux-Ablauf:
+
+1. **Asset:** `fnm-macos.zip` statt `fnm-linux.zip`. Die Datei enthält ein
+   **Universal Binary** (arm64 + x86_64) und passt damit für Apple Silicon und Intel.
+   `fnm-arm64.zip` ist das **Linux**-arm64-Asset und hier nicht das richtige.
+2. **Shell:** Die Login-Shell ist `zsh`, der `fnm env --use-on-cd`-Block gehört daher
+   nach `~/.zshrc` (mit `--shell zsh`), nicht nach `~/.bashrc`.
+3. **Gatekeeper:** Über `curl` geladene Dateien erhalten kein
+   `com.apple.quarantine`-Attribut, die Binary ist nach `install -m 0755` direkt
+   ausführbar. Ein `xattr -d` ist nicht nötig.
+
+Das Verfahren selbst — Release-Metadaten über die GitHub-API, SHA256-Abgleich gegen den
+dort hinterlegten `digest`, Abbruch bei Abweichung, Installation nach `~/.local/bin`
+ohne `sudo` — bleibt identisch und wurde so durchgeführt und verifiziert.
+
+**Konkret verwendet (20.09.2026):** fnm `v1.39.0`, Node `v22.23.2`, npm `10.9.8`.
+Die Versionslage entspricht damit weiterhin der ursprünglichen Festlegung (Node 22 LTS).
+
+Ausführbare Schritt-für-Schritt-Fassung: `docs/neuer-entwicklungsrechner-setup.md` §2.2.
