@@ -187,15 +187,20 @@ Die Infrastruktur (Zwei-Domain-Modus + Redirect-Block) ist in `nginx.conf.templa
   
 ### Dokumentierter nächste Schritte für mich als Nutzer:
 
-  **Ist-Zustand S3:**
+  **Ist-Zustand (aktualisiert 20.09.2026):**
   - `api.bebe-soft.de` → `212.132.119.150`, liefert SPA (200) und `/health/` (200) — **live**.
-  - `binokel.bebe-soft.de` → **existiert noch nicht** (NXDOMAIN), nicht erreichbar.
+  - `binokel.bebe-soft.de` → `212.132.119.150` — **A-Record gesetzt und auflösbar** (Schritt 1
+    erledigt). Zeigt aktuell noch dieselbe Auslieferung wie `api`, weil nginx bislang im
+    Ein-Domain-Modus läuft und das Zertifikat die neue Domain noch nicht abdeckt.
+    **Beide A-Records bleiben bestehen** — der spätere 301 von `api` auf `binokel` wird von nginx
+    auf der VM ausgeliefert und setzt voraus, dass `api` weiterhin auflöst; außerdem laufen SSH
+    und die CD-Pipeline (`VM_HOST`, `VM_SSH_KNOWN_HOSTS`) über den `api`-Namen.
 
   Damit ist die Reihenfolge klar. Der Cutover nach ADR-010 / Handover-Doc Abschnitt 4:
 
   | Schritt | Aktion | Wer |
   |---|---|---|
-  | **1. DNS** | A-Record `binokel.bebe-soft.de` → `212.132.119.150` bei IONOS anlegen | **du (manuell)** |
+  | ~~1. DNS~~ | ~~A-Record `binokel.bebe-soft.de` → `212.132.119.150` bei IONOS anlegen~~ — **erledigt 20.09.2026** | du (manuell) |
   | 2. env | Auf VM `DJANGO_ALLOWED_HOSTS` + `DJANGO_CSRF_TRUSTED_ORIGINS` um beide Domains ergänzen, Dienst neu starten | ich per SSH (nach deinem OK) |
   | 3. Backup | Vor Cert-/nginx-Umbau: env + `/etc/letsencrypt` + DB sichern | ich per SSH |
   | 4. Cert+nginx | `setup-server.sh` im Zwei-Domain-Modus (SAN-Cert Primär `binokel`, 301 api→binokel) | ich per SSH |
@@ -203,16 +208,27 @@ Die Infrastruktur (Zwei-Domain-Modus + Redirect-Block) ist in `nginx.conf.templa
   | 6. Verify | `curl`: binokel 200, api 301, health 200 | ich |
   | 7. Doku-Sync | BACKLOG, Handover-Docs, ADR-010-Nachtrag, Memory | ich |
 
-  **Jetzt Schritt 1 — bitte bei IONOS anlegen** (der Rest hängt daran):
+  **Wiedereinstieg: Schritt 2.** Schritt 1 ist erledigt — der A-Record ist angelegt
+  (`dig +short binokel.bebe-soft.de A` → `212.132.119.150`, geprüft 20.09.2026). Es geht weiter
+  mit dem Backup und der `env`-Erweiterung auf der VM.
 
-  - **Typ:** A
-  - **Host/Name:** `binokel` (Zone `bebe-soft.de`)
-  - **Wert/Ziel:** `212.132.119.150`
-  - **TTL:** niedrig (z. B. 300 s), damit spätere Änderungen schnell greifen
+  Für die Schritte 2–4 werden Root-Rechte gebraucht, also der **Admin-Key**
+  (`ssh binokel-admin`). Er ist passphrase-geschützt; bei interaktiver Ausführung fragt SSH
+  einfach danach.
 
-  Sag mir Bescheid, sobald der Record gesetzt ist — ich prüfe dann die Auflösung (`nslookup`/`curl`) und wir gehen mit den VM-Schritten weiter. 
+  ```bash
+  # optional, damit die Passphrase nur einmal pro Sitzung abgefragt wird:
+  ssh-add --apple-use-keychain ~/.ssh/binokel_admin
+  # wieder entfernen: ssh-add -D
+  ```
 
-  > Hinweis: `www`- oder CNAME-Varianten brauchst du nicht; ein reiner A-Record auf dieselbe VM-IP genügt, weil dieselbe nginx-Instanz beide Domains bedient.
+  > Ein Assistent kann diese Schritte nicht selbst ausführen, solange der Schlüssel nicht im
+  > Agent liegt — er kann keine Passphrase-Abfrage bedienen. Die Befehlsblöcke vorbereiten zu
+  > lassen und sie selbst auszuführen ist hier der vorgesehene Weg.
+
+  > Hinweis zum DNS: `www`- oder CNAME-Varianten sind nicht nötig; ein reiner A-Record auf
+  > dieselbe VM-IP genügt, weil dieselbe nginx-Instanz beide Domains am `Host`-Header
+  > unterscheidet. Der `api`-Record bleibt dauerhaft bestehen (siehe Ist-Zustand oben).
  
 
 - ~~`TASK-CI-007` Reviewer-Gate `production`~~ (erledigt, aktiv seit 22.07.2026),
