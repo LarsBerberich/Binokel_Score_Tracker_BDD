@@ -230,7 +230,7 @@ Alle Feature-Dateien unter `features/` sowie `docs/gherkin-step-phrase-reference
 
 ---
 
-## 9. Session-Kontinuität und Backlog-Workflow
+## 8. Session-Kontinuität und Backlog-Workflow
 
 Um zwischen Sessions (und zwischen verschiedenen KI-Assistenten) effizient weiterzumachen, gilt folgendes Workflow-Modell:
 
@@ -284,8 +284,6 @@ Die Rollenbeschreibungen liegen gebündelt unter `docs/agents/`: `coding-agent.m
 
 Dieses Dokument ist bewusst kein ADR, sondern ein **Entwicklungshandbuch**. Ein ADR dokumentiert genau eine Entscheidung knapp und strukturiert (Kontext → Entscheidung → Konsequenzen → Status). Dieses Dokument erklärt mehrere zusammenhängende Prinzipien ausführlich und mit Begründung.
 
-Dieses Dokument ist bewusst kein ADR, sondern ein **Entwicklungshandbuch**. Ein ADR dokumentiert genau eine Entscheidung knapp und strukturiert (Kontext → Entscheidung → Konsequenzen → Status). Dieses Dokument erklärt mehrere zusammenhängende Prinzipien ausführlich und mit Begründung.
-
 Einzelne Entscheidungen aus diesem Dokument können bei Bedarf als formale ADRs unter `docs/adr/` nacherfasst werden — insbesondere wenn das Projekt wächst und Entscheidungen explizit versioniert oder für neue Teammitglieder nachvollziehbar gemacht werden sollen. Kandidaten wären:
 
 - ADR-001: Backend vor Frontend in Phase 1
@@ -296,7 +294,7 @@ Diese drei ADRs sind unter `docs/adr/` erfasst.
 
 ---
 
-## 9. Verbindung zu anderen Dokumenten
+## 10. Verbindung zu anderen Dokumenten
 
 | Dokument | Rolle |
 |---|---|

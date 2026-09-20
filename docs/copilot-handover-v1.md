@@ -19,6 +19,7 @@ Für Entwicklungsprozess und technische Entscheidungen:
 - `docs/agents/coding-agent.md` – Rollenbeschreibung Coding-Agent
 - `docs/agents/rubber-duck-agent.md` – Rollen- und Prompt-Guide für den ergänzenden Rubber-Duck-Agenten
 - `docs/agents/devops-agent.md` – Rollenbeschreibung Dev/Ops-Agent
+- `docs/agents/tester-agent.md` – Rollenbeschreibung Tester-Agent (exploratives Testen, Findings)
 - `docs/agents/orchestration.md` – Orchestrierungs-Workflow der Agenten
 - `docs/adr/ADR-001-backend-vor-frontend.md` – Backend vor Frontend in Phase 1
 - `docs/adr/ADR-002-vertikale-slices.md` – Vertikale Slices statt horizontaler Schichten
@@ -35,6 +36,7 @@ Für Entwicklungsprozess und technische Entscheidungen:
 - `docs/adr/ADR-013-teststrategie-testpyramide.md` – Teststrategie/Testpyramide
 - `docs/adr/ADR-014-zehner-eingabe-und-endrunden-tiebreak.md` – Zehner-Eingabe des STAND + Endrunden-Tiebreak
 - `docs/adr/ADR-015-korrektur-nur-letzte-runde.md` – Korrektur: nur die letzte Runde bearbeitbar
+- `docs/adr/ADR-016-tausender-ausser-konkurrenz.md` – Tausender außer Konkurrenz: Sequenz vs. gezählte Spielrunde
 
 ## V1-Scope
 V1 unterstützt ausschließlich:
@@ -90,6 +92,29 @@ Nicht Teil von V1 sind insbesondere:
 - Kein Einfluss auf den numerischen Punktestand
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
+
+## Stand 27.08.2026 — FND-006 (Tausender außer Konkurrenz) behoben + UX-Feinschliff
+
+Aus einem Pairing-Durchspielen (Tester-Agent) entstanden:
+
+- **UX (Anschreibetabelle + RundeForm):** M/S/Mit je Spieler **vertikal** (stabile Spaltenbreite),
+  „Mit"-Zeile nur bei Abgeh-Ausgängen; `RundeForm`-Felder in Spielfluss-Reihenfolge
+  **Reizwert → Spielmacher → Meldungen → Spielart → Stichwerte**.
+- **FND-006 (ADR-016):** Ein **Tausender läuft außer Konkurrenz** und zählt nicht als gespielte
+  Runde (`rule-set-v1.md` §15.6). Entkopplung von **Erfassungs-Sequenz** (`rundennummer`,
+  serverseitig `max+1`, eindeutig, korrigierbar) und **gezählter Spielrunde** (`zaehlrunde`, aus
+  der Rundenhistorie abgeleitet, Tausender = `null`). **Keine Migration.** Der Geber wird für die
+  Korrektur aus `geber_fuer_sequenz` abgeleitet; das Frontend leitet Fortschritt/Geber/Spielende
+  aus der Historie ab (kein lokaler Zähler mehr). Anschreibetabelle zeigt Tausender-Zeilen als
+  „außer Konkurrenz" ohne gezählte Nummer.
+- **Tests:** 61 Django (+6) / 32 Behave (+1) / 61 Vitest (+2) / Build + TSC grün; live im Browser
+  verifiziert (Spiel 23: „Runde 4 / 4", Geber bleibt, Tausender außer Konkurrenz).
+- **Doku synchron:** rule-set §15.6, **ADR-016**, ubiquitous-language §4.26/§4.27,
+  datenmodell-v1.puml, OpenAPI (RundeBasis `rundennummer` optional, HistorieRunde `sequenz`+`zaehlrunde`),
+  Testprotokoll FND-006 → BEHOBEN, BACKLOG.
+- **Nicht committet/gepusht** (main weiter vor origin; Push triggert CD → bewusste USER-Entscheidung).
+- **Altdaten:** Bestandsspiele mit historisch mitgezählten Tausendern renummerieren ihre gezählten
+  Runden (die alte Zählung war der Bug) – bewusst akzeptiert.
 
 ## Stand 26.08.2026 (TASK-014 Nacharbeit — 3 Findings aus Pairing-Durchspielen behoben)
 
@@ -578,39 +603,6 @@ Deploy ausgelöst.
 
 ---
 
-## Stand 26.06.2026
-
-### Abgeschlossen
-Die Gherkin-Arbeit an den Feature-Dateien ist abgeschlossen.
-
-Alle sechs Feature-Dateien unter `features/` enthalten konkrete Szenarien:
-- `spiel_anlegen.feature`
-- `runde_normales_spiel.feature`
-- `runde_einfaches_abgehen_auswerten.feature`
-- `runde_deoppeltes_abgehen.feature`
-- `runde_tausender.feature`
-- `spielende_und_siegerermittlung.feature`
-
-Zusätzlich wurde `docs/gherkin-step-phrase-reference-v1.md` angelegt.
-Sie enthält alle kanonischen Step-Phrasen als Referenz für die spätere Testautomation.
-
-### Wichtige Sprachregeln für Gherkin
-- Rundenausgang wird ausschließlich über Zielerreichung des Spielmachers bestimmt.
-- Stich-Zwang ist eine Zählregel für Meldepunkte, keine Gewinnbedingung.
-- Gegenspieler können fachlich nicht verlieren; sie sammeln nur Punkte.
-- Terminologie: "geht ab", nicht "gibt ab".
-- Doppeltes Abgehen: Runde wird regulär vollständig ausgespielt.
-- Kein Szenario "Spielmacher mit 0 Stichen" in normaler Runde (würde in der Praxis zum einfachen Abgehen führen).
-
-### Offene Todos (Stand 26.06.2026 — inzwischen abgeschlossen, siehe Stand 28.06.2026)
-
-1. ~~Fehlende Szenarien prüfen~~ → erledigt
-2. ~~Projektstruktur aufsetzen~~ → noch offen
-3. ~~Step-Definitionen schreiben~~ → noch offen
-4. ~~Domänenlogik implementieren~~ → noch offen
-
----
-
 ## Stand 19.07.2026 (CI/CD)
 
 ### Abgeschlossen
@@ -746,26 +738,33 @@ Neue Step-Phrasen in `docs/gherkin-step-phrase-reference-v1.md` (Geberrotation, 
 
 ---
 
-## Stand 27.08.2026 — FND-006 (Tausender außer Konkurrenz) behoben + UX-Feinschliff
+## Stand 26.06.2026
 
-Aus einem Pairing-Durchspielen (Tester-Agent) entstanden:
+### Abgeschlossen
+Die Gherkin-Arbeit an den Feature-Dateien ist abgeschlossen.
 
-- **UX (Anschreibetabelle + RundeForm):** M/S/Mit je Spieler **vertikal** (stabile Spaltenbreite),
-  „Mit"-Zeile nur bei Abgeh-Ausgängen; `RundeForm`-Felder in Spielfluss-Reihenfolge
-  **Reizwert → Spielmacher → Meldungen → Spielart → Stichwerte**.
-- **FND-006 (ADR-016):** Ein **Tausender läuft außer Konkurrenz** und zählt nicht als gespielte
-  Runde (`rule-set-v1.md` §15.6). Entkopplung von **Erfassungs-Sequenz** (`rundennummer`,
-  serverseitig `max+1`, eindeutig, korrigierbar) und **gezählter Spielrunde** (`zaehlrunde`, aus
-  der Rundenhistorie abgeleitet, Tausender = `null`). **Keine Migration.** Der Geber wird für die
-  Korrektur aus `geber_fuer_sequenz` abgeleitet; das Frontend leitet Fortschritt/Geber/Spielende
-  aus der Historie ab (kein lokaler Zähler mehr). Anschreibetabelle zeigt Tausender-Zeilen als
-  „außer Konkurrenz" ohne gezählte Nummer.
-- **Tests:** 61 Django (+6) / 32 Behave (+1) / 61 Vitest (+2) / Build + TSC grün; live im Browser
-  verifiziert (Spiel 23: „Runde 4 / 4", Geber bleibt, Tausender außer Konkurrenz).
-- **Doku synchron:** rule-set §15.6, **ADR-016**, ubiquitous-language §4.26/§4.27,
-  datenmodell-v1.puml, OpenAPI (RundeBasis `rundennummer` optional, HistorieRunde `sequenz`+`zaehlrunde`),
-  Testprotokoll FND-006 → BEHOBEN, BACKLOG.
-- **Nicht committet/gepusht** (main weiter vor origin; Push triggert CD → bewusste USER-Entscheidung).
-- **Altdaten:** Bestandsspiele mit historisch mitgezählten Tausendern renummerieren ihre gezählten
-  Runden (die alte Zählung war der Bug) – bewusst akzeptiert.
+Alle sechs Feature-Dateien unter `features/` enthalten konkrete Szenarien:
+- `spiel_anlegen.feature`
+- `runde_normales_spiel.feature`
+- `runde_einfaches_abgehen_auswerten.feature`
+- `runde_deoppeltes_abgehen.feature`
+- `runde_tausender.feature`
+- `spielende_und_siegerermittlung.feature`
 
+Zusätzlich wurde `docs/gherkin-step-phrase-reference-v1.md` angelegt.
+Sie enthält alle kanonischen Step-Phrasen als Referenz für die spätere Testautomation.
+
+### Wichtige Sprachregeln für Gherkin
+- Rundenausgang wird ausschließlich über Zielerreichung des Spielmachers bestimmt.
+- Stich-Zwang ist eine Zählregel für Meldepunkte, keine Gewinnbedingung.
+- Gegenspieler können fachlich nicht verlieren; sie sammeln nur Punkte.
+- Terminologie: "geht ab", nicht "gibt ab".
+- Doppeltes Abgehen: Runde wird regulär vollständig ausgespielt.
+- Kein Szenario "Spielmacher mit 0 Stichen" in normaler Runde (würde in der Praxis zum einfachen Abgehen führen).
+
+### Offene Todos (Stand 26.06.2026 — inzwischen abgeschlossen, siehe Stand 28.06.2026)
+
+1. ~~Fehlende Szenarien prüfen~~ → erledigt
+2. ~~Projektstruktur aufsetzen~~ → noch offen
+3. ~~Step-Definitionen schreiben~~ → noch offen
+4. ~~Domänenlogik implementieren~~ → noch offen

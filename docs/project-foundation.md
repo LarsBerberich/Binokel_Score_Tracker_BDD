@@ -442,6 +442,9 @@ Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 - `docs/project-foundation.md` – grundlegende Produkt- und Engineering-Entscheidungen (dieses Dokument)
 - `docs/development-approach-v1.md` – operativer Entwicklungsansatz: Outside-In, RED-Green-Refactor, Vertikale Slices, Phasenmodell mit ausführlichen Begründungen
 - `docs/copilot-handover-v1.md` – Projektüberblick und Handover-Kontext für KI-Assistenten
+- `docs/handover-backup-parallelentwicklung.md` – Backup-/DR-Pflichten, Parallelentwicklung, Domain-Umstellung
+- `docs/neuer-entwicklungsrechner-setup.md` – Einrichtung eines weiteren Entwicklungsrechners
+- `docs/agents/` – Rollenbeschreibungen der vier Agenten (`coding-agent.md`, `rubber-duck-agent.md`, `devops-agent.md`, `tester-agent.md`) und `orchestration.md` (Zusammenspiel, Eskalation, Security-Review-Schleife)
 - `BACKLOG.md` – priorisierte Task-Liste (TASK-NNN); primärer Einstiegspunkt für jede neue Session
 
 #### Fachmodell und Regelwerk
@@ -462,6 +465,12 @@ Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 - `docs/datenmodell-v1.puml` – PlantUML-Klassendiagramm: Domäne, Use Cases, geplante Django-Modelle
 - `docs/engineering-notes/` – nummerierte Implementierungsfallstricke (ENG-NNN); werden bei jedem neu entdeckten Problem ergänzt
 
+#### Qualitätssicherung und Betrieb
+
+- `docs/testing/explorative-testprotokoll.md` – Findings aus explorativen/manuellen Test-Sessions (FND-NNN) mit Regelbezug, Schwere und Behebungsstand
+- `docs/security/ionos-baseline-check.md` – paraphrasierte Compliance-Matrix der Hoster-Sicherheitsempfehlungen inkl. Rubber-Duck-Audit (RD-NNN)
+- `deploy/README.md`, `deploy/runbook-task-ci-006.md` – Betriebsrunbooks für Setup, Deploy und Rollback
+
 ### Geplante Dokumente
 
 - `docs/architecture.md` – Architekturstruktur, Modulschnitt und Begründung
@@ -481,6 +490,9 @@ Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 - `ADR-011-frontend-stack-und-bdd-toolchain.md` – Vue-Stack + Playwright/playwright-bdd
 - `ADR-012-node-toolchain-fnm.md` – fnm (verifizierte Binary) als Node-Toolchain
 - `ADR-013-teststrategie-testpyramide.md` – Testpyramide; Fachlichkeit auf API-Ebene, schlankes E2E-Budget
+- `ADR-014-zehner-eingabe-und-endrunden-tiebreak.md` – Zehner-Eingabe des STAND, 1er nur für den Endrunden-Tiebreak
+- `ADR-015-korrektur-nur-letzte-runde.md` – nur die zuletzt erfasste Runde ist korrigierbar
+- `ADR-016-tausender-ausser-konkurrenz.md` – Erfassungs-Sequenz vs. gezählte Spielrunde (Tausender außer Konkurrenz)
 
 ### Dokumentationsregel
 

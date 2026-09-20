@@ -218,7 +218,7 @@ Meldepunkte und Reizwert —, sind stets Vielfache von 10.
 Damit wird der STAND ausschließlich in Zehnern geführt und zeigt nie eine Einerstelle
 (vgl. Anschreibetabelle §5, alle STAND-Werte auf Zehner). Der Spieler rundet Grenzfälle
 bereits **bei der Eingabe** sauber auf Zehner (z. B. real 95/95/60 → 100/90/60), sodass
-die 250er-Kontrollsumme (§5.2) trivial auf Zehnern gilt und nie überschritten wird.
+die 250er-Kontrollsumme (§5.3) trivial auf Zehnern gilt und nie überschritten wird.
 
 Die Zehner-Eingabe wird erzwungen: Das Erfassungs-UI sperrt das Absenden bei einem Wert,
 der kein Vielfaches von 10 ist (Modulo-10-Prüfung), und die API weist solche Werte im

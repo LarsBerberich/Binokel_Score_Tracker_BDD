@@ -87,7 +87,7 @@
 | **ESM** | (1) Extended Security Maintenance / (2) ECMAScript Modules | (1) Ubuntu-Langzeit-Sicherheitssupport; (2) JS-Modulsystem `import`/`export`. Bedeutung aus Kontext. |
 | **DR** | Disaster Recovery | Notfallwiederherstellung (Offsite-Backup, FUTURE-003). |
 | **MVP** | Minimum Viable Product | Kleinste nutzbare Produktversion. |
-| **ADR-Lineage / Lineage** | Zertifikats-Abstammung | Certbot-Ordner `live/<domain>/`; bei SAN die des ersten `-d` (ENG-005). |
+| **Lineage** | Zertifikats-Abstammung | Certbot-Ordner `live/<domain>/`; bei SAN die des ersten `-d` (ENG-005). |
 
 ## Werkzeuge & Frontend-Ökosystem
 
