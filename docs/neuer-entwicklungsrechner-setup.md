@@ -106,6 +106,31 @@ git checkout main
 git pull --ff-only origin main
 ```
 
+### 4.1 Git-Identität setzen (vor dem ersten Commit)
+
+Ohne gesetzte Identität leitet Git Autor und Committer aus Benutzername und Hostname ab
+(z. B. `lberberi@MBP-von-Lars.fritz.box`). Solche Commits lassen sich auf GitHub keinem
+Konto zuordnen. Für dieses Projekt gilt:
+
+```bash
+git config --global user.name "Lars Berberich"
+git config --global user.email "lars.berberich@bebe-soft.de"
+```
+
+Prüfen: `git config --get user.email` bzw. am Commit selbst
+`git log -1 --format='%an <%ae>'`.
+
+Ein bereits erzeugter, **noch nicht gepushter** Commit mit falscher Identität lässt sich
+nachträglich korrigieren:
+
+```bash
+git commit --amend --reset-author --no-edit
+```
+
+> **Hinweis:** `--global` gilt für alle Repositories dieses Rechners. Wird derselbe Rechner
+> auch für Arbeits-Repositories mit anderer Adresse genutzt, dort repo-lokal überschreiben
+> (`git config user.email "…"` ohne `--global`).
+
 ## 5. Backend einrichten
 
 ```bash

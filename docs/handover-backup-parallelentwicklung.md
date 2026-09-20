@@ -64,7 +64,13 @@ Tests: Backend `python manage.py test scoring`; Behave (Repo-Root)
 - **Nichts Geheimes für reine Dev-Arbeit** — der Code liegt im öffentlichen Repo, die lokale
   Dev-DB ist eine leere SQLite. Prod-Secrets werden **nicht** für die Entwicklung gebraucht.
 - **Nur wenn du vom Windows-Rechner deployen/SSH willst:** die SSH-Keys (Abschnitt 3.1).
-- Git-Identität setzen: `git config --global user.name/user.email`.
+- Git-Identität setzen — sonst baut Git Autor/Committer aus Benutzer- und Hostname
+  zusammen und der Commit ist keinem GitHub-Konto zuzuordnen:
+  ```powershell
+  git config --global user.name "Lars Berberich"
+  git config --global user.email "lars.berberich@bebe-soft.de"
+  ```
+  Details und Korrektur eines bereits erzeugten Commits: `docs/neuer-entwicklungsrechner-setup.md` §4.1.
 
 > **Parallel-Hinweis:** Auf beiden Rechnern denselben Branch `main` sauber pullen/pushen;
 > vor dem Weiterarbeiten immer `git pull`. `git push origin main` **triggert Produktions-Deploy** —
