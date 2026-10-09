@@ -48,10 +48,10 @@ function macheRunde(
     ist_tausender: istTausender,
     verlustwert: 0,
     spieler: {
-      Anna: { rolle: 'geber', meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
-      Bernd: { rolle: 'spielmacher', meldepunkte: 100, stichwerte: 100, mitpunkte: 0, hat_eigenen_stich: true, stern: istTausender },
-      Carla: { rolle: 'gegenspieler', meldepunkte: 40, stichwerte: 90, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
-      Dirk: { rolle: 'gegenspieler', meldepunkte: 0, stichwerte: 60, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+      Anna: { rolle: 'geber', ist_geber: true, meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
+      Bernd: { rolle: 'spielmacher', ist_geber: false, meldepunkte: 100, stichwerte: 100, mitpunkte: 0, hat_eigenen_stich: true, stern: istTausender },
+      Carla: { rolle: 'gegenspieler', ist_geber: false, meldepunkte: 40, stichwerte: 90, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+      Dirk: { rolle: 'gegenspieler', ist_geber: false, meldepunkte: 0, stichwerte: 60, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
     },
     stand: { Anna: 0, Bernd: 200, Carla: 130, Dirk: 60 },
   }
@@ -73,10 +73,10 @@ const historieMitRunde: Rundenhistorie = {
       ist_tausender: false,
       verlustwert: 0,
       spieler: {
-        Anna: { rolle: 'geber' as const, meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
-        Bernd: { rolle: 'spielmacher' as const, meldepunkte: 100, stichwerte: 100, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
-        Carla: { rolle: 'gegenspieler' as const, meldepunkte: 40, stichwerte: 90, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
-        Dirk: { rolle: 'gegenspieler' as const, meldepunkte: 0, stichwerte: 60, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+        Anna: { rolle: 'geber' as const, ist_geber: true, meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
+        Bernd: { rolle: 'spielmacher' as const, ist_geber: false, meldepunkte: 100, stichwerte: 100, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+        Carla: { rolle: 'gegenspieler' as const, ist_geber: false, meldepunkte: 40, stichwerte: 90, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+        Dirk: { rolle: 'gegenspieler' as const, ist_geber: false, meldepunkte: 0, stichwerte: 60, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
       },
       stand: { Anna: 0, Bernd: 200, Carla: 130, Dirk: 60 },
     },
@@ -228,10 +228,10 @@ describe('SpielView', () => {
           ist_tausender: false,
           verlustwert: 0,
           spieler: {
-            Anna: { rolle: 'geber', meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
-            Bernd: { rolle: 'spielmacher', meldepunkte: 100, stichwerte: 120, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
-            Carla: { rolle: 'gegenspieler', meldepunkte: 40, stichwerte: 130, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
-            Dirk: { rolle: 'gegenspieler', meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
+            Anna: { rolle: 'geber', ist_geber: true, meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
+            Bernd: { rolle: 'spielmacher', ist_geber: false, meldepunkte: 100, stichwerte: 120, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+            Carla: { rolle: 'gegenspieler', ist_geber: false, meldepunkte: 40, stichwerte: 130, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+            Dirk: { rolle: 'gegenspieler', ist_geber: false, meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
           },
           stand: { Anna: 0, Bernd: 220, Carla: 170, Dirk: 0 },
         },
@@ -309,10 +309,10 @@ describe('SpielView', () => {
           ist_tausender: false,
           verlustwert: -600,
           spieler: {
-            Anna: { rolle: 'geber', meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
-            Bernd: { rolle: 'spielmacher', meldepunkte: 0, stichwerte: 60, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
-            Carla: { rolle: 'gegenspieler', meldepunkte: 0, stichwerte: 130, mitpunkte: 30, hat_eigenen_stich: true, stern: false },
-            Dirk: { rolle: 'gegenspieler', meldepunkte: 0, stichwerte: 60, mitpunkte: 30, hat_eigenen_stich: true, stern: false },
+            Anna: { rolle: 'geber', ist_geber: true, meldepunkte: 0, stichwerte: 0, mitpunkte: 0, hat_eigenen_stich: false, stern: false },
+            Bernd: { rolle: 'spielmacher', ist_geber: false, meldepunkte: 0, stichwerte: 60, mitpunkte: 0, hat_eigenen_stich: true, stern: false },
+            Carla: { rolle: 'gegenspieler', ist_geber: false, meldepunkte: 0, stichwerte: 130, mitpunkte: 30, hat_eigenen_stich: true, stern: false },
+            Dirk: { rolle: 'gegenspieler', ist_geber: false, meldepunkte: 0, stichwerte: 60, mitpunkte: 30, hat_eigenen_stich: true, stern: false },
           },
           stand: { Anna: 0, Bernd: -600, Carla: 160, Dirk: 90 },
         },
@@ -332,5 +332,86 @@ describe('SpielView', () => {
     )
     // „Korrektur speichern" ist nicht gesperrt (Summe 60 + 130 + 60 == 250).
     expect(wrapper.find('[data-testid="runde-absenden"]').attributes('disabled')).toBeUndefined()
+  })
+})
+
+describe('SpielView bei 3 Spielern (ADR-017)', () => {
+  const dreiSpieler = { id: 5, rundenanzahl: 3, spieler: ['Anna', 'Bernd', 'Carla'] }
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    spielLadenMock.mockReset()
+    punktestaendeLadenMock.mockReset()
+    rundenHistorieLadenMock.mockReset()
+    rundenHistorieLadenMock.mockResolvedValue({ spiel_id: 5, spieler: dreiSpieler.spieler, runden: [] })
+    punktestaendeLadenMock.mockResolvedValue({
+      spiel_id: 5,
+      punktestaende: { Anna: 0, Bernd: 0, Carla: 0 },
+      sterne: { Anna: 0, Bernd: 0, Carla: 0 },
+    })
+  })
+
+  function mountDrei() {
+    useSpielStore().setzeSpiel(dreiSpieler)
+    return mount(SpielView, { props: { spielId: '5' }, global: { stubs: { RouterLink: RouterLinkStub } } })
+  }
+
+  it('zeigt den Geber, ohne ihn als aussetzend zu bezeichnen', () => {
+    const wrapper = mountDrei()
+    expect(wrapper.find('[data-testid="rundenfortschritt"]').text()).toContain('Runde 1 / 3')
+    expect(wrapper.find('[data-testid="geber"]').text()).toBe('Anna')
+    expect(wrapper.find('[data-testid="geber-zeile"]').text()).not.toContain('setzt aus')
+  })
+
+  it('markiert den Geber als mitspielend und alle anderen als aktiv', () => {
+    const wrapper = mountDrei()
+    expect(wrapper.find('[data-testid="spieler-status-Anna"]').text()).toBe('Geber – spielt mit')
+    expect(wrapper.find('[data-testid="spieler-status-Bernd"]').text()).toBe('aktiv')
+    expect(wrapper.find('[data-testid="spieler-status-Carla"]').text()).toBe('aktiv')
+    expect(wrapper.text()).not.toContain('setzt aus')
+  })
+
+  it('lässt den Geber als Spielmacher wählen', () => {
+    const wrapper = mountDrei()
+    const optionen = wrapper
+      .find('[data-testid="spielmacher"]')
+      .findAll('option')
+      .map((o) => o.text())
+    expect(optionen).toEqual(['Anna', 'Bernd', 'Carla'])
+  })
+
+  it('rotiert den Geber nach drei gezählten Runden wieder auf den ersten Spieler', async () => {
+    useSpielStore().setzeSpiel({ ...dreiSpieler, rundenanzahl: 6 })
+    const runde = (nr: number, geber: string) => ({
+      ...macheRunde(nr, nr),
+      geber,
+      spielmacher: geber,
+    })
+    rundenHistorieLadenMock.mockResolvedValue({
+      spiel_id: 5,
+      spieler: dreiSpieler.spieler,
+      runden: [runde(1, 'Anna'), runde(2, 'Bernd'), runde(3, 'Carla')],
+    })
+    const wrapper = mount(SpielView, { props: { spielId: '5' } })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="rundenfortschritt"]').text()).toContain('Runde 4 / 6')
+    expect(wrapper.find('[data-testid="geber"]').text()).toBe('Anna')
+  })
+})
+
+describe('SpielView bei 4 Spielern', () => {
+  it('bezeichnet den Geber weiterhin als aussetzend', () => {
+    setActivePinia(createPinia())
+    punktestaendeLadenMock.mockResolvedValue({
+      spiel_id: 3,
+      punktestaende: { Anna: 0, Bernd: 0, Carla: 0, Dirk: 0 },
+      sterne: { Anna: 0, Bernd: 0, Carla: 0, Dirk: 0 },
+    })
+    rundenHistorieLadenMock.mockResolvedValue(leereHistorie)
+    useSpielStore().setzeSpiel(beispielSpiel)
+    const wrapper = mount(SpielView, { props: { spielId: '3' } })
+    expect(wrapper.find('[data-testid="geber-zeile"]').text()).toContain('setzt aus')
+    expect(wrapper.find('[data-testid="spieler-status-Anna"]').text()).toBe('Geber – setzt aus')
+    expect(wrapper.find('[data-testid="spieler-status-Bernd"]').text()).toBe('aktiv')
   })
 })

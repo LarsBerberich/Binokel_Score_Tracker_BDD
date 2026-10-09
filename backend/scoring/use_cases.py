@@ -10,7 +10,7 @@ from scoring.domain import (
     Spiel,
     Rundenausgang,
     STANDARD_RUNDENANZAHL,
-    GUELTIGE_SPIELERZAHL,
+    GUELTIGE_SPIELERZAHLEN,
     STICHWERT_KONTROLLSUMME,
     MELDEPUNKTE_MAXIMUM,
     ZEHNER_SCHRITT,
@@ -31,28 +31,31 @@ def spiel_anlegen(
     """
     Legt ein neues V1-Binokel-Spiel an.
 
-    Validierungsregeln (normativ: docs/rule-set-v1.md §2, §3, §4):
-    - Es müssen genau 4 Spieler angegeben werden.
-    - Die Rundenzahl muss ein Vielfaches von 4 sein.
-    - Wird keine Rundenzahl angegeben, gilt der Standardwert 12.
+    Validierungsregeln (normativ: docs/rule-set-v1.md §2, §3, §4; ADR-017):
+    - Es müssen 3 oder 4 Spieler angegeben werden; die Anzahl bestimmt die Variante
+      (4 Spieler: der Geber setzt aus, 3 Spieler: der Geber spielt mit).
+    - Die Rundenzahl muss ein Vielfaches der Spielerzahl sein, damit jeder Spieler
+      gleich oft Geber ist.
+    - Wird keine Rundenzahl angegeben, gilt der Standardwert 12 (durch 3 und 4 teilbar).
 
     Raises:
-        UngueltigeSpielerzahl:  Wenn nicht genau 4 Spieler angegeben wurden.
-        UngueltigeRundenanzahl: Wenn die Rundenzahl kein Vielfaches von 4 ist.
+        UngueltigeSpielerzahl:  Wenn nicht genau 3 oder 4 Spieler angegeben wurden.
+        UngueltigeRundenanzahl: Wenn die Rundenzahl kein Vielfaches der Spielerzahl ist.
     """
-    if len(spieler) != GUELTIGE_SPIELERZAHL:
+    if len(spieler) not in GUELTIGE_SPIELERZAHLEN:
+        gueltig = " oder ".join(str(n) for n in GUELTIGE_SPIELERZAHLEN)
         raise UngueltigeSpielerzahl(
-            f"Ein V1-Spiel erfordert genau {GUELTIGE_SPIELERZAHL} Spieler, "
+            f"Ein Spiel erfordert {gueltig} Spieler, "
             f"aber {len(spieler)} wurden angegeben."
         )
 
     if rundenanzahl is None:
         rundenanzahl = STANDARD_RUNDENANZAHL
 
-    if rundenanzahl % 4 != 0:
+    if rundenanzahl % len(spieler) != 0:
         raise UngueltigeRundenanzahl(
-            f"Die Rundenzahl muss ein Vielfaches von 4 sein, "
-            f"aber {rundenanzahl} wurde angegeben."
+            f"Die Rundenzahl muss bei {len(spieler)} Spielern ein Vielfaches von "
+            f"{len(spieler)} sein, aber {rundenanzahl} wurde angegeben."
         )
 
     return Spiel(spieler_reihenfolge=spieler, rundenanzahl=rundenanzahl)

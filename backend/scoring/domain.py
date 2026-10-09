@@ -11,8 +11,13 @@ from enum import Enum
 
 # ── Konstanten ─────────────────────────────────────────────────────────────────
 
-STANDARD_RUNDENANZAHL: int = 12
-GUELTIGE_SPIELERZAHL: int = 4
+STANDARD_RUNDENANZAHL: int = 12  # durch 3 und 4 teilbar, also für beide Varianten gültig
+
+# Unterstützte Spielerzahlen (ADR-017, normativ: docs/rule-set-v1.md §2). Die Spielerzahl
+# bestimmt die Variante: bei 4 Spielern setzt der Geber aus, bei 3 Spielern spielt er mit.
+GUELTIGE_SPIELERZAHLEN: tuple[int, ...] = (3, 4)
+SPIELERZAHL_MIT_AUSSETZENDEM_GEBER: int = 4
+
 STICHWERT_KONTROLLSUMME: int = 250
 
 # Alle Werte, die in den kumulierten STAND einfließen (Stichwerte, Meldepunkte,
@@ -33,11 +38,23 @@ class SpielFehler(ValueError):
 
 
 class UngueltigeSpielerzahl(SpielFehler):
-    """Wird ausgelöst, wenn die angegebene Spielerzahl nicht 4 beträgt."""
+    """Wird ausgelöst, wenn die Spielerzahl weder 3 noch 4 beträgt."""
 
 
 class UngueltigeRundenanzahl(SpielFehler):
-    """Wird ausgelöst, wenn die Rundenzahl kein Vielfaches von 4 ist."""
+    """Wird ausgelöst, wenn die Rundenzahl kein Vielfaches der Spielerzahl ist."""
+
+
+class UnbekannterSpieler(SpielFehler):
+    """Wird ausgelöst, wenn ein Name nicht zur Spielerreihenfolge des Spiels gehört."""
+
+
+class UngueltigerSpielmacher(SpielFehler):
+    """Wird ausgelöst, wenn der Spielmacher in der Runde nicht aktiv mitspielt.
+
+    Das betrifft ausschließlich den aussetzenden Geber (nur bei 4 Spielern;
+    normativ: docs/rule-set-v1.md §3.4).
+    """
 
 
 class UngueltigeStichwerte(SpielFehler):
@@ -72,16 +89,61 @@ class Rundenausgang(Enum):
 @dataclass
 class Spiel:
     """
-    Repräsentiert ein laufendes oder abgeschlossenes Binokel-Spiel.
+    Repräsentiert ein laufendes oder abgeschlossenes Binokel-Spiel mit 3 oder 4 Spielern.
+
+    Die Spielerzahl bestimmt die Variante (ADR-017): Bei 4 Spielern setzt der Geber aus,
+    bei 3 Spielern spielt er mit. In beiden Varianten sind pro Runde genau drei Spieler
+    aktiv. Die Frage „wer ist aktiv?“ wird ausschließlich hier beantwortet.
 
     Attribute:
         spieler_reihenfolge: Namen der Spieler in Sitzreihenfolge gegen den
                              Uhrzeigersinn.  Der erste Eintrag ist der erste Geber.
-        rundenanzahl:        Geplante Gesamtzahl der Runden (Vielfaches von 4).
+        rundenanzahl:        Geplante Gesamtzahl der Runden (Vielfaches der Spielerzahl).
     """
 
     spieler_reihenfolge: list[str]
     rundenanzahl: int
+
+    @property
+    def geber_setzt_aus(self) -> bool:
+        """True bei 4 Spielern (der Geber setzt aus), False bei 3 (der Geber spielt mit)."""
+        return len(self.spieler_reihenfolge) == SPIELERZAHL_MIT_AUSSETZENDEM_GEBER
+
+    def aktive_spieler(self, geber: str) -> list[str]:
+        """
+        Die in der Runde aktiv mitspielenden Spieler – in Sitzreihenfolge.
+
+        Bei 4 Spielern alle außer dem aussetzenden Geber, bei 3 Spielern alle.
+        Es sind in beiden Varianten genau drei.
+
+        Raises:
+            UnbekannterSpieler: Wenn der Geber nicht zum Spiel gehört.
+        """
+        self._muss_mitspieler_sein(geber)
+        if not self.geber_setzt_aus:
+            return list(self.spieler_reihenfolge)
+        return [name for name in self.spieler_reihenfolge if name != geber]
+
+    def gegenspieler(self, geber: str, spielmacher: str) -> list[str]:
+        """
+        Die beiden Gegenspieler: die aktiven Spieler ohne den Spielmacher.
+
+        Raises:
+            UnbekannterSpieler:      Wenn Geber oder Spielmacher nicht zum Spiel gehören.
+            UngueltigerSpielmacher:  Wenn der Spielmacher nicht aktiv ist, also der
+                                     aussetzende Geber (nur bei 4 Spielern).
+        """
+        aktive = self.aktive_spieler(geber)
+        self._muss_mitspieler_sein(spielmacher)
+        if spielmacher not in aktive:
+            raise UngueltigerSpielmacher(
+                f"Der Spielmacher darf nicht der Geber sein (Geber '{geber}' setzt aus)."
+            )
+        return [name for name in aktive if name != spielmacher]
+
+    def _muss_mitspieler_sein(self, name: str) -> None:
+        if name not in self.spieler_reihenfolge:
+            raise UnbekannterSpieler(f"'{name}' gehört nicht zu diesem Spiel.")
 
     def geber_in_runde(self, runde: int) -> str:
         """
@@ -99,16 +161,18 @@ class Spiel:
 
             Der Modulo-Operator „%" gibt den Rest einer Division zurück und
             sorgt dafür, dass der Index nach dem letzten Spieler wieder bei
-            0 beginnt – das ist eine Rotation.
+            0 beginnt – das ist eine Rotation über die tatsächliche Spielerzahl.
 
-            Beispiel mit spieler_reihenfolge = ["Anna", "Bernd", "Carla", "Dirk"]:
+            Beispiel mit 4 Spielern ["Anna", "Bernd", "Carla", "Dirk"]:
 
                 Runde 1:  (1 - 1) % 4 =  0 % 4 = 0  → Anna
-                Runde 2:  (2 - 1) % 4 =  1 % 4 = 1  → Bernd
-                Runde 3:  (3 - 1) % 4 =  2 % 4 = 2  → Carla
                 Runde 4:  (4 - 1) % 4 =  3 % 4 = 3  → Dirk
                 Runde 5:  (5 - 1) % 4 =  4 % 4 = 0  → Anna  ← Neustart
-                Runde 13: (13- 1) % 4 = 12 % 4 = 0  → Anna  ← 3. Durchgang
+
+            Beispiel mit 3 Spielern ["Anna", "Bernd", "Carla"]:
+
+                Runde 3:  (3 - 1) % 3 =  2 % 3 = 2  → Carla
+                Runde 4:  (4 - 1) % 3 =  3 % 3 = 0  → Anna  ← Neustart
         """
         index = (runde - 1) % len(self.spieler_reihenfolge)
         return self.spieler_reihenfolge[index]

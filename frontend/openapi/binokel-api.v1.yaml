@@ -261,18 +261,23 @@ components:
       properties:
         spieler:
           type: array
-          description: Spielernamen in Reihenfolge. Genau 4 Spieler (rule-set-v1.md).
+          description: >-
+            Spielernamen in Sitzreihenfolge gegen den Uhrzeigersinn. 3 oder 4 Spieler
+            (rule-set-v1.md §2, ADR-017). Die Anzahl bestimmt die Variante: bei 4 Spielern
+            setzt der Geber aus, bei 3 Spielern spielt er mit.
           items:
             type: string
-          minItems: 4
+          minItems: 3
           maxItems: 4
         rundenanzahl:
           type: [integer, 'null']
           description: >-
-            Gesamtzahl der Runden. Muss ein Vielfaches von 4 sein.
-            Optional; Default legt das Backend fest.
+            Gesamtzahl der Runden. Muss ein Vielfaches der Spielerzahl sein (4 bzw. 3).
+            Optional; Default 12 (durch 3 und 4 teilbar, daher für beide Varianten gültig).
       examples:
         - spieler: [Anna, Bernd, Clara, David]
+          rundenanzahl: 12
+        - spieler: [Anna, Bernd, Clara]
           rundenanzahl: 12
 
     Spiel:
@@ -337,6 +342,9 @@ components:
           minimum: 1
         spielmacher:
           type: string
+          description: >-
+            Muss in der Runde aktiv mitspielen (rule-set-v1.md §3.4): bei 4 Spielern also nicht
+            der Geber (400), bei 3 Spielern darf es der mitspielende Geber sein (ADR-017).
         geber:
           type: string
         spielmacher_stern:
@@ -600,11 +608,18 @@ components:
       description: >-
         M|S|Mit-Aufschlüsselung eines Spielers für eine Runde
         (Rundenzeile der Anschreibetabelle, §5).
-      required: [rolle, meldepunkte, stichwerte, mitpunkte, hat_eigenen_stich, stern]
+      required: [rolle, ist_geber, meldepunkte, stichwerte, mitpunkte, hat_eigenen_stich, stern]
       properties:
         rolle:
           type: string
           enum: [geber, spielmacher, gegenspieler]
+          description: >-
+            `geber` bedeutet „setzt aus" und kommt daher nur bei 4 Spielern vor. Bei 3 Spielern
+            spielt der Geber mit und ist Spielmacher oder Gegenspieler (ADR-017).
+        ist_geber:
+          type: boolean
+          description: >-
+            Kennzeichnet den Geber der Runde – in beiden Varianten, im Gegensatz zu `rolle`.
         meldepunkte:
           type: integer
           description: Stich-zwang-gewertete Meldung (M); bei Schneider 0.

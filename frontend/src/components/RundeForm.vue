@@ -7,8 +7,8 @@ import { REIZWERT_MINIMUM, STICHWERT_KONTROLLSUMME, ZEHNER_SCHRITT, MELDEPUNKTE_
 /**
  * Erfassungsformular für eine einzelne Runde.
  *
- * Der Geber (setzt aus) und die aktiven Spieler werden von oben (SpielView)
- * hereingereicht; die Gegenspieler ergeben sich aus aktiven Spielern minus
+ * Der Geber und die aktiven Spieler werden von oben (SpielView) hereingereicht –
+ * bei 4 Spielern ohne den aussetzenden Geber, bei 3 Spielern alle drei (ADR-017); die Gegenspieler ergeben sich aus aktiven Spielern minus
  * Spielmacher. Bei gültiger Eingabe wird der passende `RundeRequest` emittiert.
  *
  * Rundentypen zur Auswahl (§16.2): Normales Spiel, Einfaches Abgehen,

@@ -5,94 +5,84 @@ Deckt runde_korrektur_letzte_runde.feature ab (TASK-014, ADR-015): Nur die
 höchste (zuletzt erfasste) Rundennummer ist per PUT editierbar. Eine Korrektur
 aktualisiert den kumulierten STAND; eine frühere Runde wird abgelehnt (409).
 
-Geberrotation (Spieler Anna,Bernd,Clara,Dieter): Runde 1→Anna, 2→Bernd.
+Läuft für 3 und 4 Spieler (ADR-017). Der Given-Step „ein neues Spiel mit der
+Spielerreihenfolge … ist angelegt" stammt aus tausender_ausser_konkurrenz_http_steps.py
+und setzt ``ak_spieler`` / ``ak_spiel_id``. Bei 3 Spielern ist der Geber der ersten
+Runde selbst Spielmacher – die Korrektur muss das akzeptieren.
 """
-import json
-
 from behave import given, when, then
 
-
-def _post(context, url: str, payload: dict):
-    return context.client.post(
-        url, data=json.dumps(payload), content_type="application/json"
-    )
-
-
-def _put(context, url: str, payload: dict):
-    return context.client.put(
-        url, data=json.dumps(payload), content_type="application/json"
-    )
+from steps.http_helfer import (
+    geber_nach,
+    normale_runde,
+    post,
+    punktestaende,
+    put,
+    rollen,
+)
 
 
-def _neues_spiel(context) -> int:
-    antwort = _post(context, "/api/spiele/", {
-        "spieler": ["Anna", "Bernd", "Clara", "Dieter"],
-        "rundenanzahl": 4,
-    })
-    assert antwort.status_code == 201, antwort.content
-    return antwort.json()["id"]
+def _runden_url(context) -> str:
+    return f"/api/spiele/{context.ak_spiel_id}/runden/"
 
 
-@given("ein neues Spiel mit einer erfassten Runde für die Korrektur ist angelegt")
-def step_spiel_mit_einer_runde(context):
-    context.korrektur_spiel_id = _neues_spiel(context)
-    url = f"/api/spiele/{context.korrektur_spiel_id}/runden/"
-    # Runde 1: Geber Anna (deterministisch), Spielmacher Bernd gewinnt mit 210.
-    antwort = _post(context, url, {
-        "typ": "normal", "rundennummer": 1, "spielmacher": "Bernd", "geber": "Anna",
+def _runde_1_erfassen(context) -> None:
+    """Runde 1: Spielmacher gewinnt mit 210 (Reizwert 200, M 110 + S 100)."""
+    geber = geber_nach(context.ak_spieler, 0)
+    spielmacher, (gs1, gs2) = rollen(context.ak_spieler, geber, spielmacher_index=0)
+    context.korrektur_spielmacher = spielmacher
+    context.korrektur_gegenspieler = (gs1, gs2)
+    antwort = post(context, _runden_url(context), {
+        "typ": "normal", "spielmacher": spielmacher, "geber": geber,
         "reizwert": 200, "meldepunkte": 110, "stichwerte": 100, "hat_eigenen_stich": True,
         "gegenspieler": [
-            {"name": "Clara", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
-            {"name": "Dieter", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+            {"name": gs1, "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
+            {"name": gs2, "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
         ],
     })
     assert antwort.status_code == 201, antwort.content
 
 
-@given("ein neues Spiel mit zwei erfassten Runden für die Korrektur ist angelegt")
-def step_spiel_mit_zwei_runden(context):
-    context.korrektur_spiel_id = _neues_spiel(context)
-    url = f"/api/spiele/{context.korrektur_spiel_id}/runden/"
-    r1 = _post(context, url, {
-        "typ": "normal", "rundennummer": 1, "spielmacher": "Bernd", "geber": "Anna",
-        "reizwert": 200, "meldepunkte": 110, "stichwerte": 100, "hat_eigenen_stich": True,
-        "gegenspieler": [
-            {"name": "Clara", "meldepunkte": 20, "stichwerte": 90, "hat_eigenen_stich": True},
-            {"name": "Dieter", "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
-        ],
-    })
-    assert r1.status_code == 201, r1.content
-    # Runde 2: Geber Bernd (deterministisch), Spielmacher Clara.
-    r2 = _post(context, url, {
-        "typ": "einfaches_abgehen", "rundennummer": 2, "spielmacher": "Clara", "geber": "Bernd",
+@given("eine reguläre Runde ist für die Korrektur erfasst")
+def step_eine_runde(context):
+    _runde_1_erfassen(context)
+
+
+@given("zwei reguläre Runden sind für die Korrektur erfasst")
+def step_zwei_runden(context):
+    _runde_1_erfassen(context)
+    # Runde 2: der Geber rückt eine Position weiter; einfaches Abgehen des zweiten aktiven Spielers.
+    geber = geber_nach(context.ak_spieler, 1)
+    spielmacher, (gs1, gs2) = rollen(context.ak_spieler, geber, spielmacher_index=1)
+    antwort = post(context, _runden_url(context), {
+        "typ": "einfaches_abgehen", "spielmacher": spielmacher, "geber": geber,
         "reizwert": 250,
         "gegenspieler": [
-            {"name": "Anna", "meldepunkte": 40},
-            {"name": "Dieter", "meldepunkte": 20},
+            {"name": gs1, "meldepunkte": 40},
+            {"name": gs2, "meldepunkte": 20},
         ],
     })
-    assert r2.status_code == 201, r2.content
+    assert antwort.status_code == 201, antwort.content
 
 
 @when("die letzte Runde mit einem höheren Spielmacher-Ergebnis korrigiert wird")
 def step_letzte_runde_korrigieren(context):
-    url = f"/api/spiele/{context.korrektur_spiel_id}/runden/1/"
+    gs1, gs2 = context.korrektur_gegenspieler
     # Korrektur: Meldepunkte 110 → 150 (Spielmacher-Punkte damit 250 statt 210).
-    context.korrektur_antwort = _put(context, url, {
-        "typ": "normal", "spielmacher": "Bernd",
+    context.korrektur_antwort = put(context, f"{_runden_url(context)}1/", {
+        "typ": "normal", "spielmacher": context.korrektur_spielmacher,
         "reizwert": 200, "meldepunkte": 150, "stichwerte": 100, "hat_eigenen_stich": True,
         "gegenspieler": [
-            {"name": "Clara", "meldepunkte": 20, "stichwerte": 80, "hat_eigenen_stich": True},
-            {"name": "Dieter", "meldepunkte": 0, "stichwerte": 70, "hat_eigenen_stich": True},
+            {"name": gs1, "meldepunkte": 20, "stichwerte": 80, "hat_eigenen_stich": True},
+            {"name": gs2, "meldepunkte": 0, "stichwerte": 70, "hat_eigenen_stich": True},
         ],
     })
 
 
 @when("versucht wird, die erste Runde zu korrigieren")
 def step_erste_runde_korrigieren(context):
-    url = f"/api/spiele/{context.korrektur_spiel_id}/runden/1/"
-    context.korrektur_antwort = _put(context, url, {
-        "typ": "tausender_gewonnen", "spielmacher": "Bernd",
+    context.korrektur_antwort = put(context, f"{_runden_url(context)}1/", {
+        "typ": "tausender_gewonnen", "spielmacher": context.korrektur_spielmacher,
     })
 
 
@@ -103,11 +93,10 @@ def step_korrektur_uebernommen(context):
 
 @then("der kumulierte STAND des Spielmachers beträgt {erwartet:d}")
 def step_stand_pruefen(context, erwartet):
-    stand = context.client.get(
-        f"/api/spiele/{context.korrektur_spiel_id}/punktestaende/"
-    ).json()["punktestaende"]
-    assert stand["Bernd"] == erwartet, (
-        f"Erwartet STAND von Bernd = {erwartet}, aber erhalten: {stand['Bernd']}"
+    stand = punktestaende(context, context.ak_spiel_id)
+    name = context.korrektur_spielmacher
+    assert stand[name] == erwartet, (
+        f"Erwartet STAND von {name} = {erwartet}, aber erhalten: {stand[name]}"
     )
 
 

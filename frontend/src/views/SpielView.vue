@@ -18,7 +18,7 @@ import {
   type SterneMap,
 } from '../api'
 import { useSpielStore } from '../stores/spiel'
-import { aktiveSpieler, geberFuerRunde } from '../domain/rotation'
+import { aktiveSpieler, geberFuerRunde, geberSetztAus } from '../domain/rotation'
 import RundeForm from '../components/RundeForm.vue'
 import Anschreibetabelle from '../components/Anschreibetabelle.vue'
 
@@ -59,6 +59,14 @@ const geber = computed(() =>
 const aktive = computed(() =>
   spiel.value ? aktiveSpieler(spiel.value.spieler, geber.value) : [],
 )
+/** 4 Spieler: der Geber setzt aus. 3 Spieler: er spielt mit (ADR-017). */
+const setztAus = computed(() => (spiel.value ? geberSetztAus(spiel.value.spieler) : false))
+
+/** Status eines Spielers in der laufenden Runde – für die Spielerliste. */
+function statusText(name: string): string {
+  if (name !== geber.value) return 'aktiv'
+  return setztAus.value ? 'Geber – setzt aus' : 'Geber – spielt mit'
+}
 const istBeendet = computed(() =>
   spiel.value ? gezaehlteRunden.value >= spiel.value.rundenanzahl : false,
 )
@@ -272,19 +280,23 @@ onMounted(async () => {
       </section>
 
       <section v-if="!istBeendet && !korrekturModus" class="flex flex-col gap-3">
-        <p class="text-slate-600">
-          Geber (setzt aus): <strong data-testid="geber">{{ geber }}</strong>
+        <p data-testid="geber-zeile" class="text-slate-600">
+          Geber<template v-if="setztAus"> (setzt aus)</template>:
+          <strong data-testid="geber">{{ geber }}</strong>
         </p>
         <ul class="flex flex-col gap-1">
           <li
             v-for="name in spiel.spieler"
             :key="name"
             class="flex items-center justify-between rounded border border-slate-200 px-3 py-2"
-            :class="name === geber ? 'bg-slate-100 text-slate-500' : 'bg-white'"
+            :class="aktive.includes(name) ? 'bg-white' : 'bg-slate-100 text-slate-500'"
           >
             <span>{{ name }}</span>
-            <span v-if="name === geber" class="text-sm">Geber – setzt aus</span>
-            <span v-else class="text-sm text-emerald-700">aktiv</span>
+            <span
+              :data-testid="`spieler-status-${name}`"
+              class="text-sm"
+              :class="name === geber && !aktive.includes(name) ? '' : 'text-emerald-700'"
+            >{{ statusText(name) }}</span>
           </li>
         </ul>
 
@@ -365,7 +377,8 @@ onMounted(async () => {
         <p class="text-sm text-amber-800">
           Korrektur der letzten Runde
           (<strong>Runde {{ korrekturRunde.rundennummer }}</strong>,
-          Geber setzt aus: {{ korrekturGeber }}). Nur diese Runde ist editierbar (ADR-015).
+          Geber<template v-if="setztAus"> setzt aus</template>: {{ korrekturGeber }}).
+          Nur diese Runde ist editierbar (ADR-015).
         </p>
 
         <RundeForm

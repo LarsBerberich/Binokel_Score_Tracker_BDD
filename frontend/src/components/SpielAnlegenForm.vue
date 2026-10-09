@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import type { SpielAnlegenRequest } from '../api'
+import { MAX_SPIELERZAHL, MIN_SPIELERZAHL } from '../domain/regeln'
+import { geberSetztAus } from '../domain/rotation'
 
 /**
- * Präsentationsnahes Formular zum Anlegen eines Spiels (Slice 1).
+ * Präsentationsnahes Formular zum Anlegen eines Spiels (Slice 1) für 3 oder 4 Spieler.
  *
  * Kennt keine API: es validiert die Eingaben und meldet ein gültiges
  * Ergebnis per `absenden`-Event nach oben. Der API-Aufruf, Fehlerbehandlung
@@ -21,31 +23,49 @@ const props = withDefaults(
 
 const emit = defineEmits<{ absenden: [payload: SpielAnlegenRequest] }>()
 
-/** Genau vier Spielernamen (Binokel zu viert). */
-const spieler = reactive<string[]>(['', '', '', ''])
+/** Pflichtfelder: die ersten drei Namen. Das vierte Feld ist optional (ADR-017). */
+const ERFORDERLICHE_NAMEN = MIN_SPIELERZAHL
+
+/** Vier Eingabefelder; ein leeres viertes Feld bedeutet „zu dritt". */
+const spieler = reactive<string[]>(Array.from({ length: MAX_SPIELERZAHL }, () => ''))
 const rundenanzahl = ref<number>(12)
 const beruehrt = ref(false)
 
 const namenGetrimmt = computed(() => spieler.map((name) => name.trim()))
 
-const alleNamenGefuellt = computed(() =>
-  namenGetrimmt.value.every((name) => name.length > 0),
+/**
+ * Spielerzahl = Variante: 4 Namen → der Geber setzt aus, 3 Namen → der Geber spielt mit.
+ * Die Variante wird nicht gesondert gewählt, sie folgt aus den Namen.
+ */
+const spielerzahl = computed(() =>
+  namenGetrimmt.value[MAX_SPIELERZAHL - 1].length > 0 ? MAX_SPIELERZAHL : MIN_SPIELERZAHL,
 )
 
-const namenEindeutig = computed(() => {
-  const gefuellt = namenGetrimmt.value.filter((name) => name.length > 0)
-  return new Set(gefuellt).size === gefuellt.length
-})
+/** Die tatsächlich teilnehmenden Namen (3 oder 4) in Sitzreihenfolge. */
+const teilnehmer = computed(() => namenGetrimmt.value.slice(0, spielerzahl.value))
+
+const erforderlicheNamenGefuellt = computed(() =>
+  namenGetrimmt.value.slice(0, ERFORDERLICHE_NAMEN).every((name) => name.length > 0),
+)
+
+const namenEindeutig = computed(() => new Set(teilnehmer.value).size === teilnehmer.value.length)
 
 const rundenanzahlGueltig = computed(
-  () => Number.isInteger(rundenanzahl.value) && rundenanzahl.value > 0 && rundenanzahl.value % 4 === 0,
+  () =>
+    Number.isInteger(rundenanzahl.value) &&
+    rundenanzahl.value > 0 &&
+    rundenanzahl.value % spielerzahl.value === 0,
 )
 
 /** Erste zutreffende Validierungsmeldung – oder null, wenn alles passt. */
 const validierungsfehler = computed<string | null>(() => {
-  if (!alleNamenGefuellt.value) return 'Bitte alle vier Spielernamen ausfüllen.'
+  if (!erforderlicheNamenGefuellt.value) {
+    return 'Bitte mindestens drei Spielernamen ausfüllen (das vierte Feld ist optional).'
+  }
   if (!namenEindeutig.value) return 'Die Spielernamen müssen eindeutig sein.'
-  if (!rundenanzahlGueltig.value) return 'Die Rundenanzahl muss ein positives Vielfaches von 4 sein.'
+  if (!rundenanzahlGueltig.value) {
+    return `Die Rundenanzahl muss ein positives Vielfaches von ${spielerzahl.value} sein.`
+  }
   return null
 })
 
@@ -55,7 +75,7 @@ function absenden(): void {
   beruehrt.value = true
   if (!istGueltig.value || props.laedt) return
   emit('absenden', {
-    spieler: [...namenGetrimmt.value],
+    spieler: [...teilnehmer.value],
     rundenanzahl: rundenanzahl.value,
   })
 }
@@ -72,24 +92,34 @@ function absenden(): void {
       <legend class="mb-1 text-lg font-semibold">Neues Spiel</legend>
 
       <label v-for="(_, i) in spieler" :key="i" class="flex flex-col gap-1">
-        <span class="text-sm text-slate-600">Spieler {{ i + 1 }}</span>
+        <span class="text-sm text-slate-600">
+          Spieler {{ i + 1 }}<template v-if="i >= ERFORDERLICHE_NAMEN"> (optional)</template>
+        </span>
         <input
           v-model="spieler[i]"
           type="text"
+          :required="i < ERFORDERLICHE_NAMEN"
           :data-testid="`spieler-${i}`"
-          :placeholder="`Name Spieler ${i + 1}`"
+          :placeholder="
+            i < ERFORDERLICHE_NAMEN ? `Name Spieler ${i + 1}` : 'Leer lassen für ein Spiel zu dritt'
+          "
           autocomplete="off"
           class="rounded border border-slate-300 px-3 py-2"
         />
       </label>
 
+      <p data-testid="variante-hinweis" class="text-sm text-slate-500">
+        {{ spielerzahl }} Spieler –
+        {{ geberSetztAus(teilnehmer) ? 'der Geber setzt aus.' : 'der Geber spielt mit.' }}
+      </p>
+
       <label class="flex flex-col gap-1">
-        <span class="text-sm text-slate-600">Rundenanzahl (Vielfaches von 4)</span>
+        <span class="text-sm text-slate-600">Rundenanzahl (Vielfaches von {{ spielerzahl }})</span>
         <input
           v-model.number="rundenanzahl"
           type="number"
-          min="4"
-          step="4"
+          :min="spielerzahl"
+          :step="spielerzahl"
           data-testid="rundenanzahl"
           class="rounded border border-slate-300 px-3 py-2"
         />

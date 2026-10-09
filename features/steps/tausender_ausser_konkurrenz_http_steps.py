@@ -5,101 +5,84 @@ Prüft über die HTTP-API (ADR-006), dass ein Tausender eine eigene eindeutige
 Sequenz erhält, aber keine gezählte Spielrunde (``zaehlrunde=None``): der Zähler
 rückt erst durch eine reguläre Runde weiter, und der numerische Punktestand
 friert bei einem Tausender ein (normativ: docs/rule-set-v1.md §15).
-"""
-import json
 
+Läuft für 3 und 4 Spieler (ADR-017); die Rollen leiten sich aus der Spielerreihenfolge
+ab (siehe http_helfer.rollen). Bei 3 Spielern ist der Geber der ersten Runde selbst
+Spielmacher.
+"""
 from behave import given, when, then
 
-
-def _post(context, url: str, payload: dict):
-    return context.client.post(
-        url, data=json.dumps(payload), content_type="application/json"
-    )
-
-
-def _normale_runde(context, spielmacher: str, geber: str, gs1: str, gs2: str):
-    """Eine gewonnene reguläre Runde (Summe 250, alle Werte Zehner)."""
-    url = f"/api/spiele/{context.ak_spiel_id}/runden/"
-    return _post(context, url, {
-        "typ": "normal",
-        "rundennummer": 1,  # wird serverseitig als Sequenz vergeben (ignoriert)
-        "spielmacher": spielmacher,
-        "geber": geber,
-        "reizwert": 150,
-        "meldepunkte": 150,
-        "stichwerte": 100,
-        "hat_eigenen_stich": True,
-        "gegenspieler": [
-            {"name": gs1, "meldepunkte": 0, "stichwerte": 90, "hat_eigenen_stich": True},
-            {"name": gs2, "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
-        ],
-    })
+from steps.http_helfer import (
+    geber_nach,
+    historie,
+    normale_runde,
+    post,
+    punktestaende,
+    rollen,
+    spiel_anlegen,
+    spieler_aus_string,
+)
 
 
-def _historie(context):
-    return context.client.get(
-        f"/api/spiele/{context.ak_spiel_id}/runden/"
-    ).json()["runden"]
+def _runden_url(context) -> str:
+    return f"/api/spiele/{context.ak_spiel_id}/runden/"
 
 
-def _stand(context):
-    return context.client.get(
-        f"/api/spiele/{context.ak_spiel_id}/punktestaende/"
-    ).json()["punktestaende"]
-
-
-@given("ein neues Spiel mit 4 Runden ist angelegt")
-def step_neues_spiel_4_runden(context):
-    antwort = _post(context, "/api/spiele/", {
-        "spieler": ["Anna", "Bernd", "Carla", "Dirk"],
-        "rundenanzahl": 4,
-    })
-    assert antwort.status_code == 201, antwort.content
-    context.ak_spiel_id = antwort.json()["id"]
+@given('ein neues Spiel mit der Spielerreihenfolge "{reihenfolge}" und {runden:d} Runden ist angelegt')
+def step_neues_spiel(context, reihenfolge, runden):
+    context.ak_spieler = spieler_aus_string(reihenfolge)
+    context.ak_runden = runden
+    context.ak_spiel_id = spiel_anlegen(context, context.ak_spieler, runden)
 
 
 @given("die erste reguläre Runde ist gespielt")
 def step_erste_regulaere_runde(context):
-    # Gezählte Runde 1: Geber Anna, Spielmacher Bernd, Gegenspieler Carla/Dirk.
-    antwort = _normale_runde(context, "Bernd", "Anna", "Carla", "Dirk")
+    # Gezählte Runde 1: Geber ist der erste Spieler, Spielmacher der erste aktive Spieler.
+    geber = geber_nach(context.ak_spieler, 0)
+    spielmacher, gegenspieler = rollen(context.ak_spieler, geber, spielmacher_index=0)
+    antwort = post(context, _runden_url(context), normale_runde(spielmacher, geber, gegenspieler))
     assert antwort.status_code == 201, antwort.content
-    context.ak_stand_vor_tausender = _stand(context)
+    context.ak_stand_vor_tausender = punktestaende(context, context.ak_spiel_id)
 
 
 @when("in derselben gezählten Runde ein Tausender ausgewertet wird")
 def step_tausender_ausgewertet(context):
-    url = f"/api/spiele/{context.ak_spiel_id}/runden/"
-    # Gezählte Runde 2: Geber bleibt Bernd (Tausender verschiebt ihn nicht).
-    antwort = _post(context, url, {
+    # Gezählte Runde 2: der Geber rückt einmal weiter und bleibt dann über den Tausender stehen.
+    geber = geber_nach(context.ak_spieler, 1)
+    spielmacher, _ = rollen(context.ak_spieler, geber, spielmacher_index=1)
+    antwort = post(context, _runden_url(context), {
         "typ": "tausender_gewonnen",
-        "rundennummer": 2,
-        "spielmacher": "Carla",
-        "geber": "Bernd",
+        "spielmacher": spielmacher,
+        "geber": geber,
     })
     assert antwort.status_code == 201, antwort.content
 
 
 @then("trägt die Tausender-Runde keine gezählte Rundennummer")
 def step_tausender_ohne_zaehlrunde(context):
-    tausender = [r for r in _historie(context) if r["ist_tausender"]]
-    assert len(tausender) == 1, _historie(context)
+    runden = historie(context, context.ak_spiel_id)
+    tausender = [r for r in runden if r["ist_tausender"]]
+    assert len(tausender) == 1, runden
     assert tausender[0]["zaehlrunde"] is None, tausender[0]
 
 
 @then("der numerische Punktestand ändert sich durch den Tausender nicht")
 def step_stand_unveraendert(context):
-    assert _stand(context) == context.ak_stand_vor_tausender, (
-        context.ak_stand_vor_tausender, _stand(context)
-    )
+    stand = punktestaende(context, context.ak_spiel_id)
+    assert stand == context.ak_stand_vor_tausender, (context.ak_stand_vor_tausender, stand)
 
 
 @then("die gezählte Rundennummer rückt erst durch die nächste reguläre Runde weiter")
 def step_zaehler_rueckt_bei_regulaer(context):
-    # Wiederholung der gezählten Runde 2: Geber weiterhin Bernd, Spielmacher Carla.
-    antwort = _normale_runde(context, "Carla", "Bernd", "Anna", "Dirk")
+    # Wiederholung der gezählten Runde 2: derselbe Geber, derselbe Spielmacher.
+    geber = geber_nach(context.ak_spieler, 1)
+    spielmacher, gegenspieler = rollen(context.ak_spieler, geber, spielmacher_index=1)
+    antwort = post(context, _runden_url(context), normale_runde(spielmacher, geber, gegenspieler))
     assert antwort.status_code == 201, antwort.content
 
-    runden = _historie(context)
+    runden = historie(context, context.ak_spiel_id)
     assert [r["zaehlrunde"] for r in runden] == [1, None, 2], runden
     assert [r["ist_tausender"] for r in runden] == [False, True, False], runden
     assert [r["sequenz"] for r in runden] == [1, 2, 3], runden
+    # Der Geber bleibt über den Tausender hinweg derselbe (FND-006, §15.6).
+    assert [r["geber"] for r in runden][1:] == [geber, geber], runden

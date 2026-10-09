@@ -45,7 +45,7 @@ class SpielerModel(models.Model):
     """
     Ein Spieler innerhalb eines Spiels.
 
-    position: 0..3, Sitzreihenfolge gegen Uhrzeigersinn.
+    position: 0..n-1 (n = 3 oder 4, ADR-017), Sitzreihenfolge gegen Uhrzeigersinn.
     Der Spieler mit position=0 ist der erste Geber.
     """
 

@@ -56,6 +56,19 @@ def spiel_persistieren(spiel: Spiel) -> SpielModel:
     return spiel_model
 
 
+def _domaenen_spiel(spiel_model: SpielModel) -> Spiel:
+    """Konvertiert ein SpielModel in das Domänenobjekt (einzige Konvertierungsstelle).
+
+    Die Spielerzahl (3 oder 4) ergibt sich aus den gespeicherten SpielerModel-Zeilen; sie
+    wird bewusst nicht redundant am Spiel gespeichert (ADR-017). Alle Rollenfragen – wer ist
+    aktiv, wer sind die Gegenspieler – beantwortet das Domänenobjekt, nicht das Repository.
+    """
+    return Spiel(
+        spieler_reihenfolge=_spieler_positionsliste(spiel_model),
+        rundenanzahl=spiel_model.rundenanzahl,
+    )
+
+
 def spiel_laden(spiel_id: int) -> Spiel:
     """
     Lädt ein SpielModel aus der DB und konvertiert es in ein Spiel-Domain-Objekt.
@@ -64,10 +77,7 @@ def spiel_laden(spiel_id: int) -> Spiel:
         SpielModel.DoesNotExist: Wenn kein Spiel mit dieser ID existiert.
     """
     spiel_model = SpielModel.objects.prefetch_related("spieler").get(pk=spiel_id)
-    spieler_namen = list(
-        spiel_model.spieler.order_by("position").values_list("name", flat=True)
-    )
-    return Spiel(spieler_reihenfolge=spieler_namen, rundenanzahl=spiel_model.rundenanzahl)
+    return _domaenen_spiel(spiel_model)
 
 
 # ── FND-006: gezählte Runden, Sequenz und Geber-Ableitung ──────────────────────
@@ -79,7 +89,7 @@ _TAUSENDER_AUSGAENGE: tuple[str, str] = (
 
 
 def _spieler_positionsliste(spiel_model: SpielModel) -> list[str]:
-    """Spielernamen in fester Sitzreihenfolge (position 0..3)."""
+    """Spielernamen in fester Sitzreihenfolge (position 0..n-1, n = 3 oder 4)."""
     return list(
         spiel_model.spieler.order_by("position").values_list("name", flat=True)
     )
@@ -102,7 +112,7 @@ def _gezaehlte_runden(spiel_model: SpielModel, *, vor_sequenz: int | None = None
 def geber_fuer_sequenz(spiel_id: int, sequenz: int) -> str:
     """Geber der Runde mit gegebener Sequenz (``rundennummer``) – für die Korrektur (PUT).
 
-    = spieler[(Anzahl gezählter Runden mit Sequenz < sequenz) % 4]. Hängt nur von
+    = spieler[(Anzahl gezählter Runden mit Sequenz < sequenz) % Spielerzahl]. Hängt nur von
     den Runden DAVOR ab, ist damit unabhängig vom (ggf. korrigierten) Typ der Runde
     selbst. Ohne Tausender identisch zu ``Spiel.geber_in_runde(sequenz)`` – mit
     Tausender bleibt der Geber über die außer-Konkurrenz-Runden hinweg stehen
@@ -405,8 +415,9 @@ def sterne_laden(spiel_id: int) -> dict[str, int]:
     - gegenspieler_stern gesetzt → +1 für jeden aktiven Gegenspieler (Tausender verloren).
 
     Wichtig: Bei Tausender-Runden werden KEINE GegenspielerRundeModel-Zeilen angelegt.
-    Die aktiven Gegenspieler werden daher aus „alle Spieler − Geber − Spielmacher"
-    hergeleitet (der Geber setzt aus und erhält keinen Stern, §15.3).
+    Die aktiven Gegenspieler stellt daher das Domänenobjekt bereit (``Spiel.gegenspieler``):
+    bei 4 Spielern ohne den aussetzenden Geber (er erhält keinen Stern, §15.3), bei
+    3 Spielern ist der mitspielende Geber ein ganz normaler Gegenspieler (ADR-017).
 
     Returns:
         Mapping Spielername → Anzahl Sterne.
@@ -415,8 +426,8 @@ def sterne_laden(spiel_id: int) -> dict[str, int]:
         SpielModel.DoesNotExist: Wenn das Spiel nicht gefunden wird.
     """
     spiel_model = SpielModel.objects.prefetch_related("spieler").get(pk=spiel_id)
-    sterne: dict[str, int] = {s.name: 0 for s in spiel_model.spieler.all()}
-    alle_namen = set(sterne)
+    spiel = _domaenen_spiel(spiel_model)
+    sterne: dict[str, int] = {name: 0 for name in spiel.spieler_reihenfolge}
 
     runden = spiel_model.runden.select_related("spielmacher", "geber")
 
@@ -424,8 +435,7 @@ def sterne_laden(spiel_id: int) -> dict[str, int]:
         if runde.spielmacher_stern:
             sterne[runde.spielmacher.name] += 1
         if runde.gegenspieler_stern:
-            gegenspieler = alle_namen - {runde.geber.name, runde.spielmacher.name}
-            for name in gegenspieler:
+            for name in spiel.gegenspieler(runde.geber.name, runde.spielmacher.name):
                 sterne[name] += 1
 
     return sterne
@@ -438,13 +448,13 @@ def rundenhistorie_laden(spiel_id: int) -> dict:
     Baut die zweizeilige Anschreibetabelle (docs/Anschreibetabelle_4_Spieler.md §5).
 
     Je Runde eine Rundenzeile (M | S | Mit pro Spieler, Verlustwert beim
-    verlierenden Spielmacher, Stern bei Tausender, „setzt aus" für den Geber) und
-    der kumulierte STAND-Zwischenstand je Spieler. Der STAND wird über den
+    verlierenden Spielmacher, Stern bei Tausender, „setzt aus" für den aussetzenden
+    Geber) und der kumulierte STAND-Zwischenstand je Spieler. Der STAND wird über den
     gemeinsamen `_runde_beitrag` als laufende Summe gebildet (HOCH-4), sodass die
     letzte STAND-Zeile garantiert `punktestaende_laden` entspricht.
 
     Bei Tausender-Runden existieren KEINE GegenspielerRundeModel-Zeilen; die
-    aktiven Gegenspieler werden aus „alle − Geber − Spielmacher" hergeleitet und
+    aktiven Gegenspieler stellt das Domänenobjekt bereit (``Spiel.gegenspieler``) und
     erhalten (bei Tausender verloren) ihren Stern (§15.3). Der STAND friert ein.
 
     Returns:
@@ -454,7 +464,7 @@ def rundenhistorie_laden(spiel_id: int) -> dict:
             {
               "rundennummer", "geber", "spielmacher", "reizwert",
               "rundenausgang", "ist_tausender", "verlustwert",
-              "spieler": {Name: {rolle, meldepunkte, stichwerte, mitpunkte,
+              "spieler": {Name: {rolle, ist_geber, meldepunkte, stichwerte, mitpunkte,
                                  hat_eigenen_stich, stern}},
               "stand": {Name: kumulierter STAND}
             }, …
@@ -465,9 +475,8 @@ def rundenhistorie_laden(spiel_id: int) -> dict:
         SpielModel.DoesNotExist: Wenn das Spiel nicht gefunden wird.
     """
     spiel_model = SpielModel.objects.prefetch_related("spieler").get(pk=spiel_id)
-    alle_namen = list(
-        spiel_model.spieler.order_by("position").values_list("name", flat=True)
-    )
+    spiel = _domaenen_spiel(spiel_model)
+    alle_namen = spiel.spieler_reihenfolge
 
     runden = (
         spiel_model.runden
@@ -499,14 +508,21 @@ def rundenhistorie_laden(spiel_id: int) -> dict:
         for name, wert in _runde_beitrag(runde).items():
             laufender_stand[name] += wert
 
-        aktive_gegenspieler = set(alle_namen) - {runde.geber.name, runde.spielmacher.name}
+        geber_name = runde.geber.name
+        aktive = set(spiel.aktive_spieler(geber_name))
+        aktive_gegenspieler = set(spiel.gegenspieler(geber_name, runde.spielmacher.name))
         gs_map = {gs.spieler.name: gs for gs in runde.gegenspieler.all()}
 
         spieler_daten: dict[str, dict] = {}
         for name in alle_namen:
-            if name == runde.geber.name:
+            # „ist_geber" kennzeichnet den Geber in BEIDEN Varianten. Die Rolle „geber" steht
+            # dagegen für „setzt aus" und kommt nur vor, wenn der Geber nicht aktiv ist
+            # (4 Spieler). Bei 3 Spielern ist der Geber Spielmacher oder Gegenspieler.
+            ist_geber = name == geber_name
+            if name not in aktive:
                 spieler_daten[name] = {
                     "rolle": "geber",
+                    "ist_geber": ist_geber,
                     "meldepunkte": 0,
                     "stichwerte": 0,
                     "mitpunkte": 0,
@@ -516,6 +532,7 @@ def rundenhistorie_laden(spiel_id: int) -> dict:
             elif name == runde.spielmacher.name:
                 spieler_daten[name] = {
                     "rolle": "spielmacher",
+                    "ist_geber": ist_geber,
                     "meldepunkte": runde.spielmacher_meldepunkte,
                     "stichwerte": runde.spielmacher_stichwerte,
                     "mitpunkte": 0,
@@ -526,6 +543,7 @@ def rundenhistorie_laden(spiel_id: int) -> dict:
                 gs = gs_map.get(name)
                 spieler_daten[name] = {
                     "rolle": "gegenspieler",
+                    "ist_geber": ist_geber,
                     "meldepunkte": gs.meldepunkte if gs else 0,
                     "stichwerte": gs.stichwerte if gs else 0,
                     "mitpunkte": runde.mitpunkte_pro_gegenspieler if gs else 0,

@@ -37,9 +37,12 @@ export interface Fehler {
 // ── Slice 1: Spiel ────────────────────────────────────────────────────────────
 
 export interface SpielAnlegenRequest {
-  /** Genau 4 Spielernamen in Reihenfolge. */
+  /**
+   * 3 oder 4 Spielernamen in Sitzreihenfolge. Die Anzahl bestimmt die Variante (ADR-017):
+   * bei 4 Spielern setzt der Geber aus, bei 3 Spielern spielt er mit.
+   */
   spieler: string[]
-  /** Muss ein Vielfaches von 4 sein. Optional; Default legt das Backend fest. */
+  /** Muss ein Vielfaches der Spielerzahl sein. Optional; Default 12 (gilt für 3 und 4). */
   rundenanzahl?: number | null
 }
 
@@ -119,12 +122,17 @@ export interface RundeErgebnis {
 
 // ── TASK-014: Rundenhistorie / Anschreibetabelle ──────────────────────────────
 
-/** Rolle eines Spielers in einer Runde (der Geber setzt aus). */
+/**
+ * Rolle eines Spielers in einer Runde. `geber` bedeutet „setzt aus" und kommt daher nur bei
+ * 4 Spielern vor; bei 3 Spielern spielt der Geber mit und ist Spielmacher oder Gegenspieler.
+ */
 export type SpielerRolle = 'geber' | 'spielmacher' | 'gegenspieler'
 
 /** Aufschlüsselung eines Spielers in einer Runde (M | S | Mit + Stern-Kennzeichen). */
 export interface RundenhistorieZelle {
   rolle: SpielerRolle
+  /** Kennzeichnet den Geber der Runde – in beiden Varianten (anders als `rolle`). */
+  ist_geber: boolean
   meldepunkte: number
   stichwerte: number
   mitpunkte: number

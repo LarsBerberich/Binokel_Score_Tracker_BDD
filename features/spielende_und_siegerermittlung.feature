@@ -5,7 +5,7 @@ Funktionalität: Spielende und Siegerermittlung
 
   Regelhintergrund:
   - V1 verwendet eine feste Rundenzahl als Endbedingung.
-  - Die Rundenzahl muss ein Vielfaches von 4 sein.
+  - Die Rundenzahl muss ein Vielfaches der Spielerzahl sein (4 bzw. 3, ADR-017).
   - Wenn nichts anderes vereinbart wurde, werden 12 Runden gespielt.
   - Sieger ist, wer nach der letzten Runde den höchsten numerischen Punktestand hat.
   - Sterne aus Tausender-Runden beeinflussen den Gesamtsieg nicht.
@@ -37,9 +37,14 @@ Funktionalität: Spielende und Siegerermittlung
     Wenn das Spiel abgeschlossen wird
     Dann gibt es mehrere Sieger
 
-  Szenario: Endrunden-Gleichstand in Zehnern wird per 1er-Tiebreak entschieden
-    Angenommen ein neues Spiel für den Endrunden-Tiebreak ist angelegt
-    Und die letzte Runde führt zu einem Gleichstand in Zehnern zwischen Bernd und Carla
-    Wenn der Sieger mit exakten 1er-Stichwerten Bernd 78 und Carla 72 ermittelt wird
-    Dann ist Bernd der alleinige Sieger des Spiels
+  Szenariogrundriss: Endrunden-Gleichstand in Zehnern wird per 1er-Tiebreak entschieden
+    Angenommen ein neues Spiel mit der Spielerreihenfolge "<spieler>" und <runden> Runden ist angelegt
+    Und die letzte Runde führt zu einem Gleichstand in Zehnern zwischen <gegenspieler_1> und <gegenspieler_2>
+    Wenn der Sieger mit exakten 1er-Stichwerten <gegenspieler_1> 78 und <gegenspieler_2> 72 ermittelt wird
+    Dann ist <gegenspieler_1> der alleinige Sieger des Spiels
+
+    Beispiele:
+      | spieler                  | runden | gegenspieler_1 | gegenspieler_2 |
+      | Anna, Bernd, Carla, Dirk | 4      | Bernd          | Carla          |
+      | Anna, Bernd, Carla       | 3      | Bernd          | Carla          |
   

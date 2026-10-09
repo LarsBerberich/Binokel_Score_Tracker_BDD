@@ -23,10 +23,13 @@ from django.views.decorators.http import require_GET
 
 from scoring.domain import (
     Rundenausgang,
+    Spiel,
+    UnbekannterSpieler,
     UngueltigeRundenanzahl,
     UngueltigeStichwerte,
     UngueltigeSpielerzahl,
     UngueltigeMeldepunkte,
+    UngueltigerSpielmacher,
     UngueltigerZehnerwert,
 )
 from scoring.repositories import (
@@ -69,9 +72,9 @@ def _fehler(nachricht: str, status: int = 400) -> JsonResponse:
 
 def _validierungsfehler_nachricht(exc: Exception) -> str:
     if isinstance(exc, UngueltigeSpielerzahl):
-        return "Ungültige Spielerzahl: Es müssen genau 4 Spieler angegeben werden."
+        return f"Ungültige Spielerzahl: {exc}"
     if isinstance(exc, UngueltigeRundenanzahl):
-        return "Ungültige Rundenzahl: Die Rundenzahl muss ein Vielfaches von 4 sein."
+        return f"Ungültige Rundenzahl: {exc}"
     if isinstance(exc, UngueltigeStichwerte):
         return str(exc)
     if isinstance(exc, UngueltigerZehnerwert):
@@ -142,6 +145,22 @@ class _RundeEingabeFehler(Exception):
         super().__init__(nachricht)
         self.nachricht = nachricht
         self.status = status
+
+
+def _rollen_pruefen(spiel: Spiel, geber: str, spielmacher: str) -> None:
+    """Der Spielmacher muss aktiv mitspielen (rule-set-v1.md §3.4, ADR-017).
+
+    Gemeinsam für POST und PUT. Bei 4 Spielern setzt der Geber aus und kann nicht
+    Spielmacher sein; bei 3 Spielern spielt er mit. Die Regel selbst beantwortet das
+    Domänenobjekt – die View übersetzt nur den Fehler in eine 400-Antwort.
+
+    Raises:
+        _RundeEingabeFehler: Bei unbekanntem Geber/Spielmacher oder aussetzendem Spielmacher.
+    """
+    try:
+        spiel.gegenspieler(geber, spielmacher)
+    except (UnbekannterSpieler, UngueltigerSpielmacher) as exc:
+        raise _RundeEingabeFehler(str(exc)) from exc
 
 
 def _runde_wertung_berechnen(body: dict) -> dict:
@@ -432,6 +451,13 @@ def runden_view(request, spiel_id: int) -> JsonResponse:
     except _RundeEingabeFehler as exc:
         return _fehler(exc.nachricht, status=exc.status)
 
+    try:
+        _rollen_pruefen(spiel_laden(spiel_id), body["geber"], body["spielmacher"])
+    except ObjectDoesNotExist:
+        return _fehler(f"Spiel {spiel_id} nicht gefunden.", status=404)
+    except _RundeEingabeFehler as exc:
+        return _fehler(exc.nachricht, status=exc.status)
+
     # rundennummer (Sequenz) vergibt das Repository selbst (max+1, FND-006); eine im
     # Body mitgeschickte rundennummer wird bewusst ignoriert. Der geber kommt weiterhin
     # aus dem Body (das Frontend leitet ihn aus der gezählten Runde/Historie ab).
@@ -472,7 +498,10 @@ def runde_detail_view(request, spiel_id: int, rundennummer: int) -> JsonResponse
 
     Body-Felder wie bei POST, jedoch OHNE ``geber``: der Geber wird deterministisch
     aus der Rundennummer abgeleitet (HOCH-5, Geberrotation §3), nicht vom Client
-    übernommen. Der Dispatch ist mit POST geteilt (HOCH-2), sodass Typ-Übergänge
+    übernommen. Der Spielmacher muss aktiv mitspielen – bei 4 Spielern also nicht der
+    (aussetzende) Geber, bei 3 Spielern darf es der mitspielende Geber sein (ADR-017).
+
+    Der Dispatch ist mit POST geteilt (HOCH-2), sodass Typ-Übergänge
     tausender↔normal die Gegenspieler-Zeilen und Sterne korrekt umschalten (HOCH-3)
     und die Spielmacher-M|S-Invariante (HOCH-1) erhalten bleibt.
     """
@@ -512,17 +541,8 @@ def runde_detail_view(request, spiel_id: int, rundennummer: int) -> JsonResponse
     # zählender Runden vor dieser Sequenz. Ohne Tausender identisch zur alten Rotation.
     geber_name = geber_fuer_sequenz(spiel_id, rundennummer)
     spielmacher_name: str = body["spielmacher"]
-    if spielmacher_name not in spiel.spieler_reihenfolge:
-        return _fehler(
-            f"Spielmacher '{spielmacher_name}' ist nicht im Spiel #{spiel_id} registriert."
-        )
-    if spielmacher_name == geber_name:
-        return _fehler(
-            f"Der Spielmacher darf nicht der Geber sein (Geber in Runde {rundennummer}: "
-            f"'{geber_name}')."
-        )
-
     try:
+        _rollen_pruefen(spiel, geber_name, spielmacher_name)
         wertung = _runde_wertung_berechnen(body)
     except _RundeEingabeFehler as exc:
         return _fehler(exc.nachricht, status=exc.status)

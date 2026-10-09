@@ -12,6 +12,7 @@ import type {
 function zelle(rolle: SpielerRolle, teil: Partial<RundenhistorieZelle> = {}): RundenhistorieZelle {
   return {
     rolle,
+    ist_geber: rolle === 'geber',
     meldepunkte: 0,
     stichwerte: 0,
     mitpunkte: 0,
@@ -163,5 +164,50 @@ describe('Anschreibetabelle', () => {
     expect(wrapper.find('[data-testid="stand-1-B"]').text()).toBe('220')
     expect(wrapper.find('[data-testid="stand-2-C"]').text()).toBe('-80')
     expect(wrapper.find('[data-testid="stand-2-D"]').text()).toBe('50')
+  })
+})
+
+describe('Anschreibetabelle bei 3 Spielern (ADR-017)', () => {
+  /** Der Geber A ist Spielmacher: er spielt mit und trägt seine Werte ein. */
+  const dreierRunde: RundenhistorieRunde = {
+    rundennummer: 1,
+    sequenz: 1,
+    zaehlrunde: 1,
+    geber: 'A',
+    spielmacher: 'A',
+    reizwert: 150,
+    rundenausgang: 'gewonnenes Spiel',
+    ist_tausender: false,
+    verlustwert: 0,
+    spieler: {
+      A: zelle('spielmacher', { ist_geber: true, meldepunkte: 150, stichwerte: 100, hat_eigenen_stich: true }),
+      B: zelle('gegenspieler', { meldepunkte: 0, stichwerte: 90, hat_eigenen_stich: true }),
+      C: zelle('gegenspieler', { meldepunkte: 0, stichwerte: 60, hat_eigenen_stich: true }),
+    },
+    stand: { A: 250, B: 90, C: 60 },
+  }
+  const dreierHistorie: Rundenhistorie = { spiel_id: 8, spieler: ['A', 'B', 'C'], runden: [dreierRunde] }
+
+  it('zeigt den mitspielenden Geber mit seinen Werten und ohne „setzt aus"', () => {
+    const wrapper = mounten(dreierHistorie)
+    expect(wrapper.find('[data-testid="setzt-aus-1-A"]').exists()).toBe(false)
+    const text = wrapper.find('[data-testid="runde-1-A"]').text()
+    expect(text).toContain('150')
+    expect(text).toContain('100')
+    expect(text).not.toContain('setzt aus')
+  })
+
+  it('führt die Geber-Spalte weiterhin mit dem Namen des Gebers', () => {
+    const wrapper = mounten(dreierHistorie)
+    expect(wrapper.text()).toContain('Geber')
+    expect(wrapper.text()).toContain('A')
+  })
+
+  it('zeigt eine Spalte je Spieler – drei statt vier', () => {
+    const wrapper = mounten(dreierHistorie)
+    for (const name of ['A', 'B', 'C']) {
+      expect(wrapper.find(`[data-testid="runde-1-${name}"]`).exists()).toBe(true)
+    }
+    expect(wrapper.find('[data-testid="runde-1-D"]').exists()).toBe(false)
   })
 })

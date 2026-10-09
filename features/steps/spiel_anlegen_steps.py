@@ -143,18 +143,18 @@ def step_fehler_spielerzahl(context):
     daten = context.antwort.json()
     assert "fehler" in daten, f"Kein 'fehler'-Feld im Response: {daten}"
     nachricht = daten["fehler"].lower()
-    assert "spieler" in nachricht or "4" in nachricht, (
-        f"Unerwartete Fehlermeldung: {daten['fehler']}"
+    assert "3 oder 4" in nachricht, (
+        f"Die Fehlermeldung muss beide gültigen Spielerzahlen nennen: {daten['fehler']}"
     )
 
 
-@step("es wird ein Fehler angezeigt, dass die Rundenzahl ein Vielfaches von 4 sein muss")
-def step_fehler_rundenzahl(context):
+@step("es wird ein Fehler angezeigt, dass die Rundenzahl ein Vielfaches von {teiler:d} sein muss")
+def step_fehler_rundenzahl(context, teiler):
     daten = context.antwort.json()
     assert "fehler" in daten, f"Kein 'fehler'-Feld im Response: {daten}"
     nachricht = daten["fehler"].lower()
-    assert "vielfaches" in nachricht or "4" in nachricht, (
-        f"Unerwartete Fehlermeldung: {daten['fehler']}"
+    assert f"vielfaches von {teiler}" in nachricht, (
+        f"Erwartet 'Vielfaches von {teiler}' in der Fehlermeldung, erhalten: {daten['fehler']}"
     )
 
 
@@ -166,10 +166,25 @@ def step_geber_step(context, spieler, runde):
     )
 
 
-
-@step("{spieler} ist erneut Geber in Runde {runde:d}")
-def step_geber_erneut_step(context, spieler, runde):
-    tatsaechlich = context.spiel.geber_in_runde(runde)
-    assert tatsaechlich == spieler, (
-        f"Runde {runde}: Erwartet '{spieler}' erneut als Geber, aber erhalten: '{tatsaechlich}'"
+@then('spielen in Runde {runde:d} "{aktive}" aktiv mit')
+def step_aktive_spieler(context, runde, aktive):
+    geber = context.spiel.geber_in_runde(runde)
+    erwartet = _spieler_aus_string(aktive)
+    tatsaechlich = context.spiel.aktive_spieler(geber)
+    assert tatsaechlich == erwartet, (
+        f"Runde {runde} (Geber {geber}): Erwartet aktive Spieler {erwartet}, "
+        f"aber erhalten: {tatsaechlich}"
     )
+
+
+@step("der Geber in Runde {runde:d} {verhalten}")
+def step_geber_verhalten(context, runde, verhalten):
+    """'setzt aus' (4 Spieler) bzw. 'spielt mit' (3 Spieler) – abgeleitet aus der Spielerzahl."""
+    erwartet_setzt_aus = {"setzt aus": True, "spielt mit": False}[verhalten]
+    geber = context.spiel.geber_in_runde(runde)
+    ist_aktiv = geber in context.spiel.aktive_spieler(geber)
+    assert (not ist_aktiv) == erwartet_setzt_aus, (
+        f"Runde {runde}: Geber {geber} soll '{verhalten}', "
+        f"ist aber {'aktiv' if ist_aktiv else 'nicht aktiv'}"
+    )
+    assert context.spiel.geber_setzt_aus == erwartet_setzt_aus

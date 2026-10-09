@@ -25,3 +25,11 @@ export const MELDEPUNKTE_MAXIMUM = 1800
 
 /** Schrittweite für 10er-genaue Eingabefelder (Reizwert, Meldepunkte, Stichwerte). */
 export const ZEHNER_SCHRITT = 10
+
+/**
+ * Unterstützte Spielerzahlen (ADR-017, rule-set-v1.md §2): 3 (der Geber spielt mit) oder
+ * 4 (der Geber setzt aus). Die Anzahl bestimmt die Variante; in beiden spielen pro Runde
+ * genau drei Spieler aktiv.
+ */
+export const MIN_SPIELERZAHL = 3
+export const MAX_SPIELERZAHL = 4

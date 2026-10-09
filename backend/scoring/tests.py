@@ -12,7 +12,7 @@ Normative Quellen:
 """
 import json
 
-from django.test import Client, TestCase
+from django.test import Client, SimpleTestCase, TestCase
 
 
 # ── Hilfsfunktion ─────────────────────────────────────────────────────────────
@@ -50,12 +50,12 @@ class SpielAnlegenApiTest(TestCase):
         self.assertEqual(antwort.json()["rundenanzahl"], 8)
 
     def test_spiel_anlegen_ungueltige_spielerzahl(self):
-        """POST mit 3 Spielern → 400."""
-        antwort = _post_json(self.client, "/api/spiele/", {
-            "spieler": ["Anna", "Bernd", "Clara"],
-        })
-        self.assertEqual(antwort.status_code, 400)
-        self.assertIn("fehler", antwort.json())
+        """POST mit 2 oder 5 Spielern → 400 (gültig sind 3 und 4, ADR-017)."""
+        for spieler in (["Anna", "Bernd"], ["Anna", "Bernd", "Clara", "Dieter", "Emil"]):
+            with self.subTest(spielerzahl=len(spieler)):
+                antwort = _post_json(self.client, "/api/spiele/", {"spieler": spieler})
+                self.assertEqual(antwort.status_code, 400)
+                self.assertIn("fehler", antwort.json())
 
     def test_spiel_anlegen_ungueltige_rundenanzahl(self):
         """POST mit rundenanzahl=7 (kein Vielfaches von 4) → 400."""
@@ -1137,3 +1137,306 @@ class TausenderAusserKonkurrenzApiTest(TestCase):
         )
         self.assertEqual(antwort.status_code, 409)
 
+
+# ══ ADR-017: Drei- und Vier-Spieler-Variante ══════════════════════════════════
+#
+# Die Wertung ist in beiden Varianten identisch (immer genau 3 aktive Spieler); nur
+# die Rolle des Gebers unterscheidet sich: bei 4 Spielern setzt er aus, bei 3 spielt
+# er mit. Die Klassen unten laufen deshalb für BEIDE Varianten (subTest je Variante).
+
+VARIANTEN: dict[str, list[str]] = {
+    "vier_spieler": ["Anna", "Bernd", "Clara", "Dieter"],
+    "drei_spieler": ["Anna", "Bernd", "Clara"],
+}
+
+
+def _spiel_mit(client: Client, spieler: list[str], rundenanzahl: int | None = None) -> int:
+    payload: dict = {"spieler": spieler}
+    if rundenanzahl is not None:
+        payload["rundenanzahl"] = rundenanzahl
+    antwort = _post_json(client, "/api/spiele/", payload)
+    assert antwort.status_code == 201, antwort.content
+    return antwort.json()["id"]
+
+
+def _normale_runde_body(spielmacher: str, geber: str, gegenspieler: list[str]) -> dict:
+    """Gewonnene reguläre Runde: Summe der Stichwerte 250, alle Werte Zehner."""
+    gs1, gs2 = gegenspieler
+    return {
+        "typ": "normal", "spielmacher": spielmacher, "geber": geber,
+        "reizwert": 150, "meldepunkte": 150, "stichwerte": 100, "hat_eigenen_stich": True,
+        "gegenspieler": [
+            {"name": gs1, "meldepunkte": 0, "stichwerte": 90, "hat_eigenen_stich": True},
+            {"name": gs2, "meldepunkte": 0, "stichwerte": 60, "hat_eigenen_stich": True},
+        ],
+    }
+
+
+def _aktive(spieler: list[str], geber: str) -> list[str]:
+    """Test-Orakel zu rule-set-v1.md §3.4 – bewusst unabhängig von ``Spiel.aktive_spieler``.
+
+    4 Spieler: der Geber setzt aus. 3 Spieler: der Geber spielt mit.
+    """
+    return [s for s in spieler if s != geber] if len(spieler) == 4 else list(spieler)
+
+
+class SpielerzahlDomaeneTest(SimpleTestCase):
+    """Domäne ohne HTTP/DB: Variante, aktive Spieler, Gegenspieler, Validierung."""
+
+    def test_spiel_anlegen_gueltige_spielerzahlen_und_standardrunden(self):
+        from scoring.use_cases import spiel_anlegen
+        for name, spieler in VARIANTEN.items():
+            with self.subTest(variante=name):
+                spiel = spiel_anlegen(spieler)
+                self.assertEqual(spiel.spieler_reihenfolge, spieler)
+                self.assertEqual(spiel.rundenanzahl, 12)  # durch 3 und 4 teilbar
+
+    def test_rundenanzahl_muss_vielfaches_der_spielerzahl_sein(self):
+        from scoring.domain import UngueltigeRundenanzahl
+        from scoring.use_cases import spiel_anlegen
+        gueltig = {"vier_spieler": (4, 8, 12, 16), "drei_spieler": (3, 6, 9, 12, 15)}
+        ungueltig = {"vier_spieler": (3, 6, 10), "drei_spieler": (4, 8, 10)}
+        for name, spieler in VARIANTEN.items():
+            for runden in gueltig[name]:
+                with self.subTest(variante=name, runden=runden, erwartet="gueltig"):
+                    self.assertEqual(spiel_anlegen(spieler, runden).rundenanzahl, runden)
+            for runden in ungueltig[name]:
+                with self.subTest(variante=name, runden=runden, erwartet="ungueltig"):
+                    with self.assertRaises(UngueltigeRundenanzahl) as ctx:
+                        spiel_anlegen(spieler, runden)
+                    self.assertIn(f"Vielfaches von {len(spieler)}", str(ctx.exception))
+
+    def test_nur_drei_oder_vier_spieler_zulaessig(self):
+        from scoring.domain import UngueltigeSpielerzahl
+        from scoring.use_cases import spiel_anlegen
+        for anzahl in (0, 1, 2, 5, 6):
+            with self.subTest(spielerzahl=anzahl):
+                namen = [f"Spieler{i}" for i in range(anzahl)]
+                with self.assertRaises(UngueltigeSpielerzahl) as ctx:
+                    spiel_anlegen(namen)
+                self.assertIn("3 oder 4", str(ctx.exception))
+
+    def test_geber_setzt_nur_bei_vier_spielern_aus(self):
+        from scoring.use_cases import spiel_anlegen
+        self.assertTrue(spiel_anlegen(VARIANTEN["vier_spieler"]).geber_setzt_aus)
+        self.assertFalse(spiel_anlegen(VARIANTEN["drei_spieler"]).geber_setzt_aus)
+
+    def test_aktive_spieler_je_variante(self):
+        from scoring.use_cases import spiel_anlegen
+        vier = spiel_anlegen(VARIANTEN["vier_spieler"])
+        self.assertEqual(vier.aktive_spieler("Anna"), ["Bernd", "Clara", "Dieter"])
+        self.assertEqual(vier.aktive_spieler("Clara"), ["Anna", "Bernd", "Dieter"])
+        drei = spiel_anlegen(VARIANTEN["drei_spieler"])
+        for geber in drei.spieler_reihenfolge:
+            with self.subTest(geber=geber):
+                self.assertEqual(drei.aktive_spieler(geber), ["Anna", "Bernd", "Clara"])
+
+    def test_in_beiden_varianten_spielen_genau_drei_aktiv(self):
+        from scoring.use_cases import spiel_anlegen
+        for name, spieler in VARIANTEN.items():
+            spiel = spiel_anlegen(spieler)
+            for geber in spieler:
+                with self.subTest(variante=name, geber=geber):
+                    self.assertEqual(len(spiel.aktive_spieler(geber)), 3)
+
+    def test_gegenspieler_sind_aktive_ohne_spielmacher(self):
+        from scoring.use_cases import spiel_anlegen
+        vier = spiel_anlegen(VARIANTEN["vier_spieler"])
+        self.assertEqual(vier.gegenspieler("Anna", "Bernd"), ["Clara", "Dieter"])
+        drei = spiel_anlegen(VARIANTEN["drei_spieler"])
+        self.assertEqual(drei.gegenspieler("Anna", "Bernd"), ["Anna", "Clara"])  # Geber spielt mit
+        self.assertEqual(drei.gegenspieler("Anna", "Anna"), ["Bernd", "Clara"])  # Geber ist SM
+
+    def test_spielmacher_darf_nur_bei_vier_spielern_nicht_der_geber_sein(self):
+        from scoring.domain import UngueltigerSpielmacher
+        from scoring.use_cases import spiel_anlegen
+        vier = spiel_anlegen(VARIANTEN["vier_spieler"])
+        with self.assertRaises(UngueltigerSpielmacher):
+            vier.gegenspieler("Anna", "Anna")
+        # bei 3 Spielern ist der Geber ein gewöhnlicher aktiver Spieler:
+        self.assertEqual(
+            spiel_anlegen(VARIANTEN["drei_spieler"]).gegenspieler("Anna", "Anna"),
+            ["Bernd", "Clara"],
+        )
+
+    def test_unbekannter_geber_oder_spielmacher_wird_abgelehnt(self):
+        from scoring.domain import SpielFehler
+        from scoring.use_cases import spiel_anlegen
+        for name, spieler in VARIANTEN.items():
+            spiel = spiel_anlegen(spieler)
+            with self.subTest(variante=name):
+                with self.assertRaises(SpielFehler):
+                    spiel.aktive_spieler("Niemand")
+                with self.assertRaises(SpielFehler):
+                    spiel.gegenspieler("Anna", "Niemand")
+
+    def test_geberrotation_je_variante(self):
+        from scoring.use_cases import spiel_anlegen
+        erwartet = {
+            "vier_spieler": ["Anna", "Bernd", "Clara", "Dieter", "Anna"],
+            "drei_spieler": ["Anna", "Bernd", "Clara", "Anna", "Bernd"],
+        }
+        for name, spieler in VARIANTEN.items():
+            spiel = spiel_anlegen(spieler)
+            with self.subTest(variante=name):
+                self.assertEqual(
+                    [spiel.geber_in_runde(n) for n in range(1, 6)], erwartet[name]
+                )
+
+
+class SpielerzahlApiTest(TestCase):
+    """HTTP-Stack für beide Varianten (ADR-017)."""
+
+    def test_anlegen_standard_und_laden(self):
+        for name, spieler in VARIANTEN.items():
+            with self.subTest(variante=name):
+                spiel_id = _spiel_mit(self.client, spieler)
+                daten = self.client.get(f"/api/spiele/{spiel_id}/").json()
+                self.assertEqual(daten["spieler"], spieler)
+                self.assertEqual(daten["rundenanzahl"], 12)
+
+    def test_ungueltige_rundenanzahl_nennt_den_richtigen_teiler(self):
+        faelle = [("vier_spieler", 10, 4), ("vier_spieler", 6, 4),
+                  ("drei_spieler", 4, 3), ("drei_spieler", 10, 3)]
+        for name, runden, teiler in faelle:
+            with self.subTest(variante=name, runden=runden):
+                antwort = _post_json(self.client, "/api/spiele/", {
+                    "spieler": VARIANTEN[name], "rundenanzahl": runden,
+                })
+                self.assertEqual(antwort.status_code, 400)
+                self.assertIn(f"Vielfaches von {teiler}", antwort.json()["fehler"])
+
+    def test_ungueltige_spielerzahl_nennt_beide_gueltigen_zahlen(self):
+        antwort = _post_json(self.client, "/api/spiele/", {"spieler": ["Anna", "Bernd"]})
+        self.assertEqual(antwort.status_code, 400)
+        self.assertIn("3 oder 4", antwort.json()["fehler"])
+
+    def test_geber_rotation_serverseitig(self):
+        """geber_fuer_sequenz rotiert über die tatsächliche Spielerzahl (nicht fest über 4)."""
+        from scoring.repositories import geber_fuer_sequenz
+        for name, spieler in VARIANTEN.items():
+            spiel_id = _spiel_mit(self.client, spieler)
+            url = f"/api/spiele/{spiel_id}/runden/"
+            with self.subTest(variante=name):
+                for gezaehlt in range(len(spieler) + 1):
+                    sequenz = gezaehlt + 1
+                    erwarteter_geber = spieler[gezaehlt % len(spieler)]
+                    self.assertEqual(geber_fuer_sequenz(spiel_id, sequenz), erwarteter_geber)
+                    spielmacher, *gegenspieler = _aktive(spieler, erwarteter_geber)
+                    antwort = _post_json(
+                        self.client, url,
+                        _normale_runde_body(spielmacher, erwarteter_geber, gegenspieler),
+                    )
+                    self.assertEqual(antwort.status_code, 201, antwort.content)
+                # Nach einem vollen Durchgang ist wieder der erste Spieler Geber.
+                self.assertEqual(geber_fuer_sequenz(spiel_id, len(spieler) + 1), spieler[0])
+
+    def test_verlorener_tausender_sterne_an_aktive_gegenspieler(self):
+        faelle = {
+            # variante: (spielmacher, geber, erwartete Sterne)
+            "vier_spieler": ("Bernd", "Anna", {"Anna": 0, "Bernd": 0, "Clara": 1, "Dieter": 1}),
+            "drei_spieler": ("Bernd", "Anna", {"Anna": 1, "Bernd": 0, "Clara": 1}),
+        }
+        for name, (spielmacher, geber, erwartet) in faelle.items():
+            with self.subTest(variante=name):
+                spiel_id = _spiel_mit(self.client, VARIANTEN[name])
+                antwort = _post_json(self.client, f"/api/spiele/{spiel_id}/runden/", {
+                    "typ": "tausender_verloren", "spielmacher": spielmacher, "geber": geber,
+                })
+                self.assertEqual(antwort.status_code, 201)
+                sterne = self.client.get(f"/api/spiele/{spiel_id}/punktestaende/").json()["sterne"]
+                self.assertEqual(sterne, erwartet)
+
+    def test_gewonnener_tausender_stern_nur_fuer_den_spielmacher_auch_wenn_er_geber_ist(self):
+        spiel_id = _spiel_mit(self.client, VARIANTEN["drei_spieler"])
+        antwort = _post_json(self.client, f"/api/spiele/{spiel_id}/runden/", {
+            "typ": "tausender_gewonnen", "spielmacher": "Anna", "geber": "Anna",
+        })
+        self.assertEqual(antwort.status_code, 201)
+        sterne = self.client.get(f"/api/spiele/{spiel_id}/punktestaende/").json()["sterne"]
+        self.assertEqual(sterne, {"Anna": 1, "Bernd": 0, "Clara": 0})
+
+    def test_historie_rolle_und_ist_geber(self):
+        faelle = [
+            # variante, spielmacher, geber, erwartete Rolle des Gebers
+            ("vier_spieler", "Bernd", "Anna", "geber"),
+            ("drei_spieler", "Anna", "Anna", "spielmacher"),
+            ("drei_spieler", "Bernd", "Anna", "gegenspieler"),
+        ]
+        for name, spielmacher, geber, rolle in faelle:
+            with self.subTest(variante=name, spielmacher=spielmacher):
+                spieler = VARIANTEN[name]
+                spiel_id = _spiel_mit(self.client, spieler)
+                gegenspieler = [s for s in _aktive(spieler, geber) if s != spielmacher]
+                _post_json(
+                    self.client, f"/api/spiele/{spiel_id}/runden/",
+                    _normale_runde_body(spielmacher, geber, gegenspieler),
+                )
+                runde = self.client.get(f"/api/spiele/{spiel_id}/runden/").json()["runden"][0]
+                self.assertEqual(runde["spieler"][geber]["rolle"], rolle)
+                self.assertEqual(
+                    {n for n, e in runde["spieler"].items() if e["ist_geber"]}, {geber}
+                )
+
+    def test_mitspielender_geber_wird_wie_jeder_gegenspieler_gewertet(self):
+        spiel_id = _spiel_mit(self.client, VARIANTEN["drei_spieler"])
+        _post_json(
+            self.client, f"/api/spiele/{spiel_id}/runden/",
+            _normale_runde_body("Bernd", "Anna", ["Anna", "Clara"]),
+        )
+        stand = self.client.get(f"/api/spiele/{spiel_id}/punktestaende/").json()["punktestaende"]
+        self.assertEqual(stand, {"Anna": 90, "Bernd": 250, "Clara": 60})
+
+    def test_aussetzender_geber_wird_nicht_gewertet(self):
+        spiel_id = _spiel_mit(self.client, VARIANTEN["vier_spieler"])
+        _post_json(
+            self.client, f"/api/spiele/{spiel_id}/runden/",
+            _normale_runde_body("Bernd", "Anna", ["Clara", "Dieter"]),
+        )
+        stand = self.client.get(f"/api/spiele/{spiel_id}/punktestaende/").json()["punktestaende"]
+        self.assertEqual(stand, {"Anna": 0, "Bernd": 250, "Clara": 90, "Dieter": 60})
+
+    def test_anlegen_spielmacher_gleich_geber_nur_bei_drei_spielern(self):
+        """POST: Spielmacher = Geber → 201 bei 3 Spielern, 400 bei 4 (Geber setzt aus).
+
+        Schreib- und Lesepfade müssen dieselbe Rollenregel teilen (rule-set §3.4): Sterne und
+        Historie leiten die Gegenspieler aus dem Spielmacher ab und dürfen sich auf eine am
+        Schreibpfad geprüfte Invariante verlassen.
+        """
+        for name, erwarteter_status in (("drei_spieler", 201), ("vier_spieler", 400)):
+            with self.subTest(variante=name):
+                spieler = VARIANTEN[name]
+                spiel_id = _spiel_mit(self.client, spieler)
+                geber = spieler[0]
+                gegenspieler = [s for s in spieler if s != geber][:2]
+                antwort = _post_json(
+                    self.client, f"/api/spiele/{spiel_id}/runden/",
+                    _normale_runde_body(geber, geber, gegenspieler),
+                )
+                self.assertEqual(antwort.status_code, erwarteter_status, antwort.content)
+                if erwarteter_status == 400:
+                    self.assertIn("Geber", antwort.json()["fehler"])
+
+    def test_korrektur_spielmacher_gleich_geber_nur_bei_drei_spielern(self):
+        """PUT: Spielmacher = Geber → 200 bei 3 Spielern, 400 bei 4 (Geber setzt aus)."""
+        for name, erwarteter_status in (("drei_spieler", 200), ("vier_spieler", 400)):
+            with self.subTest(variante=name):
+                spieler = VARIANTEN[name]
+                geber = spieler[0]
+                spiel_id = _spiel_mit(self.client, spieler)
+                # Runde 1 regulär: Spielmacher Bernd (in beiden Varianten ein aktiver Spieler).
+                gegenspieler = [s for s in _aktive(spieler, geber) if s != "Bernd"]
+                _post_json(
+                    self.client, f"/api/spiele/{spiel_id}/runden/",
+                    _normale_runde_body("Bernd", geber, gegenspieler),
+                )
+                # Korrektur: der Geber wird Spielmacher.
+                korrektur = _normale_runde_body(
+                    geber, geber, [s for s in spieler if s != geber][:2]
+                )
+                korrektur.pop("geber")  # PUT leitet den Geber serverseitig ab
+                antwort = self.client.put(
+                    f"/api/spiele/{spiel_id}/runden/1/",
+                    data=json.dumps(korrektur), content_type="application/json",
+                )
+                self.assertEqual(antwort.status_code, erwarteter_status, antwort.content)
