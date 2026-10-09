@@ -1,6 +1,8 @@
 
 # Regeln mit 4 Spielern, wenn der Geber jeweils aussetzt und technisch agnostischer Tabellenaufbau
 
+> **Hinweis (ADR-017):** Dieses Dokument leitet die Wertung am 4-Spieler-Fall her (Geber setzt aus). Für **3 Spieler** (Geber spielt mit) gilt dieselbe Wertung; die Unterschiede in der Tabelle beschreibt **§6**. Der Dateiname bleibt zugunsten stabiler Verweise erhalten.
+
 ## Binokel-Regelwerk und Abrechnungssystem
 Variante: 4 Spieler (Geber setzt aus, 3 Spieler aktiv)
 ------------------------------
@@ -102,7 +104,37 @@ Rechenformel für die STAND-Zeile:
 	`Neuer STAND = Vorheriger STAND + negativer Verlustwert in Klammern`
 
 
+------------------------------
+## 6. Variante mit 3 Spielern (Geber spielt mit)
 
+Mit drei Spielern sind **alle drei** in jeder Runde aktiv. Reizwert, Meldepunkte, Stichwerte,
+Mitpunkte, Stich-Zwang, die 250er-Kontrollsumme und der Tausender funktionieren **unverändert**
+(§1–§4); die Rechenformeln aus §5 gelten wörtlich weiter.
 
+Was sich in der Tabelle ändert:
 
+* **Drei statt vier Spielerspalten.**
+* **Kein „— (setzt aus)"-Feld.** Der Geber trägt wie jeder andere seine Werte ein. Er ist nur in der
+  Spalte **Geber** erkennbar und kann Spielmacher (Runde 1) oder Gegenspieler (Runde 2) sein.
+* **Rundenzahl:** ein Vielfaches von **3** (Standard: 12, also 4 Durchgänge).
+* **Geberrotation:** unverändert streng reihum, nach drei Runden beginnt der nächste Durchgang.
 
+Beispiel (Spieler A, B, C; Geber rotiert A → B → C):
+
+| Runde | Geber | Gereizt bis | Wert | Spieler A | Spieler B | Spieler C |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| | | | | **M** \| **S** \| **Mit** | **M** \| **S** \| **Mit** | **M** \| **S** \| **Mit** |
+| **1** | **A** | **180** / A <br>*(Gewonnen)* | Runde | 100 \| 120 \| 0 *(Geber ist Spielmacher)* | 40 \| 130 \| 0 | 40 \| 0 \| 0 *(0 Stiche)* |
+| | | | **STAND** | **220** | **170** | **0** *(M gestrichen)* |
+| **2** | **B** | **250** / C <br>**(A) - Einfach** | Runde | 40 \| 0 \| **30** | 20 \| 0 \| **30** *(Geber spielt mit)* | **(-250)** \| 0 \| 0 |
+| | | | **STAND** | **290** | **220** | **-250** |
+| — | **C** | **Tausender** / A <br>*(Gewonnen)* | Runde | **★** | 0 \| 0 \| 0 | 0 \| 0 \| 0 *(Geber spielt mit)* |
+| | | | **STAND** | **290** | **220** | **-250** |
+
+Die Tausender-Zeile läuft **außer Konkurrenz** (§15.6 des Regelwerks): Sie trägt keine gezählte
+Rundennummer, und der Geber bleibt für die folgende reguläre Runde derselbe.
+
+Nachrechnung Runde 1: Stichwerte 120 + 130 + 0 = 250 ✓; Spielmacher A erreicht 100 + 120 = 220 ≥ 180
+(gewonnen); C hat keinen Stich, seine 40 Meldepunkte verfallen. Runde 2: einfaches Abgehen von C
+mit Reizwert 250 → Verlustwert (-250); die Gegenspieler A und B behalten ihre Meldepunkte
+(kein Stich-Zwang, §13.4) und erhalten je +30 Mit.

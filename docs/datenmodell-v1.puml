@@ -21,9 +21,17 @@ package "Domäne  ·  scoring/domain.py" {
 
   class Spiel <<dataclass>> {
     + spieler_reihenfolge : list[str]
+    ' 3 oder 4 Spieler; die Anzahl bestimmt die Variante (ADR-017)
     + rundenanzahl : int
+    ' Vielfaches der Spielerzahl (Standard 12 gilt fuer 3 und 4)
     ==
+    + geber_setzt_aus : bool  {property}
+    ' 4 Spieler: True (Geber setzt aus), 3 Spieler: False (Geber spielt mit)
     + geber_in_runde(runde : int) : str
+    + aktive_spieler(geber : str) : list[str]
+    ' immer genau 3: 4 Spieler ohne Geber, 3 Spieler alle
+    + gegenspieler(geber : str, spielmacher : str) : list[str]
+    ' aktive Spieler ohne Spielmacher, immer genau 2
   }
 
   enum Rundenausgang {
@@ -42,10 +50,16 @@ package "Domäne  ·  scoring/domain.py" {
   }
   class UngueltigeStichwerte <<Exception>> {
   }
+  class UnbekannterSpieler <<Exception>> {
+  }
+  class UngueltigerSpielmacher <<Exception>> {
+  }
 
   SpielFehler      <|-- UngueltigeSpielerzahl
   SpielFehler      <|-- UngueltigeRundenanzahl
   SpielFehler      <|-- UngueltigeStichwerte
+  SpielFehler      <|-- UnbekannterSpieler
+  SpielFehler      <|-- UngueltigerSpielmacher
 }
 
 
@@ -90,7 +104,7 @@ package "Persistenz  ·  scoring/models.py  [geplant]" {
     + spiel : ForeignKey  {FK → SpielModel}
     + name : CharField
     + position : PositiveSmallIntegerField
-    ' position = 0..3 → Reihenfolge gegen Uhrzeigersinn
+    ' position = 0..n-1 (n = 3 oder 4) → Reihenfolge gegen Uhrzeigersinn
   }
 
   class RundeModel <<Django Model>> {
@@ -129,7 +143,7 @@ package "Persistenz  ·  scoring/models.py  [geplant]" {
   }
 
   ' Beziehungen
-  SpielModel  "1" *-down- "4"    SpielerModel         : enthält >
+  SpielModel  "1" *-down- "3..4"  SpielerModel         : enthält >
   SpielModel  "1" *-down- "1..*" RundeModel            : hat >
   RundeModel  "1" *-down- "2..3" GegenspielerRundeModel : hat >
   SpielerModel -right[hidden]- RundeModel

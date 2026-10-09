@@ -105,11 +105,14 @@ Im MVP ist ein Spieler primär ein fachlicher Wertungsteilnehmer. Persistente Sp
 
 Der **Geber** ist der Spieler, der in einer Runde die Karten gibt.
 
-In der derzeit dokumentierten 4-Spieler-Auslegung setzt der Geber in der Runde aus, während die drei anderen Spieler aktiv sind.
+Die Rolle des Gebers hängt von der **Spielerzahl** ab (ADR-017):
 
-**Bevorzugte Verwendung im Code:** `Geber`
+- **4 Spieler:** Der Geber **setzt aus**; die drei anderen Spieler sind aktiv.
+- **3 Spieler:** Der Geber **spielt mit**; er ist Spielmacher oder Gegenspieler.
 
-**Hinweis:** Dieses Verhalten gehört zum gewählten Regelwerk und darf nicht pauschal für alle künftigen Varianten angenommen werden.
+**Bevorzugte Verwendung im Code:** `Geber`; die Frage „setzt er aus?" beantwortet `Spiel.geber_setzt_aus`.
+
+**Hinweis:** Dieses Verhalten gehört zur Variante und darf nicht pauschal angenommen werden. Die Rolle `geber` in der Rundenhistorie bedeutet „setzt aus" und kommt deshalb nur bei 4 Spielern vor; wer Geber *ist*, steht in beiden Varianten in `ist_geber`.
 
 ---
 
@@ -117,11 +120,14 @@ In der derzeit dokumentierten 4-Spieler-Auslegung setzt der Geber in der Runde a
 
 Ein **aktiver Spieler** ist ein Spieler, der in der aktuellen Runde direkt mitspielt.
 
-In der derzeit dokumentierten 4-Spieler-Auslegung gilt:
-- 3 Spieler sind aktiv,
-- 1 Spieler ist Geber und in dieser Runde nicht aktiv.
+In **beiden** Varianten sind pro Runde genau **3 Spieler aktiv**:
 
-**Bevorzugte Verwendung im Code:** `AktiverSpieler` oder fachlich über Rollenmodell
+- **4 Spieler:** alle außer dem aussetzenden Geber,
+- **3 Spieler:** alle Spieler, der Geber eingeschlossen.
+
+Die **Gegenspieler** sind die aktiven Spieler ohne den Spielmacher – immer genau zwei.
+
+**Bevorzugte Verwendung im Code:** `Spiel.aktive_spieler(geber)` und `Spiel.gegenspieler(geber, spielmacher)`; die Regel wird ausschließlich im Domänenobjekt beantwortet, nicht in Repositories oder Views.
 
 ---
 
@@ -434,6 +440,25 @@ Sie ist bewusst **getrennt** von der gezählten Spielrunde (§4.26): mehrere au�
 Tausender können dieselbe gezählte Runde teilen, haben aber je eine eigene Sequenz (ADR-016).
 
 **Bevorzugte Verwendung im Code:** `rundennummer` / `sequenz`
+
+---
+
+### 4.28 Spielerzahl (Variante)
+
+Die **Spielerzahl** – 3 oder 4 – bestimmt die **Variante** des Spiels. Es gibt keine separate
+Auswahl: Wer drei Namen einträgt, spielt zu dritt; wer vier einträgt, spielt zu viert.
+
+| | 4 Spieler | 3 Spieler |
+|---|---|---|
+| Geber | setzt aus | spielt mit |
+| Aktive Spieler | alle außer Geber | alle |
+| Rundenzahl | Vielfaches von 4 | Vielfaches von 3 |
+
+Die Wertung ist in beiden Varianten identisch (immer drei aktive Spieler). Der Standardwert von
+12 Runden ist durch 3 und 4 teilbar und deshalb für beide gültig.
+
+**Bevorzugte Verwendung im Code:** `len(spiel.spieler_reihenfolge)`, `GUELTIGE_SPIELERZAHLEN`;
+die Spielerzahl wird bewusst **nicht** als eigenes Feld gespeichert (ADR-017).
 
 ---
 

@@ -18,18 +18,26 @@ Dieses Dokument ist normativ für Fachmodell, Gherkin-Spezifikationen, Implement
 
 ## 2. Unterstützte Spielvariante in V1
 
-V1 unterstützt ausschließlich die folgende Spielvariante:
+V1 unterstützt zwei Spielvarianten, die sich **ausschließlich** in der Rolle des Gebers
+und in der zulässigen Rundenzahl unterscheiden (ADR-017). Die Variante ergibt sich aus der
+Anzahl der beim Anlegen erfassten Spieler — es gibt keine separate Auswahl.
 
-- **4 Spieler**
-- **Einzelwertung**
-- **pro Runde ein aussetzender Geber**
-- **3 aktive Spieler pro Runde**
-- **feste Rundenzahl als Endkriterium**
+| | **4 Spieler** | **3 Spieler** |
+|---|---|---|
+| Wertung | Einzelwertung | Einzelwertung |
+| Geber | **setzt aus** | **spielt mit** |
+| Aktive Spieler pro Runde | 3 (alle außer dem Geber) | 3 (alle) |
+| Rundenzahl | Vielfaches von **4** | Vielfaches von **3** |
+| Endkriterium | feste Rundenzahl | feste Rundenzahl |
+
+In beiden Varianten spielen pro Runde **genau 3 Spieler aktiv**. Die gesamte Wertung (Reizwert,
+Meldepunkte, Stichwerte, Mitpunkte, Stich-Zwang, 250er-Kontrollsumme, Tausender) ist daher in
+beiden Varianten identisch; nur die Frage, *wer* aktiv ist, hängt von der Spielerzahl ab (§3.4).
 
 Nicht Teil von V1 sind:
 
 - Teamwertung,
-- andere Spielerzahlen,
+- andere Spielerzahlen als 3 oder 4,
 - Endbedingungen auf Basis von Zielwerten wie 1000 oder 1500,
 - weitere noch nicht spezifizierte Regelvarianten.
 
@@ -57,26 +65,40 @@ Der Geber rotiert **streng reihum** entlang der einmal festgelegten Spielerreihe
 
 Da die Reihenfolge gegen den Uhrzeigersinn erfasst wird, erfolgt auch die Geberrotation in dieser Reihenfolge.
 
+Die Rotationsformel ist in beiden Varianten dieselbe (Geber in Runde *n* = Spieler an Position
+`(n − 1) mod Spielerzahl`); nur die Länge eines Durchgangs ändert sich (3 bzw. 4 Runden).
+
+### 3.4 Aktive Spieler einer Runde
+
+Wer in einer Runde aktiv mitspielt, hängt von der Spielerzahl ab:
+
+- **4 Spieler:** Der Geber **setzt aus**. Aktiv sind die drei übrigen Spieler. Der Spielmacher
+  darf nie der Geber sein.
+- **3 Spieler:** Der Geber **spielt mit**. Alle drei Spieler sind aktiv; der Geber kann
+  Spielmacher oder Gegenspieler sein.
+
+Die **Gegenspieler** sind in beiden Varianten die aktiven Spieler ohne den Spielmacher — also
+immer genau zwei.
+
 ---
 
 ## 4. Rundenanzahl und Endbedingung
 
 ### 4.1 Rundenanzahl
 
-Die Anzahl der Runden ist **frei wählbar**, muss aber immer ein **Vielfaches von 4** sein.
+Die Anzahl der Runden ist **frei wählbar**, muss aber immer ein **Vielfaches der Spielerzahl**
+sein, damit jeder Spieler gleich oft Geber ist:
 
-Zulässige Beispiele sind:
-
-- 4
-- 8
-- 12
-- 16
+- **4 Spieler:** Vielfaches von 4 — zulässig sind z. B. 4, 8, 12, 16.
+- **3 Spieler:** Vielfaches von 3 — zulässig sind z. B. 3, 6, 9, 12, 15.
 
 ### 4.2 Standardwert
 
-Wenn nicht anders vereinbart wurde, werden **12 Runden** gespielt.
+Wenn nicht anders vereinbart wurde, werden **12 Runden** gespielt. 12 ist ein Vielfaches von
+3 **und** von 4 und deshalb für beide Varianten gültig.
 
-Dies entspricht fachlich **3 Gesamtdurchgängen**, sodass jeder Spieler gleich oft Geber ist.
+Dies entspricht fachlich **3 Gesamtdurchgängen bei 4 Spielern** bzw. **4 Gesamtdurchgängen bei
+3 Spielern**, sodass jeder Spieler gleich oft Geber ist.
 
 ### 4.3 Endbedingung in V1
 
@@ -132,7 +154,7 @@ Dies dient als fachliche Kontrollsumme.
 
 Der **Dapp** sind die 4 verdeckten Karten, um die gereizt wird.
 
-Bei 40 Karten erhalten die 3 aktiven Spieler, also ohne Geber, zunächst zusammen 36 Karten. Die verbleibenden 4 Karten bilden den Dapp.
+Bei 40 Karten erhalten die 3 aktiven Spieler zunächst zusammen 36 Karten (bei 4 Spielern ohne den aussetzenden Geber, bei 3 Spielern alle Spieler). Die verbleibenden 4 Karten bilden den Dapp.
 
 ### 6.2 Spielmacher
 
@@ -238,9 +260,9 @@ sowie Meldepunkte und Reizwert. Der automatisch berechnete dritte Stichwert
 
 In der letzten Runde werden bei möglichem Gleichstand um den Gesamtsieg zusätzlich die
 **exakten 1er-Werte** der Stiche berücksichtigt, damit eine punktgenaue Siegerermittlung
-möglich ist. Der Tiebreak wirkt über die **aktiven Spieler der letzten Runde**; der in der
-letzten Runde aussetzende Geber bringt keinen Endrunden-Stich ein und nimmt am 1er-Tiebreak
-nicht teil.
+möglich ist. Der Tiebreak wirkt über die **aktiven Spieler der letzten Runde**. Bei 4 Spielern bringt der in der
+letzten Runde aussetzende Geber keinen Endrunden-Stich ein und nimmt am 1er-Tiebreak
+nicht teil; bei 3 Spielern sind alle Spieler aktiv und damit tiebreak-fähig.
 
 Nur wenn danach weiterhin Gleichstand besteht, gibt es mehrere Sieger.
 
@@ -412,7 +434,9 @@ Statt numerischer Punkte werden Sterne vergeben:
 - gewinnt der Spielmacher den Tausender, erhält **nur der Spielmacher** einen Stern
 - verliert der Spielmacher den Tausender, erhalten die **beiden aktiven Gegenspieler** jeweils einen Stern
 
-Der Geber erhält keinen Stern, da er an der Runde nicht aktiv beteiligt ist.
+Bei 4 Spielern erhält der aussetzende Geber keinen Stern, da er an der Runde nicht aktiv beteiligt
+ist. Bei 3 Spielern spielt der Geber mit: Ist er Spielmacher, gilt die Regel für den Spielmacher;
+ist er Gegenspieler, erhält er bei verlorenem Tausender einen Stern.
 
 ### 15.4 Speicherung und Darstellung der Sterne
 
@@ -505,9 +529,11 @@ Nur wenn danach weiterhin Gleichstand besteht, gibt es mehrere Sieger.
 
 ### 18.1 Geber
 
-In der Spalte des Gebers wird in der Rundenzeile ein **Strich** eingetragen.
+**Nur bei 4 Spielern** wird in der Spalte des Gebers in der Rundenzeile ein **Strich** eingetragen.
 
 Dies macht sichtbar, dass der Geber aussetzt und in dieser Runde weder Punkte noch Sterne erhält.
+Bei 3 Spielern spielt der Geber mit und trägt wie jeder andere aktive Spieler seine Werte ein; er
+ist dort lediglich über die Spalte „Geber" erkennbar.
 
 ### 18.2 Verlustwerte
 

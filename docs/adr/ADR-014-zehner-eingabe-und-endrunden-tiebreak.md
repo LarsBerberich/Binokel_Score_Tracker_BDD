@@ -60,6 +60,9 @@ vorhandenen Backend-Mechanismus `sieger_ermitteln(exakte_stichwerte=…)` bzw. d
 - **Residualrisiko (NIEDRIG-1):** Der in der letzten Runde aussetzende Geber bringt keinen
   Endrunden-Stich ein und nimmt am 1er-Tiebreak nicht teil (§9.3). Ein Gleichstand, an dem der
   Geber beteiligt wäre, ist über die letzten 1er nicht auflösbar — für V1 akzeptiert.
+  **Nachtrag (09.10.2026, ADR-017):** Bei **3 Spielern** entfällt dieses Restrisiko, weil der
+  Geber mitspielt — alle drei Spieler sind in der letzten Runde aktiv und tiebreak-fähig.
+  Es besteht nur bei 4 Spielern fort.
 
 ## Normative Quellen
 

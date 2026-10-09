@@ -7,7 +7,14 @@
 
 ## ▶ Aktueller Fokus
 
-> **Zuletzt (27.08.2026):** Pairing-Durchspielen → **FND-006 behoben** (ADR-016): Tausender
+> **Zuletzt (09.10.2026):** **Drei-Spieler-Variante umgesetzt** (ADR-017, **TASK-020**): Die Spielerzahl
+> (3 oder 4) bestimmt die Variante — zu dritt **spielt der Geber mit**, die Rundenzahl ist ein
+> Vielfaches von 3. Die Wertung blieb unverändert (immer 3 aktive Spieler); geändert wurden nur
+> Validierung, Rotation und die Ableitung der aktiven Spieler, die jetzt ausschließlich `Spiel`
+> beantwortet. Test-first: Behave 32 → **57**, Django 61 → **82**, Vitest 61 → **84**, Build grün.
+> **Nicht committet.** Offen: manuelles Durchspielen zu dritt im Browser.
+
+> **Davor (27.08.2026):** Pairing-Durchspielen → **FND-006 behoben** (ADR-016): Tausender
 > laufen **außer Konkurrenz** und zählen nicht als gespielte Runde. Entkopplung
 > Erfassungs-Sequenz (`rundennummer`, backend-vergeben) ↔ gezählte Spielrunde (`zaehlrunde`,
 > aus Historie abgeleitet, Tausender = `null`); Geber/Fortschritt/Spielende aus der Historie;
@@ -342,6 +349,23 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
     begleitet von „Alle 4 Runden gespielt." → der Zähler wirkt falsch.
   - Vorschlag: bei beendetem Spiel auf „4 / 4 – beendet" o. ä. kappen; `SpielView`-Vitest ergänzen.
 
+### Phase 2c – Drei-Spieler-Variante (09.10.2026)
+
+- [x] **TASK-020** Spiel auch zu dritt spielbar (ADR-017) — Backend + Frontend + Doku
+  - [x] Regelwerk zuerst: `rule-set-v1.md` §2/§3.4/§4/§9.3/§15.3/§18.1, ADR-017
+  - [x] **Tests zuerst (RED):** Gherkin als Szenariogrundrisse für 3 **und** 4 Spieler
+    (`spiel_anlegen`, Tausender außer Konkurrenz, Korrektur, Endrunden-Tiebreak), neues Feature
+    `runde_rollen_je_spielerzahl.feature`; Django `SpielerzahlDomaeneTest`/`SpielerzahlApiTest`;
+    Vitest für Rotation, Formular, `SpielView`, Anschreibetabelle
+  - [x] **GREEN:** `domain.py` (`geber_setzt_aus`, `aktive_spieler`, `gegenspieler`),
+    `use_cases.spiel_anlegen` (3 oder 4, Teiler = Spielerzahl), `repositories` (Rollen aus der Domäne),
+    `views` (gemeinsame `_rollen_pruefen` für POST und PUT), Frontend (`rotation.ts`,
+    `SpielAnlegenForm`, `SpielView`), OpenAPI (`ist_geber`, 3–4 Spieler)
+  - [x] **REFACTOR:** Rollenregel nur noch in `Spiel`; Konstanten `MIN_/MAX_SPIELERZAHL`; Reste der
+    4er-Annahme in Kommentaren und Docstrings entfernt
+  - [ ] **Offen:** manuelles Durchspielen zu dritt im Browser (Tester-Agent, Pairing)
+  - [ ] **Offen (Entscheidung):** Spielerzahl eines laufenden Spiels nachträglich ändern? — bisher bewusst nein
+
 ### Nach Phase 2 – Go-Live-Nacharbeiten (Restaufgaben aus TASK-CI-006)
 
 > Der Prod-Deploy selbst ist abgeschlossen (TASK-CI-006 ✅). Diese betrieblichen Nacharbeiten
@@ -462,6 +486,14 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
 | ADR-007 | GitHub Actions als CI/CD-Toolchain |
 | ADR-008 | VM-Deployment: systemd/Gunicorn/Nginx, kein Docker |
 | ADR-009 | Internet-Hardening-Baseline der VM |
+| ADR-010 | Frontend-Deployment Same-Origin auf einer Domain |
+| ADR-011 | Frontend-Stack (Vue) und BDD-Toolchain (Playwright) |
+| ADR-012 | Node-Toolchain via fnm |
+| ADR-013 | Teststrategie und Testpyramide |
+| ADR-014 | Zehner-Eingabe des STAND und Endrunden-Tiebreak |
+| ADR-015 | Korrektur: nur die letzte Runde bearbeitbar |
+| ADR-016 | Tausender außer Konkurrenz: Sequenz vs. gezählte Spielrunde |
+| ADR-017 | Drei-Spieler-Variante: Geber spielt mit |
 
 ---
 

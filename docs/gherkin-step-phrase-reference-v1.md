@@ -76,13 +76,18 @@ Normative Quellen:
 - Dann bleibt der numerische Punktestand für alle Spieler unverändert
 
 ## Spiel anlegen
+Die Spielerzahl (3 oder 4) bestimmt die Variante (ADR-017). Szenarien, die für beide Varianten
+gelten, werden als **Szenariogrundriss** mit einer `Beispiele`-Tabelle formuliert (Spalte `spieler`).
 - Angenommen es wird ein neues V1-Spiel angelegt
-- Wenn die Spielerreihenfolge "<spieler_1>, <spieler_2>, <spieler_3>, <spieler_4>" gegen den Uhrzeigersinn erfasst wird
+- Wenn die Spielerreihenfolge "<spieler>" gegen den Uhrzeigersinn erfasst wird
+- Wenn nur die Spieler "<spieler>" erfasst werden
 - Und keine abweichende Rundenzahl angegeben wird
-- Und als Rundenzahl <rundenanzahl> angegeben wird
-- Dann wird das Spiel mit <rundenanzahl> Runden angelegt
-- Und die Spielerreihenfolge bleibt als "<spieler_1>, <spieler_2>, <spieler_3>, <spieler_4>" gespeichert
+- Und als Rundenzahl <runden> angegeben wird
+- Dann wird das Spiel mit <runden> Runden angelegt
+- Und die Spielerreihenfolge bleibt als "<spieler>" gespeichert
 - Dann wird das Spiel nicht angelegt
+- Und es wird ein Fehler zur ungültigen Spielerzahl angezeigt
+- Und es wird ein Fehler angezeigt, dass die Rundenzahl ein Vielfaches von <teiler> sein muss
 
 ## Spielende und Siegerermittlung
 - Angenommen die letzte Runde ist ausgewertet
@@ -91,11 +96,17 @@ Normative Quellen:
 - Dann wird die Siegerermittlung mit den exakten 1er-Werten durchgeführt
 - Dann gibt es mehrere Sieger
 
-## Geberrotation
-- Angenommen das Spiel wurde mit der Spielerreihenfolge "<spieler_1>, <spieler_2>, <spieler_3>, <spieler_4>" angelegt
-- Und <spielername> ist Geber in Runde <rundennummer>
+## Geberrotation und aktive Spieler
+- Angenommen das Spiel wurde mit der Spielerreihenfolge "<spieler>" angelegt
 - Dann ist <spielername> Geber in Runde <rundennummer>
-- Und <spielername> ist erneut Geber in Runde <rundennummer>
+- Und <spielername> ist Geber in Runde <rundennummer>
+- Dann spielen in Runde <rundennummer> "<aktive>" aktiv mit
+- Und der Geber in Runde <rundennummer> setzt aus
+- Und der Geber in Runde <rundennummer> spielt mit
+
+Hinweis: „setzt aus" gilt nur bei 4 Spielern, „spielt mit" nur bei 3 (rule-set-v1.md §3.4).
+Die frühere Phrase „… ist erneut Geber in Runde …" entfällt; die Rotation über einen vollen
+Durchgang hinaus wird in der `Beispiele`-Tabelle für jede Runde einzeln geprüft.
 
 ## Stichwert-Validierung
 - Und die Stichwerte aller drei aktiven Spieler sind <wert_1>, <wert_2> und <wert_3>
@@ -106,10 +117,29 @@ Normative Quellen:
 - Dann wird der Verlustwert als "<darstellungswert>" in der Tabelle dargestellt
 
 ## Korrektur der letzten Runde
-- Angenommen ein neues Spiel mit einer erfassten Runde für die Korrektur ist angelegt
-- Angenommen ein neues Spiel mit zwei erfassten Runden für die Korrektur ist angelegt
+Läuft für 3 und 4 Spieler; der Given-Schritt „ein neues Spiel mit der Spielerreihenfolge …" ist
+unter „HTTP-Szenarien für beide Varianten" beschrieben.
+- Angenommen eine reguläre Runde ist für die Korrektur erfasst
+- Angenommen zwei reguläre Runden sind für die Korrektur erfasst
 - Wenn die letzte Runde mit einem höheren Spielmacher-Ergebnis korrigiert wird
 - Wenn versucht wird, die erste Runde zu korrigieren
 - Dann wird die Korrektur übernommen
 - Und der kumulierte STAND des Spielmachers beträgt <punkte>
 - Dann wird die Korrektur abgelehnt
+
+## HTTP-Szenarien für beide Varianten (ADR-017)
+Gemeinsamer Ausgangsschritt der HTTP-Blackbox-Szenarien (Tausender außer Konkurrenz, Korrektur,
+Endrunden-Tiebreak, Rollen je Spielerzahl):
+- Angenommen ein neues Spiel mit der Spielerreihenfolge "<spieler>" und <runden> Runden ist angelegt
+
+Rollen je Spielerzahl (`runde_rollen_je_spielerzahl.feature`):
+- Wenn <spielmacher> bei Geber <geber> einen Tausender verliert
+- Dann erhalten genau <sternempfaenger> je einen Stern
+- Wenn eine reguläre Runde mit Spielmacher <spielmacher> und Geber <geber> gespielt wird
+- Dann hat <geber> in der Rundenhistorie die Rolle "<rolle>" und ist als Geber gekennzeichnet
+- Dann hat <spielername> den Punktestand <punkte>
+
+Endrunden-Tiebreak:
+- Und die letzte Runde führt zu einem Gleichstand in Zehnern zwischen <gegenspieler_1> und <gegenspieler_2>
+- Wenn der Sieger mit exakten 1er-Stichwerten <gegenspieler_1> <wert_1> und <gegenspieler_2> <wert_2> ermittelt wird
+- Dann ist <spielername> der alleinige Sieger des Spiels

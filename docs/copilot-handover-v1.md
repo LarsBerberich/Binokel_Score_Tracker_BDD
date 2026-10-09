@@ -37,22 +37,22 @@ Für Entwicklungsprozess und technische Entscheidungen:
 - `docs/adr/ADR-014-zehner-eingabe-und-endrunden-tiebreak.md` – Zehner-Eingabe des STAND + Endrunden-Tiebreak
 - `docs/adr/ADR-015-korrektur-nur-letzte-runde.md` – Korrektur: nur die letzte Runde bearbeitbar
 - `docs/adr/ADR-016-tausender-ausser-konkurrenz.md` – Tausender außer Konkurrenz: Sequenz vs. gezählte Spielrunde
+- `docs/adr/ADR-017-drei-spieler-variante.md` – Drei-Spieler-Variante: Geber spielt mit, Rundenzahl Vielfaches der Spielerzahl
 
 ## V1-Scope
-V1 unterstützt ausschließlich:
+V1 unterstützt (seit ADR-017) zwei Varianten, die sich allein aus der Spielerzahl ergeben:
 
-- 4 Spieler
-- Einzelwertung
-- Geber setzt aus
+- **4 Spieler:** Geber setzt aus, Rundenzahl Vielfaches von 4
+- **3 Spieler:** Geber spielt mit, Rundenzahl Vielfaches von 3
+- in beiden: Einzelwertung, genau 3 aktive Spieler pro Runde
 - feste Spielerreihenfolge gegen den Uhrzeigersinn
-- feste Rundenzahl als Vielfaches von 4
-- Default: 12 Runden
+- Default: 12 Runden (durch 3 und 4 teilbar, gilt für beide)
 
 Nicht Teil von V1 sind insbesondere:
 
 - Zielspiel-Endbedingungen wie 1000 oder 1500
 - Teamwertung
-- andere Spielerzahlen
+- andere Spielerzahlen als 3 oder 4
 
 ## Wichtige Rundenausgänge
 - gewonnenes Spiel
@@ -62,8 +62,8 @@ Nicht Teil von V1 sind insbesondere:
 - Tausender verloren
 
 ## Fachliche Kernaussagen
-- Der Geber spielt in der Runde nicht mit.
-- In der Geber-Spalte wird in der Rundenzeile ein Strich dargestellt.
+- Bei 4 Spielern spielt der Geber in der Runde nicht mit; bei 3 Spielern spielt er mit.
+- Nur bei 4 Spielern wird in der Geber-Spalte der Rundenzeile ein Strich dargestellt.
 - Der Spielmacher nimmt den Dapp auf und drückt anschließend 4 Karten.
 - Dapp und gedrückte Karten sind fachlich nicht dasselbe.
 - Eingegebene Stichwerte enthalten den letzten Stichbonus bereits.
@@ -92,6 +92,47 @@ Nicht Teil von V1 sind insbesondere:
 - Kein Einfluss auf den numerischen Punktestand
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
+
+## Stand 09.10.2026 — Drei-Spieler-Variante (ADR-017), test-first umgesetzt
+
+**Neu:** Das Spiel läuft jetzt auch zu dritt. Die Variante ergibt sich aus der Zahl der erfassten
+Spieler — wer nur drei Namen einträgt, spielt zu dritt (der Geber **spielt mit**, Rundenzahl
+Vielfaches von **3**); mit vier Namen bleibt alles wie bisher (Geber setzt aus, Vielfaches von 4).
+Standard 12 Runden gilt für beide.
+
+**Kernbefund der Analyse:** Die gesamte Wertung ist spielerzahl-unabhängig, weil in beiden
+Varianten genau 3 Spieler aktiv sind. Fest verdrahtet war die „4" nur in drei Stellen: Validierung
+beim Anlegen, Rotation/Rundenzahl und die Ableitung „aktive Spieler = alle − Geber" (Repositories,
+Frontend). Deshalb wurde **keine** Wertungslogik angefasst.
+
+**Umsetzung (Red → Green → Refactor):**
+
+- **Domäne** (`domain.py`): `Spiel` beantwortet jetzt als einzige Stelle, wer aktiv ist
+  (`geber_setzt_aus`, `aktive_spieler`, `gegenspieler`); neue Fehler `UnbekannterSpieler`,
+  `UngueltigerSpielmacher`; `GUELTIGE_SPIELERZAHLEN = (3, 4)`. Repositories/Views fragen die Domäne
+  statt selbst „alle − Geber" zu rechnen.
+- **API (additiv):** `ist_geber` je Spieler in der Rundenhistorie; Rolle `geber` bedeutet weiter
+  „setzt aus" und kommt nur bei 4 Spielern vor. Keine Migration, keine gespeicherte Spielerzahl.
+- **Strengere Validierung:** Spielmacher muss aktiv mitspielen — jetzt auch beim **Anlegen (POST)**,
+  nicht nur bei der Korrektur. Bei 4 Spielern wird Spielmacher = Geber nun mit 400 abgelehnt statt
+  still gespeichert; die Weboberfläche bot das nie an (Begründung: ADR-017).
+- **Frontend:** Formular mit optionalem 4. Namen (Rundenzahl-Schritt = Spielerzahl), `SpielView`
+  zeigt „Geber spielt mit" bzw. „setzt aus", Rotation in `domain/rotation.ts`
+  (`geberSetztAus`).
+
+**Tests** (zuerst angepasst und rot gesehen, dann Code): Behave **32 → 57 Szenarien** (Szenario-
+grundrisse für 3 **und** 4 Spieler; neues Feature `runde_rollen_je_spielerzahl.feature`), Django
+**61 → 82**, Vitest **61 → 84**, Build + Typecheck grün. Die Rollenregel steht in den Tests als
+unabhängiges Orakel (`features/steps/http_helfer.py`, `_aktive` in `tests.py`), nicht als Aufruf
+der geprüften Domänenfunktion.
+
+**Doku:** `rule-set-v1.md` (§2, §3.4 neu, §4, §9.3, §15.3, §18.1), ADR-017, `ubiquitous-language.md`
+(§4.4, §4.5, §4.28 neu), `Anschreibetabelle_4_Spieler.md` (§6 mit Drei-Spieler-Beispiel),
+`gherkin-step-phrase-reference-v1.md`, `datenmodell-v1.puml`, OpenAPI.
+
+**Nicht gemacht / bewusst offen:** Die Spielerzahl eines laufenden Spiels ist nicht änderbar.
+Beim Endrunden-Tiebreak entfällt zu dritt das in ADR-014 akzeptierte Restrisiko (alle drei sind
+aktiv). Ein manuelles Durchspielen zu dritt im Browser steht noch aus. **Nicht committet.**
 
 ## Stand 20.09.2026 — Neuer Entwicklungsrechner (macOS) eingerichtet; Reviewer-Gate ist aktiv
 

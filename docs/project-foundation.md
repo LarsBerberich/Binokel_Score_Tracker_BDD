@@ -493,6 +493,7 @@ Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 - `ADR-014-zehner-eingabe-und-endrunden-tiebreak.md` – Zehner-Eingabe des STAND, 1er nur für den Endrunden-Tiebreak
 - `ADR-015-korrektur-nur-letzte-runde.md` – nur die zuletzt erfasste Runde ist korrigierbar
 - `ADR-016-tausender-ausser-konkurrenz.md` – Erfassungs-Sequenz vs. gezählte Spielrunde (Tausender außer Konkurrenz)
+- `ADR-017-drei-spieler-variante.md` – Drei-Spieler-Variante: Geber spielt mit, Rundenzahl Vielfaches der Spielerzahl
 
 ### Dokumentationsregel
 
