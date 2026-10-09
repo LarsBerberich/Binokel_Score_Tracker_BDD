@@ -134,6 +134,17 @@ der geprüften Domänenfunktion.
 Beim Endrunden-Tiebreak entfällt zu dritt das in ADR-014 akzeptierte Restrisiko (alle drei sind
 aktiv). Zu dritt im Browser manuell durchgespielt (Plannotator, 09.10.2026): funktioniert wie erwartet.
 
+**Deployt (09.10.2026):** Push `089adf0..301397e`, CI grün, CD-Lauf `301397e` nach manueller
+Freigabe (Reviewer-Gate) **erfolgreich**; `/health/` und `/` liefern 200. Erstes Durchspielen
+auf dem Live-Server hat funktioniert. Die strengere Rollenprüfung (Spielmacher = Geber → 400
+bei 4 Spielern) ist damit auch in Produktion aktiv.
+
+**Nächste Schritte (Stand Feierabend 09.10.2026):** Domain-Cutover `binokel.bebe-soft.de`
+(`TASK-CI-011` M4) ab Schritt 2 — DNS-A-Record ist gesetzt; Befehle auf der VM gibt der Nutzer
+selbst ein. Danach `TASK-CI-008` bis `-010`, `TASK-017` bis `-019`. Offene Entscheidung aus
+TASK-020: Spielerzahl eines laufenden Spiels nachträglich ändern? (bisher bewusst nein).
+Ungeklärt: zwei `npm audit`-Meldungen (vitest 5.x Major-Upgrade, npm-Bug bei `brace-expansion`).
+
 ## Stand 20.09.2026 — Neuer Entwicklungsrechner (macOS) eingerichtet; Reviewer-Gate ist aktiv
 
 **Korrektur einer bislang falschen Annahme:** Das Environment `production` trägt die Schutzregel

@@ -12,7 +12,9 @@
 > Vielfaches von 3. Die Wertung blieb unverändert (immer 3 aktive Spieler); geändert wurden nur
 > Validierung, Rotation und die Ableitung der aktiven Spieler, die jetzt ausschließlich `Spiel`
 > beantwortet. Test-first: Behave 32 → **57**, Django 61 → **82**, Vitest 61 → **84**, Build grün.
-> Manuell im Browser durchgespielt (Plannotator): funktioniert wie erwartet.
+> Manuell im Browser durchgespielt (Plannotator): funktioniert wie erwartet. **Deployt am 09.10.2026**
+> (CI + CD `301397e` grün, Live-Durchspielen erfolgreich). **Nächster Fokus:** Domain-Cutover
+> `TASK-CI-011` M4 ab Schritt 2 (DNS gesetzt).
 
 > **Davor (27.08.2026):** Pairing-Durchspielen → **FND-006 behoben** (ADR-016): Tausender
 > laufen **außer Konkurrenz** und zählen nicht als gespielte Runde. Entkopplung
