@@ -12,7 +12,7 @@
 > Vielfaches von 3. Die Wertung blieb unverändert (immer 3 aktive Spieler); geändert wurden nur
 > Validierung, Rotation und die Ableitung der aktiven Spieler, die jetzt ausschließlich `Spiel`
 > beantwortet. Test-first: Behave 32 → **57**, Django 61 → **82**, Vitest 61 → **84**, Build grün.
-> **Nicht committet.** Offen: manuelles Durchspielen zu dritt im Browser.
+> Manuell im Browser durchgespielt (Plannotator): funktioniert wie erwartet.
 
 > **Davor (27.08.2026):** Pairing-Durchspielen → **FND-006 behoben** (ADR-016): Tausender
 > laufen **außer Konkurrenz** und zählen nicht als gespielte Runde. Entkopplung
@@ -363,7 +363,7 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
     `SpielAnlegenForm`, `SpielView`), OpenAPI (`ist_geber`, 3–4 Spieler)
   - [x] **REFACTOR:** Rollenregel nur noch in `Spiel`; Konstanten `MIN_/MAX_SPIELERZAHL`; Reste der
     4er-Annahme in Kommentaren und Docstrings entfernt
-  - [ ] **Offen:** manuelles Durchspielen zu dritt im Browser (Tester-Agent, Pairing)
+  - [x] Manuelles Durchspielen zu dritt im Browser (Plannotator, 09.10.2026): funktioniert wie erwartet
   - [ ] **Offen (Entscheidung):** Spielerzahl eines laufenden Spiels nachträglich ändern? — bisher bewusst nein
 
 ### Nach Phase 2 – Go-Live-Nacharbeiten (Restaufgaben aus TASK-CI-006)

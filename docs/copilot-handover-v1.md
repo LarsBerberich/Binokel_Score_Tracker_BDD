@@ -132,7 +132,7 @@ der geprüften Domänenfunktion.
 
 **Nicht gemacht / bewusst offen:** Die Spielerzahl eines laufenden Spiels ist nicht änderbar.
 Beim Endrunden-Tiebreak entfällt zu dritt das in ADR-014 akzeptierte Restrisiko (alle drei sind
-aktiv). Ein manuelles Durchspielen zu dritt im Browser steht noch aus. **Nicht committet.**
+aktiv). Zu dritt im Browser manuell durchgespielt (Plannotator, 09.10.2026): funktioniert wie erwartet.
 
 ## Stand 20.09.2026 — Neuer Entwicklungsrechner (macOS) eingerichtet; Reviewer-Gate ist aktiv
 
