@@ -270,9 +270,75 @@ describe('RundeForm', () => {
     await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(90)
     expect(wrapper.find('[data-testid="gs-stichwerte-Dirk"]').attributes('readonly')).toBeDefined()
 
-    // Carla wieder leeren (0) → nur noch ein manueller Wert → Dirk wieder editierbar.
-    await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(0)
+    // Carla wieder leeren (Eingabe löschen) → nur noch ein manueller Wert → Dirk wieder editierbar.
+    await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue('')
     expect(wrapper.find('[data-testid="gs-stichwerte-Dirk"]').attributes('readonly')).toBeUndefined()
+  })
+
+  // ── Eine eingegebene 0 ist ein echter Wert: der Spieler hatte keinen Stich ────
+  // Abgrenzung zu FND-001: Nur ein GELEERTES Feld gilt als „nicht erfasst".
+
+  describe('Stichwert 0 (Spieler ohne Stich) zählt als erfasst', () => {
+    const dirk = '[data-testid="gs-stichwerte-Dirk"]'
+
+    it('berechnet den dritten Wert, wenn ein Gegenspieler 0 eingibt', async () => {
+      const wrapper = mountForm()
+      await wrapper.find('[data-testid="sm-stichwerte"]').setValue(120)
+      await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(0)
+
+      expect((wrapper.find(dirk).element as HTMLInputElement).value).toBe('130')
+      expect(wrapper.find(dirk).attributes('readonly')).toBeDefined()
+      expect(wrapper.find('[data-testid="stichwerte-summe"]').text()).toContain('250 / 250')
+    })
+
+    it('berechnet den dritten Wert, wenn der Spielmacher 0 eingibt', async () => {
+      const wrapper = mountForm()
+      await wrapper.find('[data-testid="sm-stichwerte"]').setValue(0)
+      await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(100)
+
+      expect((wrapper.find(dirk).element as HTMLInputElement).value).toBe('150')
+      expect(wrapper.find(dirk).attributes('readonly')).toBeDefined()
+    })
+
+    it('funktioniert unabhängig von der Eingabereihenfolge (0 zuerst)', async () => {
+      const wrapper = mountForm()
+      await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(0)
+      await wrapper.find('[data-testid="sm-stichwerte"]').setValue(120)
+
+      expect((wrapper.find(dirk).element as HTMLInputElement).value).toBe('130')
+    })
+
+    it('erlaubt zwei Nullen: der dritte Spieler bekommt alle 250', async () => {
+      const wrapper = mountForm()
+      await wrapper.find('[data-testid="sm-stichwerte"]').setValue(0)
+      await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(0)
+
+      expect((wrapper.find(dirk).element as HTMLInputElement).value).toBe('250')
+    })
+
+    it('hebt die Berechnung weiter auf, wenn das Feld danach geleert wird (FND-001)', async () => {
+      const wrapper = mountForm()
+      await wrapper.find('[data-testid="sm-stichwerte"]').setValue(120)
+      await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(0)
+      expect(wrapper.find(dirk).attributes('readonly')).toBeDefined()
+
+      await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue('')
+      expect(wrapper.find(dirk).attributes('readonly')).toBeUndefined()
+    })
+
+    it('wertet einen Spieler mit 0 als ohne eigenen Stich (Meldepunkte verfallen)', async () => {
+      const wrapper = mountForm()
+      await wrapper.find('[data-testid="sm-stichwerte"]').setValue(120)
+      await wrapper.find('[data-testid="gs-stichwerte-Carla"]').setValue(0)
+      await wrapper.find('[data-testid="gs-meldepunkte-Carla"]').setValue(40)
+      await wrapper.find('form').trigger('submit')
+
+      const nutzlast = wrapper.emitted('absenden')?.[0][0] as {
+        gegenspieler: { name: string; stichwerte: number; hat_eigenen_stich: boolean }[]
+      }
+      const carla = nutzlast.gegenspieler.find((g) => g.name === 'Carla')
+      expect(carla).toMatchObject({ stichwerte: 0, hat_eigenen_stich: false })
+    })
   })
 
   // ── TASK-016: Endrunden-Tiebreak (§9.4) ──────────────────────────────────────

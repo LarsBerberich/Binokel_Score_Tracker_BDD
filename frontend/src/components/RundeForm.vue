@@ -176,10 +176,13 @@ const autoStichwertSpieler = computed(() => {
 
 /** Merkt sich, welcher Stichwert zuletzt manuell bearbeitet wurde (012.5). */
 function stichwertErfasst(name: string): void {
-  // Wird ein Feld geleert/auf 0 gesetzt, gilt es nicht mehr als manuell erfasst;
-  // der Spieler wird aus der Reihenfolge entfernt, damit das automatische dritte
-  // Feld wieder frei editierbar wird (FND-001, §8.2).
-  if (!details[name]?.stichwerte) {
+  // Nur ein GELEERTES Feld (Eingabe gelöscht, kein Zahlenwert) gilt nicht mehr als manuell
+  // erfasst; der Spieler wird dann aus der Reihenfolge entfernt, damit das automatische dritte
+  // Feld wieder frei editierbar wird (FND-001, §8.2). Eine eingegebene 0 ist dagegen ein
+  // echter Wert – der Spieler hatte keinen Stich – und zählt als erfasst. `v-model.number`
+  // liefert bei leerem Feld den leeren String statt einer Zahl.
+  const wert: unknown = details[name]?.stichwerte
+  if (typeof wert !== 'number' || Number.isNaN(wert)) {
     stichwertReihenfolge.value = stichwertReihenfolge.value.filter((n) => n !== name)
     return
   }

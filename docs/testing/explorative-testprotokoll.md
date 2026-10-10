@@ -276,3 +276,22 @@ Design-Entscheidung mit USER → Rubber-Duck-Design-Review (Datenmodell/Migratio
 - **FND-009 (UX, NIEDRIG):** Nach allen gezählten Runden zeigt die Überschrift „Runde 5 / 4"
   (abgeleitet `gezählteRunden + 1`), begleitet von „Alle 4 Runden gespielt." → Zähler wirkt
   falsch; auf „4 / 4 – beendet" o. ä. kappen. → TASK-019.
+
+---
+
+## FND-010 — Dritter Stichwert wird bei eingegebener 0 nicht berechnet (2026-10-10, Plannotator)
+
+- **Status:** ✅ BEHOBEN (2026-10-10) — `RundeForm.vue::stichwertErfasst` unterscheidet jetzt ein
+  **geleertes** Feld (kein Zahlenwert) von einer **eingegebenen 0**. Nur ersteres gilt als „nicht
+  erfasst" (FND-001); eine 0 ist ein echter Wert („kein Stich") und löst die Berechnung aus.
+- **Datum / Modus:** 2026-10-10, geführtes Durchspielen über Plannotator (Live-App).
+- **Bereich:** Rundenerfassung, Auto-Berechnung 3. Stichwert (`RundeForm.vue`, §8.2).
+- **Schwere:** MITTEL (Spieler ohne Stich ist ein häufiger Fall; der dritte Wert musste von Hand
+  gerechnet werden).
+- **Repro:** Spielmacher 120, Gegenspieler Carla `0` eintragen → Dirk bleibt `0` und editierbar,
+  statt automatisch `130` zu werden.
+- **Ursache:** Der FND-001-Fix prüfte `!details[name]?.stichwerte` und behandelte damit 0 wie leer.
+  Die beiden Fälle kollidierten, weil der FND-001-Test „leeren" mit `setValue(0)` simulierte.
+- **Repro-Tests:** `RundeForm.spec.ts` „Stichwert 0 (Spieler ohne Stich) zählt als erfasst" (6
+  Fälle, u. a. 0 zuerst, zwei Nullen, Leeren nach 0 hebt die Berechnung wieder auf); der
+  FND-001-Test leert jetzt tatsächlich (`setValue('')`).
