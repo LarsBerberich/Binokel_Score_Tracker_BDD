@@ -462,6 +462,19 @@ die Spielerzahl wird bewusst **nicht** als eigenes Feld gespeichert (ADR-017).
 
 ---
 
+### 4.29 Abrechnung
+
+Die **Abrechnung** gibt an, wie viel jeder Spieler zahlen müsste, wenn das Spiel jetzt zu Ende
+wäre: **5 Cent je 10 Punkte** Differenz zum höchsten STAND; der Spitzenreiter zahlt nichts. Sie ist eine
+abgeleitete Anzeige und beeinflusst weder Punktestand noch Sieger (`rule-set-v1.md` §20).
+
+**Bevorzugte Verwendung im Code:** `abrechnung_ermitteln`, `zu_zahlen_cent`, `ABRECHNUNG_CENT`, `ABRECHNUNG_PUNKTE`.
+Beträge werden intern in **ganzen Cent** geführt und erst bei der Darstellung als Euro formatiert.
+
+**Nicht verwechseln mit:** dem `Punktestand` (Punkte, kein Geld) oder dem `Endergebnis`.
+
+---
+
 ## 5. Bevorzugte Begriffsmappings
 
 Im Projekt können deutsche Begriffe, Quellbegriffe und informelle Begriffe nebeneinander vorkommen. Für die gemeinsame Fachsprache gelten die folgenden bevorzugten Zuordnungen:

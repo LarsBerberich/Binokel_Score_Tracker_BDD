@@ -550,6 +550,17 @@ Diese Darstellung dient der besseren Lesbarkeit der Tabelle. Fachlich handelt es
 
 Der Punktestand wird in einer separaten **STAND-Zeile** als kumulierter Gesamtstand geführt.
 
+### 18.4 Sternesumme in der Endabrechnung
+
+In der **Endabrechnung** zeigt die Anschreibetabelle unter der letzten STAND-Zeile eine Zeile
+**„Sterne (Summe)"** mit den aufsummierten Tausender-Sternen je Spieler (§15). Sie steht **zwischen**
+der STAND-Zeile und der Abrechnung (§20).
+
+- Die Zeile erscheint **nur, wenn mindestens ein Tausender gespielt wurde**; sonst entfällt sie ganz.
+- Sie erscheint **nur in der Endabrechnung**, nicht im laufenden Spiel.
+- Ein Spieler ohne Sterne bekommt eine leere Zelle; Sterne werden als ★ je Stern dargestellt.
+- Sterne beeinflussen weder Punktestand noch Sieger noch Abrechnung (§15.3, §17, §20.2).
+
 ---
 
 ## 19. Rechenregel für den Punktestand
@@ -574,7 +585,49 @@ Beim Tausender bleibt der numerische Punktestand unverändert.
 
 ---
 
-## 20. Verhältnis zu anderen Dokumenten
+## 20. Abrechnung (Einsatz pro Punkt)
+
+### 20.1 Zweck
+
+Die Abrechnung zeigt zu jedem Zeitpunkt, **wie viel jeder Spieler zahlen müsste, wenn das Spiel
+jetzt zu Ende wäre**. Sie ist eine rein abgeleitete Anzeige: Sie verändert weder den Punktestand
+noch die Siegerermittlung.
+
+### 20.2 Berechnung
+
+- **Basis** ist der Spieler mit dem höchsten numerischen Punktestand (STAND).
+- Der **Betrag** je Spieler ist **5 Cent je 10 Punkte** Differenz zum höchsten STAND, also
+  `(höchster STAND − eigener STAND) / 10 × 5 Cent`.
+- Der Spitzenreiter zahlt **0,00 €**. Bei Gleichstand an der Spitze zahlen **alle** Spitzenreiter 0,00 €.
+- Maßgeblich ist ausschließlich der numerische STAND; **Sterne** aus Tausender-Runden (§15) fließen
+  nicht ein.
+- Gerechnet wird in **ganzen Cent**, sodass kein Rundungsfehler entsteht. Da der STAND in Zehnern
+  geführt wird (§9.1), ist die Differenz ein Vielfaches von 10 und jeder Betrag ein Vielfaches von
+  5 Cent – ohne Rundung. Nur bei Altbestand mit Einerstellen (vor der Zehner-Regel) wird
+  kaufmännisch auf ganze Cent gerundet (halbe Cent aufrunden).
+- Die Berechnung gilt unverändert für 3 und 4 Spieler (ADR-017).
+
+Beispiel (4 Spieler, STAND Bernd 250, Carla 90, Dirk 60, Anna 0): Bernd zahlt 0,00 €; Carla
+160 Punkte Differenz = 16 × 5 Cent = **0,80 €**; Dirk 190 Punkte = **0,95 €**; Anna 250 Punkte =
+**1,25 €**.
+
+### 20.3 Darstellung
+
+Beträge werden in **Euro mit Euro-Zeichen** im deutschen Format dargestellt, mit höchstens zwei
+Nachkommastellen (z. B. `0,80 €`, `1,25 €`). Die Anschreibetabelle zeigt sie in einer eigenen
+Zeile **unter der letzten STAND-Zeile**.
+
+- **Nur Zahlende werden angezeigt:** Beim Spitzenreiter – bei Gleichstand an der Spitze bei allen
+  Spitzenreitern – bleibt die Zelle leer; ein Betrag erscheint nur bei Mitspielern mit weniger
+  Punkten. Muss niemand etwas zahlen (z. B. zu Spielbeginn), entfällt die ganze Zeile.
+- Das ist eine reine Darstellungsregel: Die Berechnung (§20.2) und die API liefern für den
+  Spitzenreiter weiterhin 0 Cent.
+- **Beschriftung:** Im laufenden Spiel „zu zahlen, wenn das Spiel jetzt endet“, in der Endabrechnung
+  „Wer zahlt was in die Kasse“.
+
+---
+
+## 21. Verhältnis zu anderen Dokumenten
 
 - `docs/ubiquitous-language.md` definiert die gemeinsame Fachsprache.
 - `docs/language-conventions.md` beschreibt die Sprachkonventionen des Projekts.

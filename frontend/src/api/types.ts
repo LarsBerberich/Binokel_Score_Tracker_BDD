@@ -169,6 +169,17 @@ export interface Rundenhistorie {
   /** Feste Sitzreihenfolge (Spaltenreihenfolge der Tabelle). */
   spieler: string[]
   runden: RundenhistorieRunde[]
+  /**
+   * Abrechnung bei sofortigem Spielende (rule-set-v1.md §20): Betrag je Spieler in **ganzen
+   * Cent** – 5 Cent je 10 Punkte Differenz zum Höchststand, der Spitzenreiter zahlt 0. Optional, damit
+   * die Tabelle auch dann funktioniert, wenn ein Backend das Feld (noch) nicht liefert.
+   */
+  zu_zahlen_cent?: Record<string, number>
+  /**
+   * Summe der Tausender-Sterne je Spieler (rule-set-v1.md §15); dieselbe Aggregation wie
+   * `/punktestaende/`. Optional aus demselben Grund wie `zu_zahlen_cent`.
+   */
+  sterne?: Record<string, number>
 }
 
 /**

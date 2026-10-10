@@ -709,3 +709,24 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/HistorieRunde'
+        zu_zahlen_cent:
+          type: object
+          description: >-
+            Abrechnung bei sofortigem Spielende (rule-set-v1.md §20): Betrag je Spieler in
+            **ganzen Cent** – 5 Cent je 10 Punkte Differenz zum Höchststand. Der Spitzenreiter zahlt 0;
+            bei Gleichstand an der Spitze zahlen alle Spitzenreiter 0. Sterne fließen nicht ein.
+          additionalProperties:
+            type: integer
+            minimum: 0
+          examples:
+            - { Anna: 125, Bernd: 0, Carla: 80, Dirk: 95 }
+        sterne:
+          type: object
+          description: >-
+            Summe der Tausender-Sterne je Spieler (rule-set-v1.md §15) – dieselbe Aggregation wie
+            `/punktestaende/`. Die Anschreibetabelle zeigt sie in der Endabrechnung (§18.4).
+          additionalProperties:
+            type: integer
+            minimum: 0
+          examples:
+            - { Anna: 0, Bernd: 2, Carla: 1, Dirk: 0 }

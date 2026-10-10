@@ -3,19 +3,16 @@ import { computed, onMounted, ref } from 'vue'
 import {
   ApiError,
   letzteRundeAktualisieren,
-  punktestaendeLaden,
   rundeAuswerten,
   rundenHistorieLaden,
   spielLaden,
   RUNDENAUSGANG,
-  type PunktestandMap,
   type Rundenausgang,
   type Rundenhistorie,
   type RundeErgebnis,
   type RundeRequest,
   type RundeVorbelegung,
   type Spiel,
-  type SterneMap,
 } from '../api'
 import { useSpielStore } from '../stores/spiel'
 import { aktiveSpieler, geberFuerRunde, geberSetztAus } from '../domain/rotation'
@@ -32,8 +29,6 @@ const fehler = ref<string | null>(null)
 const rundeLaedt = ref(false)
 const rundeFehler = ref<string | null>(null)
 const letztesErgebnis = ref<RundeErgebnis | null>(null)
-const punktestaende = ref<PunktestandMap | null>(null)
-const sterne = ref<SterneMap | null>(null)
 const historie = ref<Rundenhistorie | null>(null)
 
 /** Korrektur-Modus für die letzte Runde (TASK-014 Slice 6, ADR-015). */
@@ -70,32 +65,6 @@ function statusText(name: string): string {
 const istBeendet = computed(() =>
   spiel.value ? gezaehlteRunden.value >= spiel.value.rundenanzahl : false,
 )
-
-/** Punktestände absteigend (höchster zuerst – führt zur Siegerermittlung). */
-const sortierteStaende = computed(() => {
-  if (!punktestaende.value) return []
-  return Object.entries(punktestaende.value)
-    .map(([name, punkte]) => ({ name, punkte }))
-    .sort((a, b) => b.punkte - a.punkte)
-})
-
-/** Anzahl Tausender-Sterne eines Spielers (0, wenn keine geladen). */
-function sterneVon(name: string): number {
-  return sterne.value?.[name] ?? 0
-}
-
-async function punktestaendeAktualisieren(): Promise<void> {
-  if (!spiel.value) return
-  try {
-    const antwort = await punktestaendeLaden(spiel.value.id)
-    punktestaende.value = antwort.punktestaende
-    sterne.value = antwort.sterne
-  } catch {
-    // Punktestände sind ergänzende Info – ein Ladefehler blockiert die Runde nicht.
-    punktestaende.value = null
-    sterne.value = null
-  }
-}
 
 async function historieAktualisieren(): Promise<void> {
   if (!spiel.value) return
@@ -175,7 +144,6 @@ async function rundeAbsenden(payload: RundeRequest): Promise<void> {
     letztesErgebnis.value = await rundeAuswerten(spiel.value.id, payload)
     // Kein lokaler Rundenzähler mehr: gezählte Runde/Geber/Spielende ergeben sich
     // aus der neu geladenen Historie (FND-006 – Tausender zählen nicht).
-    await punktestaendeAktualisieren()
     await historieAktualisieren()
   } catch (error) {
     rundeFehler.value =
@@ -185,7 +153,7 @@ async function rundeAbsenden(payload: RundeRequest): Promise<void> {
   }
 }
 
-/** PUT-Korrektur der letzten Runde; danach Punktestände, Sterne & Anschreibetabelle neu laden. */
+/** PUT-Korrektur der letzten Runde; danach die Anschreibetabelle (STAND, Abrechnung) neu laden. */
 async function korrekturAbsenden(payload: RundeRequest): Promise<void> {
   if (!spiel.value || !korrekturRunde.value) return
   rundeLaedt.value = true
@@ -197,10 +165,8 @@ async function korrekturAbsenden(payload: RundeRequest): Promise<void> {
       payload,
     )
     korrekturModus.value = false
-    // Punktestände + Sterne und Anschreibetabelle spiegeln die neu berechneten
-    // Stände; der Sieger wird serverseitig neu berechnet und von SpielendeView
-    // beim Öffnen frisch geladen (§9.3).
-    await punktestaendeAktualisieren()
+    // Die Anschreibetabelle spiegelt die neu berechneten Stände; der Sieger wird
+    // serverseitig neu berechnet und von SpielendeView beim Öffnen frisch geladen (§9.3).
     await historieAktualisieren()
   } catch (error) {
     rundeFehler.value =
@@ -233,7 +199,6 @@ onMounted(async () => {
       laedt.value = false
     }
   }
-  await punktestaendeAktualisieren()
   await historieAktualisieren()
 })
 </script>
@@ -250,34 +215,6 @@ onMounted(async () => {
           Runde {{ rundennummer }} / {{ spiel.rundenanzahl }}
         </span>
       </header>
-
-      <section
-        v-if="sortierteStaende.length"
-        data-testid="punktestaende"
-        class="flex flex-col gap-2 rounded border border-slate-200 p-3"
-      >
-        <h2 class="text-lg font-semibold text-slate-700">Punktestand</h2>
-        <ol class="flex flex-col gap-1">
-          <li
-            v-for="(eintrag, i) in sortierteStaende"
-            :key="eintrag.name"
-            :data-testid="`punktestand-${eintrag.name}`"
-            class="flex items-center justify-between rounded px-2 py-1"
-            :class="i === 0 ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-700'"
-          >
-            <span>{{ i + 1 }}. {{ eintrag.name }}</span>
-            <span class="flex items-center gap-2">
-              <span
-                v-if="sterneVon(eintrag.name) > 0"
-                :data-testid="`sterne-${eintrag.name}`"
-                :title="`${sterneVon(eintrag.name)} Tausender-Stern(e)`"
-                class="text-amber-500"
-              >{{ '★'.repeat(sterneVon(eintrag.name)) }}</span>
-              <span data-testid="punktestand-wert">{{ eintrag.punkte }}</span>
-            </span>
-          </li>
-        </ol>
-      </section>
 
       <section v-if="!istBeendet && !korrekturModus" class="flex flex-col gap-3">
         <p data-testid="geber-zeile" class="text-slate-600">

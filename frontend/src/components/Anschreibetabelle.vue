@@ -2,8 +2,16 @@
 import { computed } from 'vue'
 import { RUNDENAUSGANG } from '../api'
 import type { Rundenhistorie, RundenhistorieRunde } from '../api'
+import { euroFormatieren } from '../domain/waehrung'
 
-const props = defineProps<{ historie: Rundenhistorie }>()
+const props = withDefaults(
+  defineProps<{
+    historie: Rundenhistorie
+    /** true in der Endabrechnung: die Abrechnungszeile heißt dann „Wer zahlt was in die Kasse". */
+    spielende?: boolean
+  }>(),
+  { spielende: false },
+)
 
 /**
  * Darstellungs-Variante einer Rundenzelle je Spieler (docs/Anschreibetabelle_4_Spieler.md §5):
@@ -84,6 +92,35 @@ function ausgangLabel(runde: RundenhistorieRunde): string {
       return ''
   }
 }
+
+/** Betrag in ganzen Cent, den ein Spieler zahlen müsste (Abrechnung, rule-set §20). */
+function betragCent(name: string): number {
+  return props.historie.zu_zahlen_cent?.[name] ?? 0
+}
+
+/** Wer nichts zahlt (Spitzenreiter) bekommt keine Anzeige – nur die Mitspieler mit weniger Punkten. */
+function betragText(name: string): string {
+  const cent = betragCent(name)
+  return cent > 0 ? euroFormatieren(cent) : ''
+}
+
+/** Wurde überhaupt ein Tausender gespielt? Nur dann ist eine Sternesumme sinnvoll. */
+const hatTausender = computed(() => props.historie.runden.some((runde) => runde.ist_tausender))
+
+/** Sternesumme nur in der Endabrechnung und nur, wenn ein Tausender gespielt wurde und geliefert ist. */
+const zeigeSternesumme = computed(
+  () => props.spielende && hatTausender.value && props.historie.sterne !== undefined,
+)
+
+/** Sterne eines Spielers als ★-Folge; leer, wenn er keine hat (wie beim Betrag des Spitzenreiters). */
+function sterneText(name: string): string {
+  return '★'.repeat(props.historie.sterne?.[name] ?? 0)
+}
+
+/** Die Zeile erscheint nur, wenn mindestens ein Spieler etwas zahlen müsste. */
+const jemandZahlt = computed(() =>
+  props.historie.spieler.some((name) => betragCent(name) > 0),
+)
 </script>
 
 <template>
@@ -202,6 +239,39 @@ function ausgangLabel(runde: RundenhistorieRunde): string {
             >{{ zelle.stand }}</td>
           </tr>
         </template>
+
+        <!-- Sternesumme (rule-set §15, §18.4): nur in der Endabrechnung und nur, wenn ein Tausender gespielt wurde -->
+        <tr
+          v-if="zeigeSternesumme"
+          data-testid="sterne-summe"
+          class="border-t-2 border-slate-300 bg-slate-50 font-semibold"
+        >
+          <td colspan="4" class="px-2 py-1 text-right text-slate-500">Sterne (Summe)</td>
+          <td
+            v-for="name in historie.spieler"
+            :key="name"
+            :data-testid="`sterne-summe-${name}`"
+            class="px-2 py-1 text-amber-500"
+          >{{ sterneText(name) }}</td>
+        </tr>
+
+        <!-- Abrechnung (rule-set §20): was jeder zahlen müsste, wenn das Spiel jetzt endete -->
+        <tr
+          v-if="jemandZahlt"
+          data-testid="zu-zahlen"
+          class="bg-slate-50 font-semibold"
+          :class="zeigeSternesumme ? 'border-t border-slate-200' : 'border-t-2 border-slate-300'"
+        >
+          <td colspan="4" class="px-2 py-1 text-right text-slate-500">
+            {{ props.spielende ? 'Wer zahlt was in die Kasse' : 'zu zahlen, wenn das Spiel jetzt endet' }}
+          </td>
+          <td
+            v-for="name in historie.spieler"
+            :key="name"
+            :data-testid="`zu-zahlen-${name}`"
+            class="px-2 py-1 tabular-nums"
+          >{{ betragText(name) }}</td>
+        </tr>
       </tbody>
     </table>
   </section>

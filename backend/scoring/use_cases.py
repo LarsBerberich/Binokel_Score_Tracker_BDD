@@ -10,6 +10,8 @@ from scoring.domain import (
     Spiel,
     Rundenausgang,
     STANDARD_RUNDENANZAHL,
+    ABRECHNUNG_CENT,
+    ABRECHNUNG_PUNKTE,
     GUELTIGE_SPIELERZAHLEN,
     STICHWERT_KONTROLLSUMME,
     MELDEPUNKTE_MAXIMUM,
@@ -230,3 +232,35 @@ def sieger_ermitteln(
         kandidaten = [k for k in kandidaten if exakte_stichwerte.get(k, 0) == max_exakt]
 
     return kandidaten
+
+
+# ── Abrechnung (rule-set §20) ─────────────────────────────────────────────────
+
+def abrechnung_ermitteln(punktestaende: dict[str, int]) -> dict[str, int]:
+    """
+    Berechnet, wie viel jeder Spieler zahlen müsste, wenn das Spiel jetzt zu Ende wäre.
+
+    Normativ: docs/rule-set-v1.md §20. Basis ist der höchste Punktestand; jeder Spieler zahlt
+    ``ABRECHNUNG_CENT`` (5) Cent je ``ABRECHNUNG_PUNKTE`` (10) Punkte Differenz zum Höchststand.
+    Der Spitzenreiter zahlt nichts, bei Gleichstand an der Spitze zahlen alle Spitzenreiter
+    nichts. Sterne fließen nicht ein.
+
+    Der STAND wird in Zehnern geführt (§9.1), die Differenz ist also ein Vielfaches von 10 und der
+    Betrag exakt in ganzen Cent darstellbar. Nur für Altbestand mit Einerstellen (vor der
+    Zehner-Regel) wird kaufmännisch auf ganze Cent gerundet (halbe Cent aufrunden).
+
+    Args:
+        punktestaende: Mapping Spielername → numerischer Punktestand (kann negativ sein).
+
+    Returns:
+        Mapping Spielername → Betrag in **ganzen Cent** (immer ≥ 0). Leeres Mapping bei
+        leerer Eingabe.
+    """
+    if not punktestaende:
+        return {}
+    hoechststand = max(punktestaende.values())
+    return {
+        name: ((hoechststand - stand) * ABRECHNUNG_CENT + ABRECHNUNG_PUNKTE // 2)
+        // ABRECHNUNG_PUNKTE
+        for name, stand in punktestaende.items()
+    }

@@ -1440,3 +1440,154 @@ class SpielerzahlApiTest(TestCase):
                     data=json.dumps(korrektur), content_type="application/json",
                 )
                 self.assertEqual(antwort.status_code, erwarteter_status, antwort.content)
+
+
+# ══ rule-set §20: Abrechnung (Einsatz pro Punkt) ═══════════════════════════════
+#
+# Beträge werden in ganzen Cent geführt. Die Regel gilt unverändert für 3 und 4 Spieler.
+
+class AbrechnungDomaeneTest(SimpleTestCase):
+    """abrechnung_ermitteln: 5 Cent je 10 Punkte Differenz zum Höchststand; Spitze zahlt nichts."""
+
+    def test_spitzenreiter_zahlt_nichts_andere_differenz_mal_fuenf_cent(self):
+        from scoring.use_cases import abrechnung_ermitteln
+        stand = {"Anna": 0, "Bernd": 250, "Carla": 90, "Dieter": 60}
+        self.assertEqual(
+            abrechnung_ermitteln(stand),
+            {"Anna": 125, "Bernd": 0, "Carla": 80, "Dieter": 95},
+        )
+
+    def test_gleichstand_an_der_spitze_alle_spitzenreiter_zahlen_nichts(self):
+        from scoring.use_cases import abrechnung_ermitteln
+        stand = {"Anna": 70, "Bernd": -150, "Carla": 70}
+        self.assertEqual(abrechnung_ermitteln(stand), {"Anna": 0, "Bernd": 110, "Carla": 0})
+
+    def test_negative_staende_werden_gegen_den_hoechsten_gerechnet(self):
+        from scoring.use_cases import abrechnung_ermitteln
+        self.assertEqual(
+            abrechnung_ermitteln({"Anna": -50, "Bernd": -200}), {"Anna": 0, "Bernd": 75}
+        )
+
+    def test_alle_gleichauf_zahlt_niemand(self):
+        from scoring.use_cases import abrechnung_ermitteln
+        self.assertEqual(abrechnung_ermitteln({"Anna": 0, "Bernd": 0, "Carla": 0}),
+                         {"Anna": 0, "Bernd": 0, "Carla": 0})
+
+    def test_beitraege_sind_ganze_cent_und_bei_zehner_staenden_exakt(self):
+        """STAND in Zehnern ⇒ Differenz ein Vielfaches von 10 ⇒ Betrag exakt ein Vielfaches von 5 Cent."""
+        from scoring.use_cases import abrechnung_ermitteln
+        betraege = abrechnung_ermitteln({"A": 0, "B": 30, "C": 110, "D": 250}).values()
+        for cent in betraege:
+            self.assertIsInstance(cent, int)
+            self.assertEqual(cent % 5, 0)
+
+    def test_fuenf_cent_je_zehn_punkte(self):
+        from scoring.use_cases import abrechnung_ermitteln
+        for differenz, erwartet in ((10, 5), (20, 10), (100, 50), (160, 80), (250, 125)):
+            with self.subTest(differenz=differenz):
+                self.assertEqual(abrechnung_ermitteln({"V": differenz, "N": 0})["N"], erwartet)
+
+    def test_altbestand_mit_einerstellen_wird_kaufmaennisch_auf_ganze_cent_gerundet(self):
+        """Vor der Zehner-Regel (FND-002) konnte ein STAND Einer haben: halbe Cent werden aufgerundet."""
+        from scoring.use_cases import abrechnung_ermitteln
+        for differenz, erwartet in ((1, 1), (4, 2), (5, 3), (9, 5), (11, 6)):
+            with self.subTest(differenz=differenz):
+                self.assertEqual(abrechnung_ermitteln({"V": differenz, "N": 0})["N"], erwartet)
+
+    def test_leeres_spiel_liefert_leere_abrechnung(self):
+        from scoring.use_cases import abrechnung_ermitteln
+        self.assertEqual(abrechnung_ermitteln({}), {})
+
+    def test_satz_ist_fuenf_cent_je_zehn_punkte(self):
+        from scoring.domain import ABRECHNUNG_CENT, ABRECHNUNG_PUNKTE
+        self.assertEqual((ABRECHNUNG_CENT, ABRECHNUNG_PUNKTE), (5, 10))
+
+
+class AbrechnungApiTest(TestCase):
+    """GET /api/spiele/{id}/runden/ liefert additiv ``zu_zahlen_cent`` (beide Varianten)."""
+
+    def test_ohne_runden_zahlt_niemand(self):
+        for name, spieler in VARIANTEN.items():
+            with self.subTest(variante=name):
+                spiel_id = _spiel_mit(self.client, spieler)
+                daten = self.client.get(f"/api/spiele/{spiel_id}/runden/").json()
+                self.assertEqual(daten["zu_zahlen_cent"], {s: 0 for s in spieler})
+
+    def test_nach_einer_runde(self):
+        faelle = {
+            "vier_spieler": ("Bernd", "Anna", ["Clara", "Dieter"],
+                             {"Anna": 125, "Bernd": 0, "Clara": 80, "Dieter": 95}),
+            "drei_spieler": ("Bernd", "Anna", ["Anna", "Clara"],
+                             {"Anna": 80, "Bernd": 0, "Clara": 95}),
+        }
+        for name, (spielmacher, geber, gegenspieler, erwartet) in faelle.items():
+            with self.subTest(variante=name):
+                spiel_id = _spiel_mit(self.client, VARIANTEN[name])
+                _post_json(
+                    self.client, f"/api/spiele/{spiel_id}/runden/",
+                    _normale_runde_body(spielmacher, geber, gegenspieler),
+                )
+                daten = self.client.get(f"/api/spiele/{spiel_id}/runden/").json()
+                self.assertEqual(daten["zu_zahlen_cent"], erwartet)
+
+    def test_abrechnung_veraendert_den_punktestand_nicht(self):
+        spiel_id = _spiel_mit(self.client, VARIANTEN["drei_spieler"])
+        _post_json(
+            self.client, f"/api/spiele/{spiel_id}/runden/",
+            _normale_runde_body("Bernd", "Anna", ["Anna", "Clara"]),
+        )
+        vorher = self.client.get(f"/api/spiele/{spiel_id}/punktestaende/").json()["punktestaende"]
+        self.client.get(f"/api/spiele/{spiel_id}/runden/")
+        nachher = self.client.get(f"/api/spiele/{spiel_id}/punktestaende/").json()["punktestaende"]
+        self.assertEqual(vorher, nachher)
+
+
+# ══ Sternesumme in der Rundenhistorie (Endabrechnung) ═══════════════════════════
+#
+# Die Aggregation gibt es bereits (sterne_laden, genutzt von /punktestaende/). Die Historie
+# liefert sie additiv mit, damit die Anschreibetabelle sie nicht ein zweites Mal berechnet.
+
+class RundenhistorieSterneApiTest(TestCase):
+    """GET /api/spiele/{id}/runden/ liefert additiv ``sterne`` – für 3 und 4 Spieler."""
+
+    def test_ohne_tausender_sind_alle_sterne_null(self):
+        for name, spieler in VARIANTEN.items():
+            with self.subTest(variante=name):
+                spiel_id = _spiel_mit(self.client, spieler)
+                daten = self.client.get(f"/api/spiele/{spiel_id}/runden/").json()
+                self.assertEqual(daten["sterne"], {s: 0 for s in spieler})
+
+    def test_sterne_nach_tausendern(self):
+        faelle = {
+            # variante: (Runden als (typ, spielmacher, geber), erwartete Sterne)
+            "vier_spieler": (
+                [("tausender_gewonnen", "Anna", "Dieter"), ("tausender_verloren", "Bernd", "Anna")],
+                {"Anna": 1, "Bernd": 0, "Clara": 1, "Dieter": 1},
+            ),
+            "drei_spieler": (
+                [("tausender_gewonnen", "Anna", "Anna"), ("tausender_verloren", "Bernd", "Anna")],
+                {"Anna": 2, "Bernd": 0, "Clara": 1},  # mitspielender Geber Anna ist Gegenspieler
+            ),
+        }
+        for name, (runden, erwartet) in faelle.items():
+            with self.subTest(variante=name):
+                spiel_id = _spiel_mit(self.client, VARIANTEN[name])
+                for typ, spielmacher, geber in runden:
+                    antwort = _post_json(self.client, f"/api/spiele/{spiel_id}/runden/", {
+                        "typ": typ, "spielmacher": spielmacher, "geber": geber,
+                    })
+                    self.assertEqual(antwort.status_code, 201, antwort.content)
+                daten = self.client.get(f"/api/spiele/{spiel_id}/runden/").json()
+                self.assertEqual(daten["sterne"], erwartet)
+
+    def test_sterne_stimmen_mit_dem_punktestand_endpunkt_ueberein(self):
+        spiel_id = _spiel_mit(self.client, VARIANTEN["drei_spieler"])
+        _post_json(self.client, f"/api/spiele/{spiel_id}/runden/", {
+            "typ": "tausender_verloren", "spielmacher": "Bernd", "geber": "Anna",
+        })
+        aus_historie = self.client.get(f"/api/spiele/{spiel_id}/runden/").json()["sterne"]
+        aus_stand = self.client.get(f"/api/spiele/{spiel_id}/punktestaende/").json()["sterne"]
+        self.assertEqual(aus_historie, aus_stand)
+
+    def test_historie_nicht_vorhandenes_spiel_bleibt_404(self):
+        self.assertEqual(self.client.get("/api/spiele/9999/runden/").status_code, 404)

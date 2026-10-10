@@ -93,6 +93,57 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
+## Stand 10.10.2026 — Feedback aus der Plannotator-Session: Stichwert-0-Fix und Abrechnung
+
+Beide Anmerkungen stammen aus einem geführten Durchspielen der Live-App; beide wurden test-first
+umgesetzt (Tests rot gesehen, dann Code).
+
+- **FND-010 (Fehler, behoben):** Der dritte Stichwert wurde nicht berechnet, wenn ein Spieler ohne
+  Stich eine **0** eintrug. Ursache: Der FND-001-Fix behandelte 0 wie ein leeres Feld. Jetzt gilt
+  nur ein **geleertes** Feld als „nicht erfasst", eine eingegebene 0 als echter Wert. Details im
+  Testprotokoll; 6 neue Vitest-Fälle, der FND-001-Test leert nun wirklich (`setValue('')`).
+- **Abrechnung (neue Fachregel, rule-set §20):** Unter der letzten STAND-Zeile der
+  Anschreibetabelle steht „zu zahlen, wenn das Spiel jetzt endet": **5 Cent je 10 Punkte** Differenz zum
+  höchsten STAND (nach Feedback aus der Plannotator-Runde; zuerst waren 5 Cent je Punkt umgesetzt),
+  der Spitzenreiter zahlt 0, bei Gleichstand an der Spitze alle Spitzenreiter. Gerechnet wird in
+  **ganzen Cent** im Backend (`use_cases.abrechnung_ermitteln`, Konstanten `ABRECHNUNG_CENT` und
+  `ABRECHNUNG_PUNKTE`; bei Zehner-Ständen exakt, nur Altbestand mit Einern wird kaufmännisch gerundet),
+  die API liefert es additiv als `zu_zahlen_cent` in der Rundenhistorie; erst die Darstellung
+  (`domain/waehrung.ts`) macht Euro daraus. Gilt für 3 und 4 Spieler. Sterne fließen nicht ein.
+
+**Entschieden (10.10.2026):** Die Zeile erscheint **einmal am Tabellenende** (aktueller Stand). Beim
+**Spitzenreiter wird kein Betrag angezeigt** (Zelle leer, bei Gleichstand an der Spitze bei allen
+Spitzenreitern); nur Mitspieler mit weniger Punkten zeigen einen Betrag, und die Zeile entfällt, wenn
+niemand zahlt. Das ist eine reine Darstellungsregel — die API liefert für den Spitzenreiter weiter 0.
+Der Satz von 5 Cent ist vorerst fest einkodiert; ein **einstellbarer Betrag** steht als
+**FUTURE-007** im Backlog.
+
+- **UI-Vereinfachung (Plannotator-Feedback):** Die separate Liste „Punktestand" über der Tabelle
+  entfällt — der STAND steht bereits in der Anschreibetabelle. `SpielView` lädt die Punktestände
+  deshalb nicht mehr gesondert (nur noch die Historie). Die **Endabrechnung** (`SpielendeView`) zeigt
+  zusätzlich zu Sieger und Endstand die **vollständige Anschreibetabelle** samt Abrechnung; die
+  Historie wird dort weich geladen (Ladefehler blendet nur die Tabelle aus). **Folge:** Die
+  *aufsummierten* Tausender-Sterne je Spieler sind während des Spiels nicht mehr sichtbar, nur die ★ je
+  Runde in der Tabelle. **Entschieden (10.10.2026):** Das genügt. Eine Sterne-Spalte steht als
+  **FUTURE-008** im Backlog — zunächst verworfen, dann doch umgesetzt (siehe unten).
+- **Endabrechnung weiter vereinfacht (zweite Plannotator-Runde):** Auch die Liste „Endstand“ entfällt —
+  es bleibt Sieger-Banner plus die vollständige Anschreibetabelle. **Folge:** Die aufsummierten
+  Sterne waren dadurch kurzzeitig nirgends mehr sichtbar — jetzt über die Sternesumme-Zeile gelöst. Die Abrechnungszeile heißt zum
+  Spielende „Wer zahlt was in die Kasse“ (Prop `spielende` an `Anschreibetabelle`), im Spiel weiter
+  „zu zahlen, wenn das Spiel jetzt endet“.
+- **Sternesumme in der Endabrechnung (rule-set §18.4):** Zeile „Sterne (Summe)“ zwischen STAND und
+  Abrechnung, **nur wenn mindestens ein Tausender gespielt wurde** und **nur in der Endabrechnung**
+  (Annahmen vom Nutzer bestätigt). Die Summe liefert das Backend additiv als `sterne` in der
+  Rundenhistorie — dieselbe Aggregation wie `/punktestaende/` (`sterne_laden`), kein zweiter
+  Rechenweg im Frontend. Ein Spieler ohne Sterne hat eine leere Zelle.
+- **Neu: „Neues Spiel mit gleichen Teilnehmern“** (zweiter Knopf neben „Neues Spiel“): legt sofort
+  ein Spiel mit **denselben Teilnehmern, derselben Reihenfolge und derselben Rundenzahl** an und
+  öffnet es; die Spielerzahl (3/4) bleibt dadurch erhalten. Annahmen: die Reihenfolge rotiert nicht
+  (der erste Geber bleibt derselbe); der Knopf ist gesperrt, solange die Teilnehmer unbekannt sind.
+
+**Tests:** Behave 57 → **66** (`abrechnung.feature`, für 3 und 4 Spieler), Django 82 → **98**,
+Vitest 84 → **128**, Build + Typecheck grün.
+
 ## Stand 09.10.2026 — Drei-Spieler-Variante (ADR-017), test-first umgesetzt
 
 **Neu:** Das Spiel läuft jetzt auch zu dritt. Die Variante ergibt sich aus der Zahl der erfassten

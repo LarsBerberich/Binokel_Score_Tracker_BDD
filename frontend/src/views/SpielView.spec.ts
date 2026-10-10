@@ -124,50 +124,30 @@ describe('SpielView', () => {
     expect(wrapper.find('[data-testid="fehler"]').text()).toBe('Spiel 3 nicht gefunden.')
   })
 
-  it('lädt und zeigt die Punktestände absteigend sortiert', async () => {
+  it('zeigt keine separate Punktestand-Liste: der STAND steht in der Anschreibetabelle', async () => {
     useSpielStore().setzeSpiel(beispielSpiel)
-    punktestaendeLadenMock.mockResolvedValue({
-      spiel_id: 3,
-      punktestaende: { Anna: 120, Bernd: 90, Carla: 150, Dirk: 60 },
-      sterne: { Anna: 0, Bernd: 0, Carla: 0, Dirk: 0 },
-    })
+    rundenHistorieLadenMock.mockResolvedValue(historieMitRunde)
     const wrapper = mount(SpielView, {
       props: { spielId: '3' },
       global: { stubs: { RouterLink: RouterLinkStub } },
     })
     await flushPromises()
 
-    expect(punktestaendeLadenMock).toHaveBeenCalledWith(3)
-    const reihenfolge = wrapper
-      .findAll('[data-testid^="punktestand-"]')
-      .map((el) => el.attributes('data-testid'))
-      .filter((id) => id !== 'punktestand-wert')
-    expect(reihenfolge).toEqual([
-      'punktestand-Carla',
-      'punktestand-Anna',
-      'punktestand-Bernd',
-      'punktestand-Dirk',
-    ])
+    expect(wrapper.find('[data-testid="punktestaende"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="anschreibetabelle"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="stand-1-Bernd"]').text()).toBe('200')
   })
 
-  it('zeigt Tausender-Sterne neben dem Punktestand des Spielers', async () => {
+  it('lädt die Punktestände nicht mehr gesondert – sie stecken in der Historie', async () => {
     useSpielStore().setzeSpiel(beispielSpiel)
-    punktestaendeLadenMock.mockResolvedValue({
-      spiel_id: 3,
-      punktestaende: { Anna: 120, Bernd: 90, Carla: 150, Dirk: 60 },
-      sterne: { Anna: 2, Bernd: 0, Carla: 1, Dirk: 0 },
-    })
-    const wrapper = mount(SpielView, {
+    mount(SpielView, {
       props: { spielId: '3' },
       global: { stubs: { RouterLink: RouterLinkStub } },
     })
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="sterne-Anna"]').text()).toBe('★★')
-    expect(wrapper.find('[data-testid="sterne-Carla"]').text()).toBe('★')
-    // Spieler ohne Sterne bekommen kein Stern-Element.
-    expect(wrapper.find('[data-testid="sterne-Bernd"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="sterne-Dirk"]').exists()).toBe(false)
+    expect(punktestaendeLadenMock).not.toHaveBeenCalled()
+    expect(rundenHistorieLadenMock).toHaveBeenCalledWith(3)
   })
 
   it('zeigt nach der letzten Runde den Beendet-Bereich mit Link zur Auswertung', async () => {
@@ -248,7 +228,7 @@ describe('SpielView', () => {
     expect(wrapper.find('[data-testid="stand-1-Bernd"]').text()).toBe('220')
   })
 
-  it('korrigiert die letzte Runde per PUT und lädt Punktestände + Historie neu', async () => {
+  it('korrigiert die letzte Runde per PUT und lädt die Historie neu', async () => {
     useSpielStore().setzeSpiel(beispielSpiel)
     rundenHistorieLadenMock.mockResolvedValue(historieMitRunde)
     letzteRundeAktualisierenMock.mockResolvedValue({
@@ -286,9 +266,9 @@ describe('SpielView', () => {
     expect(rundennummer).toBe(1)
     expect(payload).toMatchObject({ typ: 'normal', spielmacher: 'Bernd', meldepunkte: 110 })
 
-    // Nach Erfolg: Korrektur-Modus verlassen, Punktestände + Historie neu geladen.
+    // Nach Erfolg: Korrektur-Modus verlassen, Historie (inkl. STAND und Abrechnung) neu geladen.
     expect(wrapper.find('[data-testid="korrektur"]').exists()).toBe(false)
-    expect(punktestaendeLadenMock).toHaveBeenCalledTimes(2)
+    expect(punktestaendeLadenMock).not.toHaveBeenCalled()
     expect(rundenHistorieLadenMock).toHaveBeenCalledTimes(2)
   })
 

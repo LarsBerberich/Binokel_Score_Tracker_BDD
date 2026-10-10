@@ -44,6 +44,7 @@ from scoring.repositories import (
     sterne_laden,
 )
 from scoring.use_cases import (
+    abrechnung_ermitteln,
     doppeltes_abgehen_auswerten,
     einfaches_abgehen_auswerten,
     meldepunkte_mit_stich_zwang,
@@ -399,13 +400,30 @@ def spiel_detail_view(request, spiel_id: int) -> JsonResponse:
 # ── Slices 2–5: Runde auswerten und persistieren ──────────────────────────────
 
 def _rundenhistorie_antwort(spiel_id: int) -> JsonResponse:
-    """Rundenhistorie (Anschreibetabelle) laden; 0 Runden → leere Historie (200)."""
+    """Rundenhistorie (Anschreibetabelle) laden; 0 Runden → leere Historie (200).
+
+    Additiv werden mitgeliefert:
+
+    - ``zu_zahlen_cent``: Abrechnung bei sofortigem Spielende (rule-set-v1.md §20), Betrag je
+      Spieler in ganzen Cent (5 Cent je 10 Punkte Differenz zum Höchststand);
+    - ``sterne``: Summe der Tausender-Sterne je Spieler (§15) – dieselbe Aggregation wie
+      ``/punktestaende/``, damit die Anschreibetabelle sie nicht ein zweites Mal berechnet.
+    """
     try:
         historie = rundenhistorie_laden(spiel_id)
+        punkte = punktestaende_laden(spiel_id)
+        sterne = sterne_laden(spiel_id)
     except ObjectDoesNotExist:
         return _fehler(f"Spiel {spiel_id} nicht gefunden.", status=404)
 
-    return JsonResponse({"spiel_id": spiel_id, **historie})
+    return JsonResponse(
+        {
+            "spiel_id": spiel_id,
+            **historie,
+            "zu_zahlen_cent": abrechnung_ermitteln(punkte),
+            "sterne": sterne,
+        }
+    )
 
 
 @csrf_exempt

@@ -143,3 +143,9 @@ Endrunden-Tiebreak:
 - Und die letzte Runde führt zu einem Gleichstand in Zehnern zwischen <gegenspieler_1> und <gegenspieler_2>
 - Wenn der Sieger mit exakten 1er-Stichwerten <gegenspieler_1> <wert_1> und <gegenspieler_2> <wert_2> ermittelt wird
 - Dann ist <spielername> der alleinige Sieger des Spiels
+
+## Abrechnung (`abrechnung.feature`, rule-set §20)
+Läuft für 3 und 4 Spieler. Beträge liefert die API in ganzen Cent; die Szenarien nennen sie im
+Euro-Format, mehrere Spieler getrennt durch `;`.
+- Wenn <spielmacher> bei Geber <geber> einfach abgeht und die Gegenspieler je 40 Meldepunkte haben
+- Dann zahlen die Spieler "<name> <betrag>; <name> <betrag>; …"

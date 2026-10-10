@@ -7,7 +7,14 @@
 
 ## ▶ Aktueller Fokus
 
-> **Zuletzt (09.10.2026):** **Drei-Spieler-Variante umgesetzt** (ADR-017, **TASK-020**): Die Spielerzahl
+> **Zuletzt (10.10.2026):** Zwei Anmerkungen aus der Plannotator-Session umgesetzt (test-first):
+> **FND-010** behoben (dritter Stichwert bei eingegebener 0) und neue **Abrechnung** unter dem
+> STAND (**TASK-021**, rule-set §20: 5 Cent je 10 Punkte Differenz zum Höchststand, in ganzen Cent im
+> Backend). Behave 66 / Django 98 / Vitest 128, Build grün. Zusätzlich: Listen „Punktestand“
+> und „Endstand“ entfernt, Endabrechnung zeigt die vollständige Anschreibetabelle (mit Sternesumme, falls
+> ein Tausender gespielt wurde), neuer Knopf „Neues Spiel mit gleichen Teilnehmern“. **Noch nicht committet/deployt.**
+
+> **Davor (09.10.2026):** **Drei-Spieler-Variante umgesetzt** (ADR-017, **TASK-020**): Die Spielerzahl
 > (3 oder 4) bestimmt die Variante — zu dritt **spielt der Geber mit**, die Rundenzahl ist ein
 > Vielfaches von 3. Die Wertung blieb unverändert (immer 3 aktive Spieler); geändert wurden nur
 > Validierung, Rotation und die Ableitung der aktiven Spieler, die jetzt ausschließlich `Spiel`
@@ -368,6 +375,15 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
   - [x] Manuelles Durchspielen zu dritt im Browser (Plannotator, 09.10.2026): funktioniert wie erwartet
   - [ ] **Offen (Entscheidung):** Spielerzahl eines laufenden Spiels nachträglich ändern? — bisher bewusst nein
 
+- [x] **TASK-021** Abrechnung unter dem STAND (rule-set §20) — Backend + Frontend + Doku
+  - [x] Regelwerk §20, Fachsprache §4.29; Gherkin `abrechnung.feature` für 3 und 4 Spieler
+  - [x] `abrechnung_ermitteln` (ganze Cent), `zu_zahlen_cent` in der Rundenhistorie, Tabellenzeile,
+    `euroFormatieren`
+  - [x] Entschieden (10.10.2026): Zeile **einmal am Tabellenende**; Beträge nur bei **zahlenden**
+    Mitspielern — Spitzenreiter-Zelle leer, Zeile entfällt, wenn niemand zahlt (rule-set §20.3)
+  - Einstellbarer Satz → siehe **FUTURE-007**
+- [x] **FND-010** Dritter Stichwert bei eingegebener 0 (MITTEL) — behoben, siehe Testprotokoll
+
 ### Nach Phase 2 – Go-Live-Nacharbeiten (Restaufgaben aus TASK-CI-006)
 
 > Der Prod-Deploy selbst ist abgeschlossen (TASK-CI-006 ✅). Diese betrieblichen Nacharbeiten
@@ -466,6 +482,27 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
   - Offen: `systemd-analyze verify` für `binokel-tracker.service`
   - Optional/abwägen: `bats`-Tests für `binokel-backup.sh` (root-/sqlite3-/cron-Abhängigkeiten → ggf. unverhältnismäßig, Trockenlauf bevorzugt)
   - Normative Quelle: `docs/project-foundation.md` §16/§17
+
+- [ ] **FUTURE-007** Einstellbarer Betrag pro Punkt in der Abrechnung (funktionale Weiterentwicklung, 10.10.2026)
+  - Heute fest: `ABRECHNUNG_CENT = 5` je `ABRECHNUNG_PUNKTE = 10` (`domain.py`, rule-set §20). Gewünscht: pro Spiel einstellbar.
+  - Zu klären: beim **Anlegen** des Spiels wählen und am Spiel speichern (neues Feld + Migration) oder
+    jederzeit nachträglich änderbar? Änderung rückwirkend auf die Anzeige (sie ist nur abgeleitet).
+  - Skizze: `SpielModel.cent_pro_punkt` (Default 5), `POST /api/spiele/` optional, Eingabefeld im
+    Anlegeformular, `abrechnung_ermitteln(punktestaende, cent_je_zehn_punkte)` bekommt den Satz als Parameter.
+  - Beträge bleiben ganze Cent; Satz als „Cent je 10 Punkte“ (ganzzahlig, Grenzen festlegen, z. B. 1–100).
+  - Normative Quelle: `docs/rule-set-v1.md` §20 (dort bei Umsetzung §20.2 anpassen)
+
+- [x] **FUTURE-008** Sternesumme in der Anschreibetabelle (nice to have, 10.10.2026) — **umgesetzt als Zeile in der Endabrechnung**
+  - Idee: je Spieler die **aufsummierten Tausender-Sterne** als Spalte/Zeile in der Anschreibetabelle,
+    damit sie auch während des Spiels sichtbar sind.
+  - Hintergrund: Mit dem Wegfall der Liste „Punktestand“ im Spiel **und** der Liste „Endstand“ in der
+    Endabrechnung (Plannotator-Feedback 10.10.2026) sind die **aufsummierten Sterne nirgends mehr
+    sichtbar**; die Anschreibetabelle zeigt nur das ★ je Tausender-Runde.
+  - **Entscheidung (10.10.2026):** zuerst vorerst verworfen, dann nach Rückfrage **doch umgesetzt** —
+    als Zeile „Sterne (Summe)“ **nur in der Endabrechnung** und **nur, wenn ein Tausender gespielt
+    wurde**, zwischen STAND und Abrechnung (rule-set §18.4). Im laufenden Spiel bleibt sie bewusst weg.
+  - Aufwand, falls doch: rein Frontend (Summe aus `spieler[name].stern` über die Runden der Historie
+    bzw. `sterne` aus dem Backend), kein neues Backend-Verhalten.
 
 - [ ] **FUTURE-005** Deploy-Zugang auf kurzlebige SSH-Zertifikate umstellen (Rubber-Duck-Review CD, 20.10.2026)
   - Statt statischem Long-lived-Deploy-Key eine **SSH-CA / kurzlebige Certs** (z. B. HashiCorp Vault SSH, Teleport) einsetzen

@@ -20,6 +20,12 @@ SPIELERZAHL_MIT_AUSSETZENDEM_GEBER: int = 4
 
 STICHWERT_KONTROLLSUMME: int = 250
 
+# Einsatz der Abrechnung (normativ: docs/rule-set-v1.md §20): 5 Cent je 10 Punkte Differenz zum
+# Höchststand. Beträge werden durchgängig in ganzen Cent geführt. Da der STAND in Zehnern geführt
+# wird (§9.1), ist die Differenz ein Vielfaches von 10 und der Betrag exakt darstellbar.
+ABRECHNUNG_CENT: int = 5
+ABRECHNUNG_PUNKTE: int = 10
+
 # Alle Werte, die in den kumulierten STAND einfließen (Stichwerte, Meldepunkte,
 # Reizwert), werden in vollen Zehnern geführt. 1er-genaue Werte gibt es nur in der
 # letzten Runde für den Gleichstand-Tiebreak (normativ: docs/rule-set-v1.md §9.1/§9.4).

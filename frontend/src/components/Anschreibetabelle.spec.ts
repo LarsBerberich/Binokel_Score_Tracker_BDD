@@ -211,3 +211,172 @@ describe('Anschreibetabelle bei 3 Spielern (ADR-017)', () => {
     expect(wrapper.find('[data-testid="runde-1-D"]').exists()).toBe(false)
   })
 })
+
+describe('Anschreibetabelle: Zeile „zu zahlen" (rule-set §20)', () => {
+  /** Beträge liefert das Backend in ganzen Cent: Höchststand B = 220, je 10 Punkte Differenz 5 Cent. */
+  const mitAbrechnung: Rundenhistorie = {
+    ...historie,
+    zu_zahlen_cent: { A: 75, B: 0, C: 150, D: 85 },
+  }
+  const normal = (text: string) => text.replace(/\u00a0/g, ' ')
+
+  it('zeigt je zahlendem Spieler den Betrag im Euro-Format', () => {
+    const wrapper = mounten(mitAbrechnung)
+    expect(normal(wrapper.find('[data-testid="zu-zahlen-A"]').text())).toBe('0,75 €')
+    expect(normal(wrapper.find('[data-testid="zu-zahlen-C"]').text())).toBe('1,50 €')
+    expect(normal(wrapper.find('[data-testid="zu-zahlen-D"]').text())).toBe('0,85 €')
+  })
+
+  it('zeigt beim Spitzenreiter keinen Betrag an – die Zelle bleibt leer', () => {
+    const zelle = mounten(mitAbrechnung).find('[data-testid="zu-zahlen-B"]')
+    expect(zelle.exists()).toBe(true) // Spalte bleibt erhalten, damit die Tabelle ausgerichtet ist
+    expect(zelle.text()).toBe('')
+  })
+
+  it('zeigt auch bei Gleichstand an der Spitze für keinen Spitzenreiter einen Betrag', () => {
+    const wrapper = mounten({ ...historie, zu_zahlen_cent: { A: 0, B: 0, C: 150, D: 85 } })
+    expect(wrapper.find('[data-testid="zu-zahlen-A"]').text()).toBe('')
+    expect(wrapper.find('[data-testid="zu-zahlen-B"]').text()).toBe('')
+    expect(normal(wrapper.find('[data-testid="zu-zahlen-C"]').text())).toBe('1,50 €')
+  })
+
+  it('blendet die ganze Zeile aus, wenn niemand etwas zahlen muss', () => {
+    const wrapper = mounten({ ...historie, zu_zahlen_cent: { A: 0, B: 0, C: 0, D: 0 } })
+    expect(wrapper.find('[data-testid="zu-zahlen"]').exists()).toBe(false)
+  })
+
+  it('steht als letzte Zeile direkt unter der letzten STAND-Zeile', () => {
+    const wrapper = mounten(mitAbrechnung)
+    const zeilen = wrapper.findAll('tbody tr')
+    const letzte = zeilen[zeilen.length - 1]
+    expect(letzte.attributes('data-testid')).toBe('zu-zahlen')
+    expect(zeilen[zeilen.length - 2].text()).toContain('STAND')
+  })
+
+  it('erscheint genau einmal – nicht unter jeder Runde', () => {
+    expect(mounten(mitAbrechnung).findAll('[data-testid="zu-zahlen"]')).toHaveLength(1)
+  })
+
+  it('benennt die Zeile verständlich', () => {
+    const text = mounten(mitAbrechnung).find('[data-testid="zu-zahlen"]').text()
+    expect(text).toContain('zu zahlen')
+  })
+
+  it('beschriftet die Zeile im laufenden Spiel mit „zu zahlen, wenn das Spiel jetzt endet"', () => {
+    const text = mounten(mitAbrechnung).find('[data-testid="zu-zahlen"]').text()
+    expect(text).toContain('zu zahlen, wenn das Spiel jetzt endet')
+  })
+
+  it('beschriftet die Zeile zum Spielende mit „Wer zahlt was in die Kasse"', () => {
+    const wrapper = mount(Anschreibetabelle, { props: { historie: mitAbrechnung, spielende: true } })
+    const text = wrapper.find('[data-testid="zu-zahlen"]').text()
+    expect(text).toContain('Wer zahlt was in die Kasse')
+    expect(text).not.toContain('jetzt endet')
+  })
+
+  it('funktioniert bei 3 Spielern mit drei Beträgen', () => {
+    const dreierRunde: RundenhistorieRunde = {
+      ...runde1,
+      spieler: { A: runde1.spieler.A, B: runde1.spieler.B, C: runde1.spieler.C },
+      stand: { A: 0, B: 220, C: 170 },
+    }
+    const wrapper = mounten({
+      spiel_id: 8,
+      spieler: ['A', 'B', 'C'],
+      runden: [dreierRunde],
+      zu_zahlen_cent: { A: 0, B: 80, C: 95 },
+    })
+    expect(normal(wrapper.find('[data-testid="zu-zahlen-B"]').text())).toBe('0,80 €')
+    expect(normal(wrapper.find('[data-testid="zu-zahlen-C"]').text())).toBe('0,95 €')
+    expect(wrapper.find('[data-testid="zu-zahlen-A"]').text()).toBe('') // Spitzenreiter
+    expect(wrapper.find('[data-testid="zu-zahlen-D"]').exists()).toBe(false)
+  })
+
+  it('blendet die Zeile aus, wenn das Backend keine Abrechnung liefert', () => {
+    expect(mounten(historie).find('[data-testid="zu-zahlen"]').exists()).toBe(false)
+  })
+
+  it('zeigt ohne Runden nur den Leerhinweis', () => {
+    const wrapper = mounten({
+      spiel_id: 7, spieler: ['A', 'B'], runden: [], zu_zahlen_cent: { A: 0, B: 50 },
+    })
+    expect(wrapper.find('[data-testid="zu-zahlen"]').exists()).toBe(false)
+  })
+})
+
+describe('Anschreibetabelle: Sternesumme in der Endabrechnung', () => {
+  /** `historie` enthält in Runde 3 einen Tausender (D ★); das Backend liefert die Summe je Spieler. */
+  const mitSternen: Rundenhistorie = {
+    ...historie,
+    sterne: { A: 0, B: 0, C: 1, D: 2 },
+    zu_zahlen_cent: { A: 75, B: 0, C: 150, D: 85 },
+  }
+  const zeile = '[data-testid="sterne-summe"]'
+  const endabrechnung = (h: Rundenhistorie) =>
+    mount(Anschreibetabelle, { props: { historie: h, spielende: true } })
+
+  it('zeigt die Sternesumme je Spieler', () => {
+    const wrapper = endabrechnung(mitSternen)
+    expect(wrapper.find('[data-testid="sterne-summe-D"]').text()).toBe('★★')
+    expect(wrapper.find('[data-testid="sterne-summe-C"]').text()).toBe('★')
+  })
+
+  it('lässt die Zelle leer, wenn ein Spieler keine Sterne hat', () => {
+    const wrapper = endabrechnung(mitSternen)
+    expect(wrapper.find('[data-testid="sterne-summe-A"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sterne-summe-A"]').text()).toBe('')
+  })
+
+  it('steht zwischen der letzten STAND-Zeile und der Abrechnung', () => {
+    const wrapper = endabrechnung(mitSternen)
+    const zeilen = wrapper.findAll('tbody tr')
+    const ids = zeilen.map((z) => z.attributes('data-testid'))
+    const anzahl = zeilen.length
+    expect(ids[anzahl - 2]).toBe('sterne-summe')
+    expect(ids[anzahl - 1]).toBe('zu-zahlen')
+    expect(zeilen[anzahl - 3].text()).toContain('STAND')
+  })
+
+  it('benennt die Zeile verständlich', () => {
+    expect(endabrechnung(mitSternen).find(zeile).text()).toContain('Sterne')
+  })
+
+  it('entfällt, wenn kein Tausender gespielt wurde', () => {
+    const ohneTausender: Rundenhistorie = {
+      ...mitSternen,
+      runden: [runde1, runde2],
+      sterne: { A: 0, B: 0, C: 0, D: 0 },
+    }
+    expect(endabrechnung(ohneTausender).find(zeile).exists()).toBe(false)
+  })
+
+  it('entfällt im laufenden Spiel – dort zählt nur die Endabrechnung', () => {
+    expect(mounten(mitSternen).find(zeile).exists()).toBe(false)
+  })
+
+  it('entfällt, wenn das Backend keine Sternesumme liefert', () => {
+    const ohneFeld: Rundenhistorie = { ...historie, zu_zahlen_cent: { A: 75, B: 0, C: 150, D: 85 } }
+    expect(endabrechnung(ohneFeld).find(zeile).exists()).toBe(false)
+  })
+
+  it('erscheint auch dann, wenn niemand zahlen muss', () => {
+    const wrapper = endabrechnung({ ...mitSternen, zu_zahlen_cent: { A: 0, B: 0, C: 0, D: 0 } })
+    expect(wrapper.find(zeile).exists()).toBe(true)
+    expect(wrapper.find('[data-testid="zu-zahlen"]').exists()).toBe(false)
+  })
+
+  it('funktioniert bei 3 Spielern', () => {
+    const dreierRunde: RundenhistorieRunde = {
+      ...runde3,
+      spieler: { A: runde3.spieler.A, B: runde3.spieler.B, C: runde3.spieler.D },
+    }
+    const wrapper = endabrechnung({
+      spiel_id: 8,
+      spieler: ['A', 'B', 'C'],
+      runden: [dreierRunde],
+      sterne: { A: 0, B: 0, C: 1 },
+    })
+    expect(wrapper.find('[data-testid="sterne-summe-C"]').text()).toBe('★')
+    expect(wrapper.find('[data-testid="sterne-summe-D"]').exists()).toBe(false)
+  })
+})
