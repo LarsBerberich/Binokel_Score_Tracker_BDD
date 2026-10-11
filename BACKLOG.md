@@ -457,6 +457,22 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
   - SSH-Step in `cd.yml` mit `sqlite3 integrity_check` auf einer zerstörungsfreien Kopie
   - Normative Quelle: `deploy/runbook-task-ci-006.md` Phase 6.2
 
+### Architektur-Nacharbeiten (aus der C4-Dokumentation, 11.10.2026)
+
+> Quelle: `docs/architecture/architektur-konformitaet.md`, Modelle unter `docs/architecture/c4/`.
+
+- [ ] **TASK-ARCH-001** C4-Diagramme auf konforme Darstellungsobjekte umstellen (**Prio niedrig**)
+  - Inhalte sind abgenommen; bemängelt ist nur die Notation: die `.drawio`-Dateien nutzen keine
+    UML-/C4-konformen Shapes (z. B. draw.io-Bibliothek „C4“ bzw. Standard-C4-Legende, Person-,
+    System-, Container- und Komponenten-Symbole, Legende mit Notationsschlüssel).
+  - Layout wurde vom Nutzer von Hand angepasst — bei der Überarbeitung nicht neu generieren,
+    sondern die vorhandenen Dateien umformatieren.
+
+- [ ] **TASK-ARCH-002** Restliche Konformitätsbefunde bewerten und einplanen (**Prio niedrig**)
+  - F-03 Vertrag ohne Maschinenprüfung (OpenAPI ↔ `types.ts`), F-04 Regeln doppelt implementiert,
+    F-05 offene Schreib-API (Rate-Limiting, nicht erratbare Spiel-IDs), F-06 Observability,
+    F-07 Backup/Rollback-Doku, F-09 große Dateien. F-01/F-02/F-08 sind in Arbeit bzw. erledigt.
+
 ---
 
 ## Abgeschlossen
