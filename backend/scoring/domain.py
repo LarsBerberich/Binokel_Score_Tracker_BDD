@@ -78,6 +78,11 @@ class UngueltigeMeldepunkte(SpielFehler):
     (negativ oder größer als das theoretische Maximum von 1800)."""
 
 
+class UngueltigeRundeneingabe(SpielFehler):
+    """Wird ausgelöst, wenn die Eingabe einer Runde unvollständig ist (Pflichtfeld
+    fehlt) oder einen unbekannten Rundentyp nennt."""
+
+
 # ── Enumerationen ──────────────────────────────────────────────────────────────
 
 class Rundenausgang(Enum):
@@ -182,3 +187,76 @@ class Spiel:
         """
         index = (runde - 1) % len(self.spieler_reihenfolge)
         return self.spieler_reihenfolge[index]
+
+
+# ── Rundenwertung und STAND-Beitrag ────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class GegenspielerWertung:
+    """Gewertete Zeile eines Gegenspielers in einer Runde.
+
+    ``meldepunkte`` sind bereits stich-zwang-gewertet (normativ: docs/rule-set-v1.md §10).
+    """
+
+    name: str
+    meldepunkte: int
+    stichwerte: int
+    hat_eigenen_stich: bool
+
+
+@dataclass(frozen=True)
+class Rundenwertung:
+    """Vollständig gewertetes Ergebnis einer Runde, unabhängig von Eingabe und Speicherung.
+
+    Die Felder entsprechen dem, was pro Runde persistiert wird. Für Tausender-Runden ist
+    ``gegenspieler`` leer (die Gegenspieler leitet das Spiel ab, §15).
+    """
+
+    rundenausgang: Rundenausgang
+    spielmacher_punkte: int
+    verlustwert: int
+    mitpunkte_pro_gegenspieler: int
+    spielmacher_stern: bool
+    gegenspieler_stern: bool
+    spielmacher_meldepunkte: int
+    spielmacher_stichwerte: int
+    gegenspieler: tuple[GegenspielerWertung, ...] = ()
+
+
+def stand_beitrag(spielmacher: str, wertung: Rundenwertung) -> dict[str, int]:
+    """
+    Beitrag einer einzelnen Runde zum kumulierten STAND je Spieler.
+
+    Gemeinsame Wahrheit für den Gesamt-Punktestand (Summe über alle Runden) und
+    die laufende STAND-Zeile der Anschreibetabelle (laufende Summe je Runde), damit
+    beide garantiert identisch rechnen (HOCH-4).
+
+    Wertungsregeln (normativ: docs/rule-set-v1.md, docs/Anschreibetabelle_3_und_4_Spieler.md §4):
+    - Gewonnenes Spiel:       Spielmacher +spielmacher_punkte.
+    - Einfaches/Doppeltes Abgehen: Spielmacher +verlustwert (negativ).
+    - Tausender:              Kein numerischer Einfluss (leerer Beitrag).
+    - Jeder Gegenspieler:     +meldepunkte +stichwerte +mitpunkte_pro_gegenspieler.
+      (meldepunkte sind bereits stich-zwang-gewertet; §12.2, §13.3, §14.3)
+
+    Returns:
+        Mapping Spielername → Beitrag dieser Runde. Nicht enthaltene Spieler tragen 0 bei.
+    """
+    beitrag: dict[str, int] = {}
+    ausgang = wertung.rundenausgang
+
+    if ausgang in (Rundenausgang.TAUSENDER_GEWONNEN, Rundenausgang.TAUSENDER_VERLOREN):
+        return beitrag  # Tausender: STAND friert ein
+
+    if ausgang == Rundenausgang.GEWONNENES_SPIEL:
+        beitrag[spielmacher] = wertung.spielmacher_punkte
+    else:
+        # Einfaches oder doppeltes Abgehen: nur Spielmacher trägt den Verlust (negativ).
+        beitrag[spielmacher] = wertung.verlustwert
+
+    for gs in wertung.gegenspieler:
+        beitrag[gs.name] = (
+            beitrag.get(gs.name, 0)
+            + gs.meldepunkte + gs.stichwerte + wertung.mitpunkte_pro_gegenspieler
+        )
+
+    return beitrag

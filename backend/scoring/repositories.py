@@ -16,7 +16,13 @@ from typing import TypedDict
 
 from django.db import transaction
 
-from scoring.domain import Rundenausgang, Spiel
+from scoring.domain import (
+    GegenspielerWertung,
+    Rundenausgang,
+    Rundenwertung,
+    Spiel,
+    stand_beitrag,
+)
 from scoring.models import (
     GegenspielerRundeModel,
     RundeModel,
@@ -338,42 +344,31 @@ def letzte_rundennummer(spiel_id: int) -> int | None:
 # ── Slice 6: Punktestände laden ────────────────────────────────────────────────
 
 def _runde_beitrag(runde: RundeModel) -> dict[str, int]:
+    """Beitrag einer Runde zum STAND je Spieler: Mapping Model → Domäne.
+
+    Die Wertungsregel selbst liegt in ``scoring.domain.stand_beitrag``; dasselbe Ergebnis
+    speist den Gesamt-Punktestand und die laufende STAND-Zeile der Anschreibetabelle (HOCH-4).
     """
-    Beitrag einer einzelnen Runde zum kumulierten STAND je Spieler.
-
-    Gemeinsame Wahrheit für den Gesamt-Punktestand (Summe über alle Runden) und
-    die laufende STAND-Zeile der Anschreibetabelle (laufende Summe je Runde), damit
-    beide garantiert identisch rechnen (HOCH-4).
-
-    Wertungsregeln (normativ: docs/rule-set-v1.md, docs/Anschreibetabelle_3_und_4_Spieler.md §4):
-    - Gewonnenes Spiel:       Spielmacher +spielmacher_punkte.
-    - Einfaches/Doppeltes Abgehen: Spielmacher +verlustwert (negativ).
-    - Tausender:              Kein numerischer Einfluss (leerer Beitrag).
-    - Jeder Gegenspieler:     +meldepunkte +stichwerte +mitpunkte_pro_gegenspieler.
-      (meldepunkte sind bereits stich-zwang-gewertet gespeichert; §12.2, §13.3, §14.3)
-
-    Returns:
-        Mapping Spielername → Beitrag dieser Runde. Nicht enthaltene Spieler tragen 0 bei.
-    """
-    beitrag: dict[str, int] = {}
-    ausgang = Rundenausgang(runde.rundenausgang)
-
-    if ausgang in (Rundenausgang.TAUSENDER_GEWONNEN, Rundenausgang.TAUSENDER_VERLOREN):
-        return beitrag  # Tausender: STAND friert ein
-
-    if ausgang == Rundenausgang.GEWONNENES_SPIEL:
-        beitrag[runde.spielmacher.name] = runde.spielmacher_punkte
-    else:
-        # Einfaches oder doppeltes Abgehen: nur Spielmacher trägt den Verlust (negativ).
-        beitrag[runde.spielmacher.name] = runde.verlustwert
-
-    for gs in runde.gegenspieler.all():
-        beitrag[gs.spieler.name] = (
-            beitrag.get(gs.spieler.name, 0)
-            + gs.meldepunkte + gs.stichwerte + runde.mitpunkte_pro_gegenspieler
-        )
-
-    return beitrag
+    wertung = Rundenwertung(
+        rundenausgang=Rundenausgang(runde.rundenausgang),
+        spielmacher_punkte=runde.spielmacher_punkte,
+        verlustwert=runde.verlustwert,
+        mitpunkte_pro_gegenspieler=runde.mitpunkte_pro_gegenspieler,
+        spielmacher_stern=runde.spielmacher_stern,
+        gegenspieler_stern=runde.gegenspieler_stern,
+        spielmacher_meldepunkte=runde.spielmacher_meldepunkte,
+        spielmacher_stichwerte=runde.spielmacher_stichwerte,
+        gegenspieler=tuple(
+            GegenspielerWertung(
+                name=gs.spieler.name,
+                meldepunkte=gs.meldepunkte,
+                stichwerte=gs.stichwerte,
+                hat_eigenen_stich=gs.hat_eigenen_stich,
+            )
+            for gs in runde.gegenspieler.all()
+        ),
+    )
+    return stand_beitrag(runde.spielmacher.name, wertung)
 
 
 def punktestaende_laden(spiel_id: int) -> dict[str, int]:
