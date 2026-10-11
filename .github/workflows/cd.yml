@@ -29,7 +29,7 @@ jobs:
 
     environment:
       name: production
-      url: https://${{ vars.VM_HOST }}
+      url: ${{ vars.SMOKE_BASE || format('https://{0}', vars.VM_HOST) }}
 
     steps:
       - name: Repository auschecken
@@ -174,7 +174,7 @@ jobs:
         # gesamte Kette TLS → Nginx → Gunicorn → Django. Ergänzt den vorherigen
         # (VM-internen) Readiness-Healthcheck um fachliche Sicherheits-Erwartungen.
         env:
-          BASE: https://${{ vars.VM_HOST }}
+          BASE: ${{ vars.SMOKE_BASE || format('https://{0}', vars.VM_HOST) }}
         run: |
           set -uo pipefail
           fail=0
@@ -201,7 +201,7 @@ jobs:
           check "SPA /" 200 "$BASE/"
 
           echo "→ HTTP wird auf HTTPS umgeleitet"
-          check "HTTP→HTTPS-Redirect" 301 "http://${{ vars.VM_HOST }}/"
+          check "HTTP→HTTPS-Redirect" 301 "http://${BASE#https://}/"
 
           echo "→ HSTS-Header ist gesetzt"
           if curl -sSI --max-time 15 "$BASE/health/" | tr -d '\r' | grep -iq '^strict-transport-security:'; then
@@ -227,6 +227,10 @@ jobs:
 #
 # VARIABLE (Settings → Secrets and variables → Actions → Variables, bzw. Environment):
 #   VM_HOST               — Hostname oder IP der 1&1 VM (z. B. 192.0.2.10)
+#   SMOKE_BASE            — (optional) Öffentliche Basis-URL der Anwendung für den Smoke-Test,
+#                           z. B. https://binokel.bebe-soft.de. Nötig, sobald VM_HOST (SSH-Ziel)
+#                           nicht mehr die Anwendung ausliefert, etwa weil api.… nur noch
+#                           auf die Haupt-Domain weiterleitet (ADR-010). Fehlt sie: https://VM_HOST.
 #   VM_USER               — Deploy-Benutzername auf der VM (z. B. binokel-deploy)
 #   VM_SSH_KNOWN_HOSTS    — (PFLICHT) Bekannte Host-Keys der VM (MITM-Schutz).
 #                           Inhalt: Zeile(n) im known_hosts-Format, z. B. aus
