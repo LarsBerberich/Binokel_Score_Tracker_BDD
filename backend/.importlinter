@@ -1,0 +1,55 @@
+[importlinter]
+root_package = scoring
+include_external_packages = True
+
+# Architektur-Fitness-Functions (ADR-004): Abhängigkeiten zeigen nach innen.
+# views -> use_cases -> domain; repositories/models sind Infrastruktur.
+
+[importlinter:contract:domaene-ohne-framework]
+name = Domäne und Use Cases sind framework-frei
+type = forbidden
+source_modules =
+    scoring.domain
+    scoring.use_cases
+forbidden_modules =
+    django
+
+[importlinter:contract:domaene-ohne-aussenwelt]
+name = Domäne kennt keine äußeren Schichten
+type = forbidden
+source_modules =
+    scoring.domain
+forbidden_modules =
+    scoring.use_cases
+    scoring.repositories
+    scoring.models
+    scoring.views
+
+[importlinter:contract:use-cases-ohne-infrastruktur]
+name = Use Cases kennen weder HTTP noch Persistenz
+type = forbidden
+source_modules =
+    scoring.use_cases
+forbidden_modules =
+    scoring.repositories
+    scoring.models
+    scoring.views
+
+[importlinter:contract:infrastruktur-ohne-http]
+name = Persistenz kennt weder HTTP noch Use Cases
+type = forbidden
+source_modules =
+    scoring.repositories
+    scoring.models
+forbidden_modules =
+    scoring.views
+    scoring.use_cases
+
+[importlinter:contract:views-ohne-orm]
+name = Views greifen nur über Repositories auf die Datenbank zu
+type = forbidden
+source_modules =
+    scoring.views
+forbidden_modules =
+    scoring.models
+allow_indirect_imports = True

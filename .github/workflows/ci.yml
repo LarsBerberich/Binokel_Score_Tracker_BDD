@@ -36,6 +36,10 @@ jobs:
         working-directory: backend
         run: uv run python manage.py makemigrations --check
 
+      - name: Schichtregeln prüfen (import-linter, ADR-004)
+        working-directory: backend
+        run: uv run lint-imports
+
       - name: BDD-Akzeptanztests ausführen (28/28 müssen GREEN sein)
         env:
           PYTHONPATH: backend
@@ -61,6 +65,10 @@ jobs:
       - name: Abhängigkeiten installieren (reproduzierbar)
         working-directory: frontend
         run: npm ci
+
+      - name: Schichtregeln prüfen (dependency-cruiser)
+        working-directory: frontend
+        run: npm run lint:arch
 
       - name: Produktions-Build (inkl. vue-tsc Typecheck)
         working-directory: frontend
