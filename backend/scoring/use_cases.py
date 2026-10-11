@@ -7,6 +7,8 @@ Normative Quelle: docs/rule-set-v1.md.
 from __future__ import annotations
 
 from scoring.domain import (
+    GegenspielerWertung,
+    Rundenwertung,
     Spiel,
     Rundenausgang,
     STANDARD_RUNDENANZAHL,
@@ -20,6 +22,7 @@ from scoring.domain import (
     UngueltigeRundenanzahl,
     UngueltigeStichwerte,
     UngueltigeMeldepunkte,
+    UngueltigeRundeneingabe,
     UngueltigerZehnerwert,
 )
 
@@ -264,3 +267,242 @@ def abrechnung_ermitteln(punktestaende: dict[str, int]) -> dict[str, int]:
         // ABRECHNUNG_PUNKTE
         for name, stand in punktestaende.items()
     }
+
+
+# ── Slices 2–5: Runde aus der Eingabe auswerten ───────────────────────────────
+
+def _pflichtfeld(eingabe: dict, *felder: str) -> str | None:
+    """Gibt den Namen des ersten fehlenden Pflichtfelds zurück, oder None."""
+    for feld in felder:
+        if feld not in eingabe:
+            return feld
+    return None
+
+
+def _meldepunkte_pruefen(eingabe: dict) -> None:
+    """Validiert alle in der Eingabe enthaltenen Meldepunkte (Spielmacher + Gegenspieler).
+
+    Plausibilitätsgrenze (normativ: docs/rule-set-v1.md §7.1).
+    """
+    if "meldepunkte" in eingabe:
+        meldepunkte_validieren(eingabe["meldepunkte"])
+    for gegenspieler in eingabe.get("gegenspieler", []):
+        if isinstance(gegenspieler, dict) and "meldepunkte" in gegenspieler:
+            meldepunkte_validieren(gegenspieler["meldepunkte"])
+
+
+def _zehner_und_kontrollsumme_pruefen(eingabe: dict, *, mit_spielmacher_stichwert: bool) -> None:
+    """Erzwingt die Zehner-Eingabe (§9.1/§9.4) für alle in den STAND einfließenden Werte.
+
+    Gilt für die Rundentypen 'normal' und 'doppeltes_abgehen': Reizwert und alle
+    Meldepunkte müssen Vielfache von 10 sein; die Stichwerte zusätzlich ≤ 250
+    (Kontrollsumme) und ebenfalls Vielfache von 10.
+
+    Args:
+        mit_spielmacher_stichwert: True bei 'normal' (Spielmacher hat einen
+            eigenen Stichwert), False bei 'doppeltes_abgehen' (Stichwert verfällt).
+
+    Raises:
+        UngueltigerZehnerwert: Reizwert/Meldepunkte kein Zehner.
+        UngueltigeStichwerte:  Stichwert kein Zehner oder Summe > 250.
+    """
+    if "reizwert" in eingabe:
+        zehnerwert_validieren(eingabe["reizwert"], "Reizwert")
+    if "meldepunkte" in eingabe:
+        zehnerwert_validieren(eingabe["meldepunkte"], "Meldepunkte")
+    for gs in eingabe.get("gegenspieler", []):
+        if isinstance(gs, dict) and "meldepunkte" in gs:
+            zehnerwert_validieren(gs["meldepunkte"], "Meldepunkte")
+
+    stichwerte = [
+        gs["stichwerte"]
+        for gs in eingabe.get("gegenspieler", [])
+        if isinstance(gs, dict) and "stichwerte" in gs
+    ]
+    if mit_spielmacher_stichwert and "stichwerte" in eingabe:
+        stichwerte.append(eingabe["stichwerte"])
+    if stichwerte:
+        stichwerte_validieren(stichwerte)
+
+
+def rollen_pruefen(spiel: Spiel, geber: str, spielmacher: str) -> None:
+    """Der Spielmacher muss aktiv mitspielen (rule-set-v1.md §3.4, ADR-017).
+
+    Bei 4 Spielern setzt der Geber aus und kann nicht Spielmacher sein; bei 3 Spielern
+    spielt er mit. Die Regel beantwortet das Domänenobjekt.
+
+    Raises:
+        UnbekannterSpieler:     Geber oder Spielmacher gehören nicht zum Spiel.
+        UngueltigerSpielmacher: Der Spielmacher setzt aus.
+    """
+    spiel.gegenspieler(geber, spielmacher)
+
+
+def runde_auswerten(eingabe: dict) -> Rundenwertung:
+    """Validiert und wertet eine Runde nach Typ – gemeinsam für Anlegen (POST) und Korrektur (PUT).
+
+    Führt Meldepunkte-Plausibilität (§7.1), Zehner-/Kontrollsummen-Prüfung (§9.1/§9.4),
+    den Typ-Dispatch inkl. Stern- und Gegenspieler-Zeilen-Logik (HOCH-3) sowie die
+    Spielmacher-M|S-Invariante (HOCH-1: ``spielmacher_punkte == spielmacher_meldepunkte +
+    spielmacher_stichwerte``) an EINER Stelle aus. Dadurch durchläuft die Korrektur exakt
+    dieselbe Wertung wie das Anlegen.
+
+    Args:
+        eingabe: Rundendaten mit mindestens dem Feld ``typ`` (normal, einfaches_abgehen,
+            doppeltes_abgehen, tausender_gewonnen, tausender_verloren) und den Feldern des Typs.
+
+    Raises:
+        UngueltigeRundeneingabe: Pflichtfeld fehlt oder Rundentyp unbekannt.
+        UngueltigeMeldepunkte:   Meldepunkte negativ oder über 1800.
+        UngueltigerZehnerwert:   Reizwert/Meldepunkte kein Zehner.
+        UngueltigeStichwerte:    Stichwert kein Zehner oder Summe > 250.
+    """
+    typ: str = eingabe["typ"]
+    spielmacher_stern: bool = eingabe.get("spielmacher_stern", False)
+    gegenspieler_stern: bool = eingabe.get("gegenspieler_stern", False)
+
+    # Spielmacher-M/S für die getrennte Anschreibetabelle (§5). Invariante:
+    # bei gewonnenem Spiel gilt spielmacher_punkte == spielmacher_meldepunkte
+    # + spielmacher_stichwerte. Bei einfachem Abgehen und Tausender bleiben beide 0.
+    # Bei doppeltem Abgehen tragen sie die roh erfassten (fachlich verfallenen) Werte
+    # als Korrektur-/Nachvollziehbarkeits-Beleg (FND-004; siehe Zweig unten).
+    spielmacher_meldepunkte = 0
+    spielmacher_stichwerte = 0
+
+    # Plausibilitätsgrenze der Meldepunkte prüfen (normativ: rule-set-v1.md §7.1).
+    _meldepunkte_pruefen(eingabe)
+
+    # ── Dispatch nach Rundentyp ────────────────────────────────────────────────
+
+    if typ == "normal":
+        fehlendes = _pflichtfeld(eingabe, "reizwert", "meldepunkte", "stichwerte",
+                                 "hat_eigenen_stich", "gegenspieler")
+        if fehlendes:
+            raise UngueltigeRundeneingabe(
+                f"Pflichtfeld fehlt für typ 'normal': '{fehlendes}'."
+            )
+
+        # Zehner-Eingabe + 250-Kontrollsumme erzwingen (normativ: §9.1/§9.4).
+        _zehner_und_kontrollsumme_pruefen(eingabe, mit_spielmacher_stichwert=True)
+
+        sm_melde = meldepunkte_mit_stich_zwang(
+            eingabe["meldepunkte"], eingabe["hat_eigenen_stich"]
+        )
+        ausgang, gesamtpunkte = normales_spiel_auswerten(
+            eingabe["reizwert"], sm_melde, eingabe["stichwerte"]
+        )
+
+        if ausgang == Rundenausgang.GEWONNENES_SPIEL:
+            spielmacher_punkte = gesamtpunkte
+            verlustwert = 0
+            mitpunkte = 0
+            # Getrennte M|S nur bei gewonnenem Spiel; Invariante M+S == Punkte (§5).
+            spielmacher_meldepunkte = sm_melde
+            spielmacher_stichwerte = eingabe["stichwerte"]
+        else:  # doppeltes Abgehen
+            spielmacher_punkte = 0
+            verlustwert, _ = doppeltes_abgehen_auswerten(eingabe["reizwert"])
+            mitpunkte = 30
+            # FND-004: Roh erfasste (fachlich verfallene) M|S des Spielmachers als
+            # Korrektur-/Nachvollziehbarkeits-Beleg persistieren. Sie fließen NICHT in
+            # den STAND ein (dort zählt allein verlustwert) und werden in der Anschreibetabelle
+            # durch die Verlustdarstellung (-x)|0|0 ersetzt. Deshalb gilt die Summen-
+            # Invariante hier bewusst NICHT (spielmacher_punkte == 0).
+            spielmacher_meldepunkte = sm_melde
+            spielmacher_stichwerte = eingabe["stichwerte"]
+
+        gegenspieler = tuple(
+            GegenspielerWertung(
+                name=gs["name"],
+                meldepunkte=meldepunkte_mit_stich_zwang(
+                    gs["meldepunkte"], gs["hat_eigenen_stich"]
+                ),
+                stichwerte=gs["stichwerte"],
+                hat_eigenen_stich=gs["hat_eigenen_stich"],
+            )
+            for gs in eingabe["gegenspieler"]
+        )
+
+    elif typ == "einfaches_abgehen":
+        fehlendes = _pflichtfeld(eingabe, "reizwert", "gegenspieler")
+        if fehlendes:
+            raise UngueltigeRundeneingabe(
+                f"Pflichtfeld fehlt für typ 'einfaches_abgehen': '{fehlendes}'."
+            )
+
+        ausgang = Rundenausgang.EINFACHES_ABGEHEN
+        spielmacher_punkte = 0
+        verlustwert, _ = einfaches_abgehen_auswerten(eingabe["reizwert"])
+        mitpunkte = 30
+
+        # Kein Stich-Zwang für Gegenspieler (normativ: rule-set-v1.md §13.4)
+        gegenspieler = tuple(
+            GegenspielerWertung(
+                name=gs["name"],
+                meldepunkte=gs["meldepunkte"],
+                stichwerte=0,
+                hat_eigenen_stich=gs.get("hat_eigenen_stich", False),
+            )
+            for gs in eingabe["gegenspieler"]
+        )
+
+    elif typ == "doppeltes_abgehen":
+        fehlendes = _pflichtfeld(eingabe, "reizwert", "gegenspieler")
+        if fehlendes:
+            raise UngueltigeRundeneingabe(
+                f"Pflichtfeld fehlt für typ 'doppeltes_abgehen': '{fehlendes}'."
+            )
+
+        # Zehner-Eingabe + 250-Kontrollsumme erzwingen; Spielmacher-Stichwert verfällt (§9.1/§9.4).
+        _zehner_und_kontrollsumme_pruefen(eingabe, mit_spielmacher_stichwert=False)
+
+        ausgang = Rundenausgang.DOPPELTES_ABGEHEN
+        spielmacher_punkte = 0
+        verlustwert, _ = doppeltes_abgehen_auswerten(eingabe["reizwert"])
+        mitpunkte = 30
+
+        # Normaler Stich-Zwang gilt (normativ: rule-set-v1.md §14.4)
+        gegenspieler = tuple(
+            GegenspielerWertung(
+                name=gs["name"],
+                meldepunkte=meldepunkte_mit_stich_zwang(
+                    gs["meldepunkte"], gs["hat_eigenen_stich"]
+                ),
+                stichwerte=gs["stichwerte"],
+                hat_eigenen_stich=gs["hat_eigenen_stich"],
+            )
+            for gs in eingabe["gegenspieler"]
+        )
+
+    elif typ in ("tausender_gewonnen", "tausender_verloren"):
+        # Kein numerischer Einfluss auf Punktestand (normativ: rule-set-v1.md §15)
+        ausgang = (
+            Rundenausgang.TAUSENDER_GEWONNEN
+            if typ == "tausender_gewonnen"
+            else Rundenausgang.TAUSENDER_VERLOREN
+        )
+        spielmacher_punkte = 0
+        verlustwert = 0
+        mitpunkte = 0
+        spielmacher_stern = ausgang == Rundenausgang.TAUSENDER_GEWONNEN
+        gegenspieler_stern = ausgang == Rundenausgang.TAUSENDER_VERLOREN
+        gegenspieler = ()
+
+    else:
+        raise UngueltigeRundeneingabe(
+            f"Unbekannter Rundentyp: '{typ}'. "
+            "Erlaubt: normal, einfaches_abgehen, doppeltes_abgehen, "
+            "tausender_gewonnen, tausender_verloren."
+        )
+
+    return Rundenwertung(
+        rundenausgang=ausgang,
+        spielmacher_punkte=spielmacher_punkte,
+        verlustwert=verlustwert,
+        mitpunkte_pro_gegenspieler=mitpunkte,
+        spielmacher_stern=spielmacher_stern,
+        gegenspieler_stern=gegenspieler_stern,
+        spielmacher_meldepunkte=spielmacher_meldepunkte,
+        spielmacher_stichwerte=spielmacher_stichwerte,
+        gegenspieler=gegenspieler,
+    )
