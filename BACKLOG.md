@@ -7,9 +7,15 @@
 
 ## ▶ Aktueller Fokus
 
-> **▶ Nächster Schritt (Stand 10.10.2026 abends):** Deploy `8997fbb` ist live und vom Nutzer
-> geprüft (funktioniert wie gewollt). Weiter mit dem Domain-Cutover `TASK-CI-011` M4 (ab Schritt 2;
-> DNS-A-Record ist gesetzt). Befehle auf der VM gibt der Nutzer selbst ein.
+> **▶ Stand 11.10.2026:** **Domain-Cutover vollzogen** (`TASK-CI-011` M4, ADR-010): Die App läuft
+> auf `https://binokel.bebe-soft.de/`, `api.bebe-soft.de` leitet per 301 dorthin weiter
+> (`/health/` bleibt auf beiden Namen erreichbar). Ein SAN-Zertifikat (Lineage
+> `binokel.bebe-soft.de`) deckt beide Namen ab. Der Smoke-Test in `cd.yml` nutzt die neue Variable
+> `SMOKE_BASE`; der CD-Lauf danach war grün. **Offen (Aufräumen):** alte Lineage `api.bebe-soft.de`
+> entfernen, VM-Backups unter `~` nach einer Karenzzeit löschen, Hinweis zur SSH-Passphrase in
+> `docs/neuer-entwicklungsrechner-setup.md` §3 ergänzen.
+
+> **Davor (10.10.2026 abends):** Deploy `8997fbb` live und vom Nutzer geprüft (funktioniert wie gewollt).
 
 > **Davor (10.10.2026):** Zwei Anmerkungen aus der Plannotator-Session umgesetzt (test-first):
 > **FND-010** behoben (dritter Stichwert bei eingegebener 0) und neue **Abrechnung** unter dem
@@ -112,7 +118,7 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
   - Secrets/Variables `VM_SSH_KEY`, `VM_HOST`, `VM_USER`, `VM_SSH_KNOWN_HOSTS` auf aktuelle Werte prüfen
   - `cd.yml`-Smoke-Base gegen den aktiven Host/Primärdomain verifizieren
 
-- [ ] **S3** Domain-/Frontend-Cutover nach ADR-010 abschließen
+- [x] **S3** Domain-/Frontend-Cutover nach ADR-010 abschließen — erledigt am 11.10.2026 (siehe TASK-CI-011 M4)
   - DNS `binokel.bebe-soft.de` auf VM-IP setzen
   - `DJANGO_ALLOWED_HOSTS` und `DJANGO_CSRF_TRUSTED_ORIGINS` auf beide Domains anpassen
   - SAN-Cert/Certbot-Lineage mit `binokel` als Primärdomain sicherstellen
@@ -420,7 +426,12 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
       `sudo bash /opt/binokel/app/deploy/setup-server.sh api.bebe-soft.de https://github.com/LarsBerberich/Binokel_Score_Tracker_BDD.git`
       → legt `/opt/binokel/frontend` + `www-data`-ACL an, aktiviert das SPA-Nginx, Certbot idempotent (bestehendes Cert bleibt), `env` unverändert. **Kein API_DOMAIN-Argument** → Single-Domain-Modus (Redirect-Block wird automatisch entfernt).
     - [ ] **M3** Deploy erneut auslösen (GitHub → Actions → „CD" → Run workflow, `confirm=yes`) **oder** kleinen Commit pushen → CD baut die SPA und liefert `dist/` nach `/opt/binokel/frontend` → App live unter `https://api.bebe-soft.de/`.
-    - [ ] **M4** Optional/später: dediziertes `binokel.bebe-soft.de` (DNS + `setup-server.sh … api.bebe-soft.de <repo> binokel.bebe-soft.de` für Zwei-Domain-Modus + SAN-Cert), Branch Protection (TASK-CI-008), IONOS-Ports (TASK-CI-009). (Reviewer-Gate/TASK-CI-007 ist bereits aktiv.)
+    - [x] **M4** Dediziertes `binokel.bebe-soft.de` — **erledigt am 11.10.2026**: DNS-A-Record, neue Certbot-Lineage
+      `binokel.bebe-soft.de` (SAN: `binokel` + `api`) per `certbot --nginx --cert-name binokel.bebe-soft.de -d binokel… -d api…`,
+      danach `setup-server.sh` erneut (Zwei-Domain-Modus, 301 von `api`), `SMOKE_BASE=https://binokel.bebe-soft.de`
+      als Variable im Environment `production`. Verifiziert von außen (200/301, SAN, HSTS) und per grünem CD-Lauf.
+      Fallstrick siehe ENG-005 (Certbot-Rückfrage bei Teilmenge der Namen). Weiterhin offen: Branch Protection
+      (TASK-CI-008), IONOS-Ports (TASK-CI-009). (Reviewer-Gate/TASK-CI-007 ist bereits aktiv.)
   - **Go-Live-Reihenfolge (Kurz):** 011.1–011.3 umsetzen → **push** (Backend live + Skripte auf VM) → **M2** (`setup-server.sh` auf VM) → **M3** (Deploy erneut) → SPA live.
 
 - [x] **TASK-CI-007** Reviewer-Gate für Environment `production` erzwingen (USER, GitHub-UI) — **AKTIV**

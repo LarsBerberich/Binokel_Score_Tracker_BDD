@@ -69,6 +69,14 @@ Sobald ein dritter, externer API-Client (z. B. native App über öffentliche API
 getrennte Skalierung von SPA und API nötig wird, ist eine getrennte-Origin-Architektur
 mit expliziter CORS-Policy neu zu bewerten.
 
+## Nachtrag 11.10.2026 — Umstellung vollzogen
+
+Die Entscheidung ist umgesetzt: Frontend und API werden unter `binokel.bebe-soft.de` ausgeliefert, `api.bebe-soft.de`
+leitet per 301 weiter und bleibt für `/health/` bedienbar. Die erwartete Lineage-Migration erfolgte nicht über
+`--expand` der alten Lineage, sondern über eine **neue** Lineage mit `--cert-name binokel.bebe-soft.de`; die alte
+Lineage `api.bebe-soft.de` bleibt bis zu ihrer Bereinigung bestehen. Der Smoke-Test des CD prüft über die Variable
+`SMOKE_BASE` die Hauptdomain, `VM_HOST` bleibt SSH-Ziel (siehe ENG-005).
+
 ## Betroffene Artefakte
 - `deploy/nginx.conf.template` — Same-Origin-Layout (SPA-Root, `/api/`-Proxy,
   SPA-Fallback, 301-Serverblock für die API-Domain).

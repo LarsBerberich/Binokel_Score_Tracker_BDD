@@ -93,6 +93,29 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
+## Stand 11.10.2026 — Domain-Cutover auf `binokel.bebe-soft.de` vollzogen
+
+**Ergebnis:** Die App ist unter `https://binokel.bebe-soft.de/` erreichbar; `api.bebe-soft.de/` antwortet mit
+301 auf die Hauptdomain, `/health/` liefert auf beiden Namen 200. Ein SAN-Zertifikat (Lineage
+`binokel.bebe-soft.de`, gültig bis 09.01.2027) enthält beide Namen; HSTS ist aktiv. Der anschließende CD-Lauf
+(Commit `134fadb`) war grün, auch der Smoke-Test.
+
+**Ablauf (Betreiber tippt auf der VM selbst):** Backup von `/etc/nginx`, `/etc/letsencrypt` und `/etc/binokel` →
+`/etc/binokel/env` in place um beide Domains erweitert (nicht `sed -i`, wegen der ACL für `binokel-deploy`) →
+`setup-server.sh` mit Primärdomain `binokel.bebe-soft.de`.
+
+**Zwischenfall:** Das Skript brach in Phase 9 ab, weil Certbot nicht-interaktiv bei einem bestehenden Zertifikat
+mit nur einem Teil der Namen eine Rückfrage stellt. Nginx blieb dabei im HTTP-Bootstrap — **HTTPS war kurz
+nicht erreichbar**. Behoben mit `certbot --nginx --cert-name binokel.bebe-soft.de -d binokel… -d api… --redirect`
+und einem erneuten Skriptlauf. Der Fix ist im Skript (`--cert-name "$DOMAIN"`, Commit `fcbc37e`), Details in ENG-005.
+
+**CD:** Der Smoke-Test nutzt die Variable `SMOKE_BASE` (Environment `production`), `VM_HOST` bleibt das SSH-Ziel
+(`api.bebe-soft.de`). Ein wartender alter CD-Lauf mit der alten `cd.yml` wurde abgebrochen, da er an der 301
+gescheitert wäre.
+
+**Offen:** alte Certbot-Lineage `api.bebe-soft.de` entfernen (läuft sonst bis 19.12.2026 parallel weiter);
+VM-Backups in `~` nach Karenzzeit löschen; SSH-Passphrase-Hinweis in `docs/neuer-entwicklungsrechner-setup.md` §3.
+
 ## Stand 10.10.2026 (abends) — Deploy `8997fbb` live und vom Nutzer geprüft
 
 **Deployt:** Push `301397e..8997fbb` (Stichwert-Fix FND-010; Abrechnung, Endabrechnung, Sternesumme),

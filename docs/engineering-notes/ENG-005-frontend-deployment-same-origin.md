@@ -55,6 +55,14 @@ Certbot-Lineage. Die Umstellung auf ein gemeinsames SAN-Zertifikat mit der neuen
 Primärdomain erfordert einen einmaligen, dokumentierten Migrationsschritt (Cert
 expandieren/neu ausstellen) — nicht einfach `setup-server.sh` erneut ausführen.
 
+**Praxis beim Cut-Over (11.10.2026):** Ein erneuter Lauf von `setup-server.sh` mit der neuen Primärdomain brach in
+Phase 9 ab: Certbot fand ein bestehendes Zertifikat (`api.bebe-soft.de`), das nur einen Teil der angeforderten Namen
+abdeckt, und fragt dann nach `--expand` — im Non-Interactive-Modus ein Abbruch. Nginx blieb im HTTP-Bootstrap, **HTTPS
+war bis zur Reparatur nicht erreichbar**. `--expand` wäre falsch gewesen, denn es erweitert die Lineage
+`api.bebe-soft.de`, nicht `live/<primärdomain>/`, die das Template erwartet. Richtig ist `--cert-name <primärdomain>`
+(legt die neue Lineage an); das Skript setzt es jetzt selbst. Vor dem Lauf also immer `certbot certificates` prüfen
+und die Backups von `/etc/nginx` und `/etc/letsencrypt` bereithalten.
+
 ---
 
 ## Fallstrick 3 (B3) — Nginx (`www-data`) braucht Leserechte auf das SPA-Verzeichnis
@@ -92,8 +100,8 @@ in beiden Modi.
 
 ## Offene Betriebspunkte (für den Live-Cut-Over)
 
-- **Smoke-Test (`cd.yml`):** prüft aktuell `api.bebe-soft.de`. Nach dem Cut-Over ist der
-  Redirect (301 auf die Primärdomain) zu berücksichtigen bzw. der Smoke-Test auf die
-  Primärdomain umzustellen. `/health/` bleibt bewusst auch auf der API-Domain bedienbar.
+- **Smoke-Test (`cd.yml`):** erledigt — nutzt `vars.SMOKE_BASE` (Fallback `https://VM_HOST`); `VM_HOST` bleibt
+  SSH-Ziel. Ohne diese Umstellung schlägt der Test nach dem Cut-Over an der 301 fehl.
+  `/health/` bleibt bewusst auch auf der API-Domain bedienbar.
 - **`DJANGO_ALLOWED_HOSTS` / `DJANGO_CSRF_TRUSTED_ORIGINS`:** beide Domains eintragen
   (der `/health/`-Proxy der API-Domain erreicht Django mit deren Host-Header).
