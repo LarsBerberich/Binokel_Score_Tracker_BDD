@@ -6,7 +6,7 @@ Angenommen (25.08.2026)
 
 ## Kontext
 
-Mit der tabellarischen Anschreibetabelle (TASK-014, `docs/Anschreibetabelle_4_Spieler.md` §5)
+Mit der tabellarischen Anschreibetabelle (TASK-014, `docs/Anschreibetabelle_3_und_4_Spieler.md` §5)
 wird der komplette Rundenverlauf sichtbar. Damit entsteht der berechtigte Nutzerwunsch,
 eine **falsch erfasste Runde korrigieren** zu können, ohne das ganze Spiel neu anzulegen.
 
@@ -60,7 +60,7 @@ umständlich verworfen (kompletter Neu-Eintrag).
 
 - TASK-014 (Rundenhistorie, Anschreibetabelle, Korrektur)
 - ADR-004 (Repository Pattern, STAND-Aggregation), ADR-006/013 (fachliche Wahrheit auf API-Ebene)
-- `docs/rule-set-v1.md` §3 (Geberrotation), `docs/Anschreibetabelle_4_Spieler.md` §5
+- `docs/rule-set-v1.md` §3 (Geberrotation), `docs/Anschreibetabelle_3_und_4_Spieler.md` §5
 
 ## Nachtrag (26.08.2026) – Roh-Persistenz der Spielmacher-M|S bei doppeltem Abgehen (FND-004)
 

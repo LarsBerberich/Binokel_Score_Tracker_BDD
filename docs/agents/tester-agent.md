@@ -20,7 +20,7 @@ Die Agent-Definition liegt im User-Profil unter `binokel-tester-agent.agent.md`.
 | **Exploratives Testen (Pairing)** | Gemeinsam mit dem Nutzer die App durchspielen, Testcharter vorschlagen, Schritt fuer Schritt fuehren |
 | **Autonomer Testlauf** | behave, Django-Tests, Vitest und den bestehenden Playwright-Smoke ausfuehren und auswerten |
 | **Live-Bedienung** | Die laufende SPA per Browser-Automation explorativ pruefen (lesend) |
-| **Regelabgleich** | Beobachtetes Verhalten gegen `docs/rule-set-v1.md` und `docs/Anschreibetabelle_4_Spieler.md` pruefen |
+| **Regelabgleich** | Beobachtetes Verhalten gegen `docs/rule-set-v1.md` und `docs/Anschreibetabelle_3_und_4_Spieler.md` pruefen |
 | **Findings-Pflege** | Defekte im Testprotokoll dokumentieren, Repro-Tests anlegen, Bugs an den Coding-Agenten uebergeben |
 
 ### Ausserhalb des Zustaendigkeitsbereichs

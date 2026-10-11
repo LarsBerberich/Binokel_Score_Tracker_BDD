@@ -14,7 +14,7 @@ const props = withDefaults(
 )
 
 /**
- * Darstellungs-Variante einer Rundenzelle je Spieler (docs/Anschreibetabelle_4_Spieler.md §5):
+ * Darstellungs-Variante einer Rundenzelle je Spieler (docs/Anschreibetabelle_3_und_4_Spieler.md §5):
  * - `setzt-aus`: der Geber setzt aus.
  * - `stern`:     Tausender-Stern (★); der STAND friert ein.
  * - `verlust`:   verlierender Spielmacher; der eingeklammerte Verlustwert rückt ins erste Feld.

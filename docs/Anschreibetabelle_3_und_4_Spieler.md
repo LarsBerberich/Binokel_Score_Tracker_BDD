@@ -1,7 +1,7 @@
 
-# Regeln mit 4 Spielern, wenn der Geber jeweils aussetzt und technisch agnostischer Tabellenaufbau
+# Anschreibetabelle für 3 und 4 Spieler – Herleitung der Wertung und technisch agnostischer Tabellenaufbau
 
-> **Hinweis (ADR-017):** Dieses Dokument leitet die Wertung am 4-Spieler-Fall her (Geber setzt aus). Für **3 Spieler** (Geber spielt mit) gilt dieselbe Wertung; die Unterschiede in der Tabelle beschreibt **§6**. Der Dateiname bleibt zugunsten stabiler Verweise erhalten.
+> **Hinweis (ADR-017):** §1–§5 leiten die Wertung am **4-Spieler-Fall** her (der Geber setzt aus). Für **3 Spieler** (der Geber spielt mit) gilt dieselbe Wertung; die Unterschiede in der Tabelle beschreibt **§6**. (Das Dokument hieß früher `Anschreibetabelle_4_Spieler.md`.)
 
 ## Binokel-Regelwerk und Abrechnungssystem
 Variante: 4 Spieler (Geber setzt aus, 3 Spieler aktiv)

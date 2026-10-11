@@ -80,7 +80,7 @@ class RundeModel(models.Model):
 
     spielmacher_meldepunkte (M) und spielmacher_stichwerte (S) schlüsseln die
     Spielmacher-Punkte für die zweizeilige Anschreibetabelle getrennt auf
-    (docs/Anschreibetabelle_4_Spieler.md §5). Invariante je Rundenausgang:
+    (docs/Anschreibetabelle_3_und_4_Spieler.md §5). Invariante je Rundenausgang:
     - Gewonnenes Spiel: spielmacher_punkte == M + S.
     - Doppeltes Abgehen: spielmacher_punkte == 0; M|S tragen die roh erfassten
       (fachlich verfallenen) Werte als Korrektur-/Nachvollziehbarkeits-Beleg

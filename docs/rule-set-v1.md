@@ -471,7 +471,7 @@ Zur Nachvollziehbarkeit wird jede erfasste Runde – auch ein Tausender – als 
 Runde mit einer eindeutigen fortlaufenden **Erfassungs-Sequenz** gespeichert und ist
 im Rahmen der Korrektur der letzten Runde (§17 / ADR-015) editierbar. In der
 Anschreibetabelle erscheint eine Tausender-Zeile mit `★` und der Kennzeichnung
-**„außer Konkurrenz"** ohne gezählte Rundennummer (vgl. docs/Anschreibetabelle_4_Spieler.md).
+**„außer Konkurrenz"** ohne gezählte Rundennummer (vgl. docs/Anschreibetabelle_3_und_4_Spieler.md).
 
 > Herleitung: siehe FND-006 (docs/testing/explorative-testprotokoll.md) und ADR-016.
 
@@ -631,7 +631,7 @@ Zeile **unter der letzten STAND-Zeile**.
 
 - `docs/ubiquitous-language.md` definiert die gemeinsame Fachsprache.
 - `docs/language-conventions.md` beschreibt die Sprachkonventionen des Projekts.
-- `docs/Anschreibetabelle_4_Spieler.md` enthält die tabellarische Herleitung und Beispiele.
+- `docs/Anschreibetabelle_3_und_4_Spieler.md` enthält die tabellarische Herleitung und Beispiele.
 - `features/` enthält die normative Gherkin-Spezifikation, die dieses Regelwerk in ausführbare BDD-Szenarien übersetzt.
 - `docs/gherkin-step-phrase-reference-v1.md` enthält die kanonischen Step-Phrasen zur Implementierung der Szenarien.
 - `docs/development-approach-v1.md` benennt dieses Dokument als normative Quelle für alle Domänenlogik-Implementierungen.

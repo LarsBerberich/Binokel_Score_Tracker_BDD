@@ -553,7 +553,7 @@ class SpielmacherMSInvarianteApiTest(TestCase):
     - Doppeltes Abgehen: spielmacher_punkte == 0; M|S tragen die roh erfassten
       (fachlich verfallenen) Werte als Korrektur-Beleg (FND-004).
     - Einfaches Abgehen und Tausender: alle drei Werte 0.
-    Normativ: docs/Anschreibetabelle_4_Spieler.md §5.
+    Normativ: docs/Anschreibetabelle_3_und_4_Spieler.md §5.
     """
 
     def setUp(self):
@@ -682,7 +682,7 @@ class RundenhistorieApiTest(TestCase):
     """
     GET /api/spiele/{id}/runden/ liefert die zweizeilige Anschreibetabelle:
     je Runde die M|S|Mit-Aufschlüsselung pro Spieler plus den kumulierten STAND
-    (normativ: docs/Anschreibetabelle_4_Spieler.md §5). Der letzte STAND je Spieler
+    (normativ: docs/Anschreibetabelle_3_und_4_Spieler.md §5). Der letzte STAND je Spieler
     muss `punktestaende_laden` entsprechen (HOCH-4).
     """
 

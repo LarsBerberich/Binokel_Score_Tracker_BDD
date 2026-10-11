@@ -23,7 +23,7 @@ function zelle(rolle: SpielerRolle, teil: Partial<RundenhistorieZelle> = {}): Ru
 }
 
 /**
- * Beispiel nach docs/Anschreibetabelle_4_Spieler.md §5 (Spieler A–D):
+ * Beispiel nach docs/Anschreibetabelle_3_und_4_Spieler.md §5 (Spieler A–D):
  * R1 gewonnen (D Schneider), R2 einfaches Abgehen (C verliert), R3 Tausender (D ★).
  */
 const runde1: RundenhistorieRunde = {

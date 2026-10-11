@@ -93,7 +93,7 @@ paths:
       description: >-
         Liefert je Runde die getrennte M|S|Mit-Aufschlüsselung pro Spieler und
         den kumulierten STAND-Zwischenstand (zweizeilige Anschreibetabelle,
-        normativ: docs/Anschreibetabelle_4_Spieler.md §5). Ohne Runden wird eine
+        normativ: docs/Anschreibetabelle_3_und_4_Spieler.md §5). Ohne Runden wird eine
         leere Historie mit 200 geliefert (kein 404). Die letzte STAND-Zeile
         entspricht garantiert `punktestaendeLaden`.
       responses:

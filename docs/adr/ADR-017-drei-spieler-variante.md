@@ -60,8 +60,9 @@ Siegerermittlung bleiben unverändert. Fest verdrahtet war die Spielerzahl nur a
 - **Spielerzahl nachträglich nicht änderbar:** Ein angelegtes Spiel behält seine Variante.
 - **Bestehende 4-Spieler-Spiele** bleiben unverändert (Variante ergibt sich aus der Anzahl der
   gespeicherten Spieler; keine Datenmigration nötig).
-- **Dateiname `Anschreibetabelle_4_Spieler.md`** ist nun missverständlich; er bleibt zugunsten
-  stabiler Verweise erhalten, das Dokument erhält einen Abschnitt für die Drei-Spieler-Tabelle.
+- **Dateiname:** `Anschreibetabelle_4_Spieler.md` wäre nach dieser Änderung missverständlich gewesen.
+  Das Dokument heißt jetzt `Anschreibetabelle_3_und_4_Spieler.md` (alle Verweise wurden angepasst)
+  und enthält in §6 die Drei-Spieler-Tabelle.
 - **Strengere Validierung beim Anlegen (Folge der Umsetzung):** Bisher lehnte nur die Korrektur
   (PUT) „Spielmacher = Geber" ab; das Anlegen (POST) prüfte keine Rollen, und nur das Frontend
   verhinderte den Fall. Die Lesepfade (Sterne, Anschreibetabelle) leiten die Gegenspieler jedoch

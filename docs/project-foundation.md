@@ -453,7 +453,7 @@ Dokumentation soll leichtgewichtig, aber bewusst gepflegt werden.
 - `docs/ubiquitous-language.md` – gemeinsame Fachsprache des Projekts
 - `docs/language-conventions.md` – Konventionen für Benennung in Dokumentation, Gherkin und Code
 - `docs/glossar.md` – Abkürzungen und technische Fachbegriffe (Nachschlagewerk)
-- `docs/Anschreibetabelle_4_Spieler.md` – tabellarische Herleitung der Wertungslogik mit Beispielen
+- `docs/Anschreibetabelle_3_und_4_Spieler.md` – tabellarische Herleitung der Wertungslogik mit Beispielen
 
 #### BDD und Testspezifikation
 

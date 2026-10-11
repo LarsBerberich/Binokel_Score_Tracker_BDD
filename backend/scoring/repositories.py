@@ -345,7 +345,7 @@ def _runde_beitrag(runde: RundeModel) -> dict[str, int]:
     die laufende STAND-Zeile der Anschreibetabelle (laufende Summe je Runde), damit
     beide garantiert identisch rechnen (HOCH-4).
 
-    Wertungsregeln (normativ: docs/rule-set-v1.md, docs/Anschreibetabelle_4_Spieler.md §4):
+    Wertungsregeln (normativ: docs/rule-set-v1.md, docs/Anschreibetabelle_3_und_4_Spieler.md §4):
     - Gewonnenes Spiel:       Spielmacher +spielmacher_punkte.
     - Einfaches/Doppeltes Abgehen: Spielmacher +verlustwert (negativ).
     - Tausender:              Kein numerischer Einfluss (leerer Beitrag).
@@ -445,7 +445,7 @@ def sterne_laden(spiel_id: int) -> dict[str, int]:
 
 def rundenhistorie_laden(spiel_id: int) -> dict:
     """
-    Baut die zweizeilige Anschreibetabelle (docs/Anschreibetabelle_4_Spieler.md §5).
+    Baut die zweizeilige Anschreibetabelle (docs/Anschreibetabelle_3_und_4_Spieler.md §5).
 
     Je Runde eine Rundenzeile (M | S | Mit pro Spieler, Verlustwert beim
     verlierenden Spielmacher, Stern bei Tausender, „setzt aus" für den aussetzenden

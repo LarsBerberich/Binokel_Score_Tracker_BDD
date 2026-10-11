@@ -392,7 +392,7 @@ Dies hilft dabei, fachliche Bedeutung von bloßen Zahlenwerten zu trennen.
 ### 4.24 Anschreibetabelle
 
 Die **Anschreibetabelle** ist die tabellarische Verlaufsdarstellung aller Runden eines Spiels
-(`docs/Anschreibetabelle_4_Spieler.md` §5). Jede Runde belegt zwei Zeilen: die **Rundenzeile**
+(`docs/Anschreibetabelle_3_und_4_Spieler.md` §5). Jede Runde belegt zwei Zeilen: die **Rundenzeile**
 mit der getrennten Erfassung `M | S | Mit` (Meldepunkte | Stichpunkte | Mitpunkte) je Spieler und
 die **STAND-Zeile** mit dem kumulierten Kontostand. Bei Spielverlust des Spielmachers steht der
 eingeklammerte Verlustwert `(-x)` im ersten Feld; bei Tausender erscheint ein Stern `★` und der

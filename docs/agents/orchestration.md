@@ -172,7 +172,7 @@ Rückgabe-Artefakt:
 
 - Manuelles/exploratives Durchspielen der App (Pairing mit dem Nutzer)
 - Selbstständiger Testlauf: behave, Django-Tests, Vitest und Playwright-Smoke ausführen und auswerten
-- Regelabgleich der laufenden App gegen `docs/rule-set-v1.md` und `docs/Anschreibetabelle_4_Spieler.md`
+- Regelabgleich der laufenden App gegen `docs/rule-set-v1.md` und `docs/Anschreibetabelle_3_und_4_Spieler.md`
 - Reproduktion eines gemeldeten Defekts (Repro-Test), UX-Findings sammeln
 - **Nicht** für Feature-Fixes: bestätigte Bugs übergibt der Tester-Agent an den Coding-Agenten
 

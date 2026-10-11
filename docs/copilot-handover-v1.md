@@ -9,7 +9,7 @@ Die folgende Priorität gilt bei fachlichen Unklarheiten:
 1. `docs/rule-set-v1.md`
 2. `docs/ubiquitous-language.md`
 3. `docs/language-conventions.md`
-4. `docs/Anschreibetabelle_4_Spieler.md`
+4. `docs/Anschreibetabelle_3_und_4_Spieler.md`
 
 ## Engineering-Dokumente
 Für Entwicklungsprozess und technische Entscheidungen:
@@ -196,7 +196,7 @@ unabhängiges Orakel (`features/steps/http_helfer.py`, `_aktive` in `tests.py`),
 der geprüften Domänenfunktion.
 
 **Doku:** `rule-set-v1.md` (§2, §3.4 neu, §4, §9.3, §15.3, §18.1), ADR-017, `ubiquitous-language.md`
-(§4.4, §4.5, §4.28 neu), `Anschreibetabelle_4_Spieler.md` (§6 mit Drei-Spieler-Beispiel),
+(§4.4, §4.5, §4.28 neu), `Anschreibetabelle_3_und_4_Spieler.md` (§6 mit Drei-Spieler-Beispiel),
 `gherkin-step-phrase-reference-v1.md`, `datenmodell-v1.puml`, OpenAPI.
 
 **Nicht gemacht / bewusst offen:** Die Spielerzahl eines laufenden Spiels ist nicht änderbar.
