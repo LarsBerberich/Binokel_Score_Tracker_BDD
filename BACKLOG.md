@@ -471,7 +471,7 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
 - [ ] **TASK-ARCH-002** Restliche Konformitätsbefunde bewerten und einplanen (**Prio niedrig**)
   - F-03 Vertrag ohne Maschinenprüfung (OpenAPI ↔ `types.ts`), F-04 Regeln doppelt implementiert,
     F-05 offene Schreib-API (Rate-Limiting, nicht erratbare Spiel-IDs), F-06 Observability,
-    F-07 Backup/Rollback-Doku, F-09 große Dateien. F-01/F-02/F-08 sind in Arbeit bzw. erledigt.
+    F-07 Backup/Rollback-Doku, F-09 große Dateien. F-01/F-02/F-08 sind erledigt (11.10.2026).
 
 ---
 
@@ -564,6 +564,7 @@ dann realer Produktions-Deploy** (reale Domain, ohne `CERTBOT_STAGING`).
 | ADR-015 | Korrektur: nur die letzte Runde bearbeitbar |
 | ADR-016 | Tausender außer Konkurrenz: Sequenz vs. gezählte Spielrunde |
 | ADR-017 | Drei-Spieler-Variante: Geber spielt mit |
+| ADR-018 | Architektur-Fitness-Functions in der CI (import-linter, dependency-cruiser) |
 
 ---
 
