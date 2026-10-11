@@ -285,7 +285,11 @@ BOOTSTRAP
     # /etc/letsencrypt/options-ssl-nginx.conf und ssl-dhparams.pem an, die das
     # vollständige Template per include benötigt. $CERTBOT_STAGING_FLAG ist im
     # Trockenlauf "--staging" (Test-CA), sonst leer (Produktions-CA).
-    certbot --nginx "${CERTBOT_DOMAIN_ARGS[@]}" --non-interactive --agree-tos \
+    # --cert-name erzwingt die Lineage live/$DOMAIN/, die das Template erwartet.
+    # Ohne den Parameter stößt Certbot bei einem bestehenden Zertifikat mit nur einem
+    # Teil der Namen im Non-Interactive-Modus auf eine Rückfrage und bricht ab.
+    certbot --nginx "${CERTBOT_DOMAIN_ARGS[@]}" --cert-name "$DOMAIN" \
+        --non-interactive --agree-tos \
         --email "admin@$DOMAIN" --redirect $CERTBOT_STAGING_FLAG
 fi
 
