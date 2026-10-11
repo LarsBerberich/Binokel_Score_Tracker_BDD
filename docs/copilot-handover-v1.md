@@ -93,6 +93,24 @@ Nicht Teil von V1 sind insbesondere:
 - Sterne nur als Zusatzinformation
 - Ausgang wird explizit als gewonnen oder verloren erfasst
 
+## Stand 10.10.2026 (abends) — Deploy `8997fbb` live und vom Nutzer geprüft
+
+**Deployt:** Push `301397e..8997fbb` (Stichwert-Fix FND-010; Abrechnung, Endabrechnung, Sternesumme),
+CI grün, CD nach Freigabe **erfolgreich**. In der Produktion geprüft: `/health/` und `/` liefern 200,
+die Rundenhistorie liefert die neuen Felder `sterne`, `zu_zahlen_cent` und `ist_geber`.
+
+**Live-Funktionalität vom Nutzer geprüft (10.10.2026): funktioniert wie gewollt.** Der zwischenzeitlich
+offene Punkt „Endabrechnung in der Produktion ansehen“ ist damit erledigt.
+
+**Zu wissen:** In der Produktion liegt ein **Testspiel (Spiel 10, Anna/Bernd/Carla)**; die App kann
+nichts löschen, es bleibt dort stehen. Daneben liegen **echte Spiele** (z. B. Spiel 1: Lars, Mario,
+Jens, Volker) — nicht anfassen.
+
+**Plannotator gegen die Live-Seite:** `--app` akzeptiert nur Loopback-Adressen. Lösung: ein lokaler
+Durchreiche-Proxy auf `127.0.0.1:8090`, der Seite und API unverändert von `api.bebe-soft.de`
+weiterreicht; Plannotator öffnet dann `http://127.0.0.1:8090/spiel/<id>`. Schreibende Aufrufe in der
+Sitzung landen in der Produktion. (Der Proxy war ein Wegwerf-Skript und ist nicht im Repo.)
+
 ## Stand 10.10.2026 — Feedback aus der Plannotator-Session: Stichwert-0-Fix und Abrechnung
 
 Beide Anmerkungen stammen aus einem geführten Durchspielen der Live-App; beide wurden test-first

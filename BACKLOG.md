@@ -7,7 +7,11 @@
 
 ## ▶ Aktueller Fokus
 
-> **Zuletzt (10.10.2026):** Zwei Anmerkungen aus der Plannotator-Session umgesetzt (test-first):
+> **▶ Nächster Schritt (Stand 10.10.2026 abends):** Deploy `8997fbb` ist live und vom Nutzer
+> geprüft (funktioniert wie gewollt). Weiter mit dem Domain-Cutover `TASK-CI-011` M4 (ab Schritt 2;
+> DNS-A-Record ist gesetzt). Befehle auf der VM gibt der Nutzer selbst ein.
+
+> **Davor (10.10.2026):** Zwei Anmerkungen aus der Plannotator-Session umgesetzt (test-first):
 > **FND-010** behoben (dritter Stichwert bei eingegebener 0) und neue **Abrechnung** unter dem
 > STAND (**TASK-021**, rule-set §20: 5 Cent je 10 Punkte Differenz zum Höchststand, in ganzen Cent im
 > Backend). Behave 66 / Django 98 / Vitest 128, Build grün. Zusätzlich: Listen „Punktestand“
